@@ -63,7 +63,11 @@ export const tileFor = (index: number, item: LibraryItem): LibraryTile => {
   const column = index % 3;
   const row = Math.floor(index / 3);
   const type = item.itemType as LibraryFilter;
-  const portrait = type === "anime" || type === "book";
+  const portrait =
+    type === "anime" ||
+    type === "book" ||
+    (type === "game" &&
+      (item.sourceId === "bangumi" || item.sourceKind === "bangumiGames"));
   const square = type === "music";
   return {
     id: item.id,

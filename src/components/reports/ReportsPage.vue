@@ -44,7 +44,7 @@ const stageHeroNames: Record<string, string> = {
   mal: "MyAnimeList",
   netease: "NetEase",
   psn: "PlayStation",
-  qq: "QQ",
+  qqmusic: "QQ music",
   steam: "Steam",
   x: "X",
   xbox: "Xbox",

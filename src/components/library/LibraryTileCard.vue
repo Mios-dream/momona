@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { computed } from 'vue';
 import type { LibraryTile } from '../../data/types';
 import FallbackImage from '../app/FallbackImage.vue';
 import IconGlyph from '../app/IconGlyph.vue';
@@ -12,6 +13,21 @@ interface Props {
 }
 
 const props = defineProps<Props>();
+
+const tileType = computed(() => props.tile.tag.trim().toLowerCase());
+const isGame = computed(() => tileType.value === 'game');
+const isMusic = computed(() => tileType.value === 'music');
+const isVideo = computed(() => tileType.value === 'video');
+const isBangumiGame = computed(
+  () =>
+    isGame.value &&
+    (props.tile.sourceId === 'bangumi' || props.tile.sourceKind === 'bangumiGames'),
+);
+const brandSourceIds = new Set(['bangumi', 'bilibili', 'netease', 'qqmusic', 'github']);
+const platformIconId = computed(() => {
+  const sourceId = props.tile.sourceId;
+  return sourceId && brandSourceIds.has(sourceId) ? sourceId : null;
+});
 </script>
 
 <template>
@@ -23,6 +39,10 @@ const props = defineProps<Props>();
       {
         'is-portrait': props.tile.height > props.tile.width * 1.25,
         'is-square': Math.abs(props.tile.width - props.tile.height) < 12,
+        'is-game': isGame,
+        'is-bangumi-game': isBangumiGame,
+        'is-music': isMusic,
+        'is-video': isVideo,
       },
     ]"
     :aria-label="props.tile.title"
@@ -33,25 +53,29 @@ const props = defineProps<Props>();
       :alt="props.tile.title"
       :fallback-icon="props.tile.icon"
       :icon-size="38"
+      :show-loading-skeleton="true"
       :referrer-policy="props.tile.sourceId === 'bilibili' ? 'no-referrer' : undefined"
       :draggable="false"
     />
-    <span class="tile-wash" aria-hidden="true"></span>
-    <span class="tile-source" :aria-label="props.sourceLabel" :title="props.sourceLabel">
+    <span
+      class="tile-source"
+      :class="`source-${props.tile.sourceId ?? 'manual'}`"
+      :aria-label="props.sourceLabel"
+      :title="props.sourceLabel"
+    >
       <ReportPlatformIcon
-        v-if="props.tile.sourceId === 'netease' || props.tile.sourceId === 'qqmusic'"
-        :platform-id="props.tile.sourceId"
-        :size="12"
+        v-if="platformIconId"
+        :platform-id="platformIconId"
+        :size="14"
       />
       <IconGlyph v-else :name="props.tile.icon" :size="12" />
-      {{ props.sourceLabel }}
+      <span class="tile-source-label">{{ props.sourceLabel }}</span>
     </span>
     <div class="tile-caption">
       <strong>{{ props.tile.title }}</strong>
-      <span v-if="props.tile.subtitle && !['Bilibili', 'Netease'].includes(props.tile.subtitle)">
+      <span v-if="props.tile.subtitle && !isVideo">
         {{ props.tile.subtitle }}
       </span>
-      <em>{{ props.tile.tag }}</em>
     </div>
   </article>
 </template>
@@ -69,24 +93,23 @@ const props = defineProps<Props>();
   isolation: isolate;
   pointer-events: auto;
   transition: box-shadow 0.2s ease,
-    transform 0.2s ease,
-    filter 0.2s ease;
+    transform 0.24s cubic-bezier(0.22, 0.72, 0.22, 1);
   will-change: transform;
 }
 
 .library-tile:hover {
   z-index: 6;
   box-shadow: 0 19px 34px rgba(54, 45, 106, 0.3);
-  filter: saturate(1.06);
-  transform: translateY(-4px) rotate(-0.4deg);
+  transform: translate3d(0, -5px, 0);
 }
 
-.tile-image,
-.tile-wash {
+.tile-image {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
+  --app-image-transform-duration: 0.52s;
+  --app-image-transform-timing: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tile-image {
@@ -94,29 +117,14 @@ const props = defineProps<Props>();
   user-select: none;
 }
 
-.tile-wash {
-  z-index: 1;
-  background: linear-gradient(180deg, rgba(30, 37, 66, 0.04) 23%, rgba(14, 19, 38, 0.65) 100%);
+.tile-image :deep(img) {
+  transform: scale(1);
+  transform-origin: center;
+  transition: transform 0.52s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-.tone-cyan .tile-wash {
-  background: linear-gradient(180deg, rgba(22, 190, 216, 0.06), rgba(18, 45, 83, 0.7));
-}
-
-.tone-pink .tile-wash {
-  background: linear-gradient(180deg, rgba(247, 95, 170, 0.04), rgba(67, 31, 72, 0.68));
-}
-
-.tone-violet .tile-wash {
-  background: linear-gradient(180deg, rgba(119, 89, 233, 0.03), rgba(39, 33, 77, 0.72));
-}
-
-.tone-cream .tile-wash {
-  background: linear-gradient(180deg, rgba(255, 202, 85, 0.02), rgba(65, 45, 30, 0.66));
-}
-
-.tone-dark .tile-wash {
-  background: linear-gradient(180deg, rgba(9, 16, 36, 0.05), rgba(8, 14, 28, 0.78));
+.library-tile:hover .tile-image :deep(img) {
+  transform: scale(1.035);
 }
 
 .tile-source {
@@ -134,24 +142,43 @@ const props = defineProps<Props>();
   border: 1px solid rgba(255, 255, 255, 0.6);
   border-radius: 50%;
   color: rgba(36, 49, 69, 0.8);
-  background: rgba(229, 247, 250, 0.72);
+  background: rgba(229, 247, 250, 0.94);
   font-size: 0;
   font-weight: 700;
   line-height: 1;
-  backdrop-filter: blur(8px);
 }
 
 .tone-pink .tile-source {
-  background: rgba(255, 231, 243, 0.76);
+  background: rgba(255, 231, 243, 0.94);
 }
 
 .tone-violet .tile-source {
-  background: rgba(239, 235, 255, 0.78);
+  background: rgba(239, 235, 255, 0.94);
 }
 
 .tone-dark .tile-source {
   color: rgba(255, 255, 255, 0.88);
-  background: rgba(27, 36, 58, 0.72);
+  background: rgba(27, 36, 58, 0.94);
+}
+
+.source-bangumi {
+  color: #dd6b77;
+}
+
+.source-bilibili {
+  color: #00aeec;
+}
+
+.source-netease {
+  color: #d43c33;
+}
+
+.source-qqmusic {
+  color: #18a957;
+}
+
+.source-github {
+  color: #24292f;
 }
 
 .tile-caption {
@@ -169,9 +196,9 @@ const props = defineProps<Props>();
   border: 1px solid rgba(255, 255, 255, 0.54);
   border-radius: 8px;
   color: #172338;
-  background: rgba(244, 247, 251, 0.78);
+  background: rgba(244, 247, 251, 0.94);
   box-shadow: 0 5px 13px rgba(18, 29, 55, 0.08);
-  backdrop-filter: blur(10px) saturate(135%);
+  transition: opacity 0.22s ease, transform 0.22s ease;
 }
 
 .tile-caption strong,
@@ -196,18 +223,26 @@ const props = defineProps<Props>();
   line-height: 1.15;
 }
 
-.tile-caption em {
-  display: inline-flex;
-  margin-top: 2px;
-  padding: 3px 5px;
-  border-radius: 5px;
-  color: rgba(192, 53, 112, 0.9);
-  background: rgba(252, 221, 235, 0.88);
-  font-size: clamp(0.42rem, 0.57vw, 0.52rem);
-  font-style: normal;
-  font-weight: 700;
-  line-height: 1;
+.tile-source-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
   white-space: nowrap;
+  border: 0;
+}
+
+.is-music .tile-caption {
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+
+.is-music:hover .tile-caption {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .tone-dark .tile-caption {
@@ -217,11 +252,6 @@ const props = defineProps<Props>();
 
 .tone-dark .tile-caption span {
   color: rgba(236, 241, 255, 0.7);
-}
-
-.tone-dark .tile-caption em {
-  color: rgba(222, 233, 255, 0.9);
-  background: rgba(90, 109, 143, 0.64);
 }
 
 .is-portrait .tile-caption {
@@ -237,6 +267,13 @@ const props = defineProps<Props>();
 
 .is-square .tile-caption strong {
   font-size: clamp(0.48rem, 0.67vw, 0.61rem);
+}
+
+.is-game .tile-caption {
+  right: auto;
+  width: fit-content;
+  max-width: calc(100% - 16px);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 @media (max-width: 820px) {
@@ -262,9 +299,28 @@ const props = defineProps<Props>();
     font-size: 0.5rem;
   }
 
-  .tile-caption span,
-  .tile-caption em {
+  .tile-caption span {
     font-size: 0.4rem;
+  }
+
+  .is-game .tile-caption {
+    max-width: calc(100% - 12px);
+  }
+}
+
+@media (hover: none) {
+  .is-music .tile-caption {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library-tile,
+  .tile-image :deep(img),
+  .tile-caption {
+    transition: none;
   }
 }
 </style>

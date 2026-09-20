@@ -35,7 +35,7 @@ export const usePanZoom = () => {
 
   /** 画布当前的 CSS 变换。 */
   const canvasStyle = computed(() => ({
-    transform: `translate3d(${offsetX.value}px, ${offsetY.value}px, 0) scale(${scale.value})`,
+    transform: `translate3d(calc(-50% + ${offsetX.value}px), calc(-50% + ${offsetY.value}px), 0) scale(${scale.value})`,
   }));
 
   /** 当前缩放百分比，供工具条显示。 */

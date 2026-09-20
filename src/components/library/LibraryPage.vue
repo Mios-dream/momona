@@ -101,6 +101,9 @@ const getGridSize = (tile: LibraryTile): { w: number; h: number } => {
   if (filterTags.anime.includes(type)) return { w: 1, h: 2 };
   if (filterTags.book.includes(type)) return { w: 1, h: 2 };
   if (filterTags.game.includes(type)) {
+    if (tile.sourceId === "bangumi" || tile.sourceKind === "bangumiGames") {
+      return { w: 1, h: 2 };
+    }
     const ratio = tile.width / Math.max(tile.height, 1);
     return ratio >= 1.15 ? { w: 2, h: 1 } : { w: 1, h: 2 };
   }
@@ -142,6 +145,18 @@ const buildSpatialIndex = (
 };
 
 const getSourceLabel = (tile: LibraryTile): string => {
+  const sourceLabels: Partial<Record<NonNullable<LibraryTile["sourceId"]>, string>> = {
+    bangumi: "Bangumi",
+    bilibili: "Bilibili",
+    github: "GitHub",
+    netease: "网易云音乐",
+    qqmusic: "QQ 音乐",
+    manual: "手动内容",
+  };
+  if (tile.sourceId && sourceLabels[tile.sourceId]) {
+    return sourceLabels[tile.sourceId] as string;
+  }
+
   const subtitle = tile.subtitle.toLowerCase();
   if (tile.sourceId === "qqmusic" || subtitle.includes("qq 音乐")) {
     return "QQ 音乐";
@@ -471,6 +486,10 @@ onBeforeUnmount(() => {
 .library-canvas-card > .library-tile {
   width: 100%;
   height: 100%;
+}
+
+.library-canvas-card:hover {
+  z-index: 40 !important;
 }
 
 .library-help-tip {
