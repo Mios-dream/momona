@@ -22,6 +22,8 @@ const sourceIds: DataSourceId[] = [
   "github",
   "netease",
   "qqmusic",
+  "steam",
+  "sfacg",
 ];
 const sourcesDirectory = resolve(process.cwd(), ".momona", "sources");
 const statusPath = resolve(process.cwd(), ".momona", "source-status.json");

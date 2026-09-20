@@ -15,7 +15,9 @@ export type DataSourceId =
   | "bilibili"
   | "github"
   | "netease"
-  | "qqmusic";
+  | "qqmusic"
+  | "steam"
+  | "sfacg";
 
 /** 远程来源写入资料库时使用的稳定内容类别。 */
 export type SourceContentKey =
@@ -31,7 +33,10 @@ export type SourceContentKey =
   | "neteaseCollected"
   | "qqmusicLiked"
   | "qqmusicCreated"
-  | "qqmusicCollected";
+  | "qqmusicCollected"
+  | "steamRecentGames"
+  | "steamLibrary"
+  | "sfacgBooks";
 
 /** 公开的 Hoyoverse 游戏标识，与参考站的 Game Presence 配置保持一致。 */
 export type HoyoGame = "genshin" | "hsr" | "zzz";
@@ -300,6 +305,9 @@ export interface SourceContentConfig {
   qqmusicLiked: boolean;
   qqmusicCreated: boolean;
   qqmusicCollected: boolean;
+  steamRecentGames: boolean;
+  steamLibrary: boolean;
+  sfacgBooks: boolean;
   githubRepositories: boolean;
   githubRepositoryScope: GitHubRepositoryScope;
   githubRepositorySort: GitHubRepositorySort;

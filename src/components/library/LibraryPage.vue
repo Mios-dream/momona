@@ -151,6 +151,8 @@ const getSourceLabel = (tile: LibraryTile): string => {
     github: "GitHub",
     netease: "网易云音乐",
     qqmusic: "QQ 音乐",
+    steam: "Steam",
+    sfacg: "SFACG",
     manual: "手动内容",
   };
   if (tile.sourceId && sourceLabels[tile.sourceId]) {

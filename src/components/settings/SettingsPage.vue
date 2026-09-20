@@ -143,6 +143,49 @@ const sourceCards: SourceCard[] = [
     ],
   },
   {
+    id: "steam",
+    title: "Steam",
+    description: "最近游玩、游戏库",
+    hint: "公开个人页可以读取最近游戏和近两周时长；完整游戏库需要 Steam Web API Key。",
+    accountLabel: "个人页 URL 或 SteamID64",
+    accountKey: "username",
+    placeholder: "例如：76561198863810095 或 Steam 个人页链接",
+    token: true,
+    icon: "game",
+    contentHint: "无 Key 时使用公开个人页的最近游戏；填写 Key 后可同步完整游戏库。",
+    contentOptions: [
+      {
+        key: "steamRecentGames",
+        label: "最近游玩",
+        description: "最近游戏、近两周时长和最后游玩日期",
+      },
+      {
+        key: "steamLibrary",
+        label: "游戏库",
+        description: "Steam 账号拥有的游戏及累计游玩时长",
+      },
+    ],
+  },
+  {
+    id: "sfacg",
+    title: "SFACG",
+    description: "菠萝包轻小说开放书架",
+    hint: "只读取公开书架页面，不需要登录；请输入 p.sfacg.com 的书架地址。",
+    accountLabel: "开放书架地址",
+    accountKey: "username",
+    placeholder: "例如：https://p.sfacg.com/p/8933368/",
+    token: false,
+    icon: "bookMarked",
+    contentHint: "公开书架中的小说会作为书籍写入资料库。",
+    contentOptions: [
+      {
+        key: "sfacgBooks",
+        label: "开放书架作品",
+        description: "书架中的小说标题、作者和封面",
+      },
+    ],
+  },
+  {
     id: "netease",
     title: "网易云音乐",
     description: "喜欢、创建、收藏歌单",
@@ -231,6 +274,8 @@ const sourceBusy = ref<Record<DataSourceId, boolean>>({
   github: false,
   netease: false,
   qqmusic: false,
+  steam: false,
+  sfacg: false,
 });
 const gameBusy = ref(false);
 const gameError = ref("");
@@ -281,6 +326,8 @@ function emptySourceSnapshotStatuses(): Record<
     github: emptySourceSnapshotInfo("github"),
     netease: emptySourceSnapshotInfo("netease"),
     qqmusic: emptySourceSnapshotInfo("qqmusic"),
+    steam: emptySourceSnapshotInfo("steam"),
+    sfacg: emptySourceSnapshotInfo("sfacg"),
   };
 }
 
@@ -956,10 +1003,14 @@ const statusClass = (status?: ProviderStatus): string =>
                       : source.id === 'github'
                         ? 'https://api.github.com'
                         : source.id === 'netease'
-                          ? 'https://music.163.com/api'
-                          : source.id === 'qqmusic'
-                            ? 'https://c.y.qq.com'
-                            : 'https://api.bilibili.com'
+                            ? 'https://music.163.com/api'
+                            : source.id === 'qqmusic'
+                              ? 'https://c.y.qq.com'
+                            : source.id === 'steam'
+                                ? 'https://steamcommunity.com'
+                                : source.id === 'sfacg'
+                                  ? 'https://p.sfacg.com'
+                                : 'https://api.bilibili.com'
                   "
               /></label>
               <label v-if="source.token" class="settings-field-wide"
@@ -967,7 +1018,11 @@ const statusClass = (status?: ProviderStatus): string =>
                   v-model="config.sources[source.id].token"
                   type="password"
                   autocomplete="off"
-                  placeholder="可选，用于提高 GitHub 限额"
+                  :placeholder="
+                    source.id === 'steam'
+                      ? '可选，Steam Web API Key，用于完整游戏库'
+                      : '可选，用于提高 GitHub 限额'
+                  "
               /></label>
             </div>
             <div class="settings-content-options">

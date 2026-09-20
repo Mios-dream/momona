@@ -23,7 +23,7 @@ const isBangumiGame = computed(
     isGame.value &&
     (props.tile.sourceId === 'bangumi' || props.tile.sourceKind === 'bangumiGames'),
 );
-const brandSourceIds = new Set(['bangumi', 'bilibili', 'netease', 'qqmusic', 'github']);
+const brandSourceIds = new Set(['bangumi', 'bilibili', 'netease', 'qqmusic', 'github', 'steam', 'sfacg']);
 const platformIconId = computed(() => {
   const sourceId = props.tile.sourceId;
   return sourceId && brandSourceIds.has(sourceId) ? sourceId : null;
@@ -179,6 +179,14 @@ const platformIconId = computed(() => {
 
 .source-github {
   color: #24292f;
+}
+
+.source-steam {
+  color: #1b75bb;
+}
+
+.source-sfacg {
+  color: #d56b8b;
 }
 
 .tile-caption {

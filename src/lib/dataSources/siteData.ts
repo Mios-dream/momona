@@ -31,6 +31,8 @@ export const sourceLabels: Record<DataSourceId, string> = {
   github: "GitHub",
   netease: "网易云音乐",
   qqmusic: "QQ 音乐",
+  steam: "Steam",
+  sfacg: "SFACG",
 };
 
 export const sourceLabel = (sourceId: DataSourceId): string =>
@@ -128,7 +130,14 @@ const reportPlatformsWithData = (
     return card;
   });
 
-  const sourceCards = (["bangumi", "bilibili", "netease", "qqmusic"] as const).flatMap((sourceId) => {
+  const sourceCards = ([
+    "bangumi",
+    "bilibili",
+    "netease",
+    "qqmusic",
+    "steam",
+    "sfacg",
+  ] as const).flatMap((sourceId) => {
     const items = libraryTiles.filter((tile) => tile.sourceId === sourceId);
     if (!items.length) return [];
     const counts = items.reduce<Record<string, number>>((result, tile) => {
@@ -138,13 +147,52 @@ const reportPlatformsWithData = (
     }, {});
     const label = sourceLabel(sourceId);
     const first = items[0];
+    const recentSteamCount = items.filter(
+      (item) =>
+        item.sourceKind === "steamRecentGames" ||
+        item.subtitle.includes("近两周"),
+    ).length;
+    const recentSteamHours = items.reduce((total, item) => {
+      const match = item.subtitle.match(/近两周\s+([\d.]+)\s+小时/);
+      return total + (match ? Number(match[1]) : 0);
+    }, 0);
     const primaryCount =
       sourceId === "bangumi"
         ? counts.game ?? counts.anime ?? counts.book ?? 0
         : sourceId === "bilibili"
           ? counts.video ?? 0
-          : counts.music ?? 0;
+          : sourceId === "steam"
+            ? recentSteamCount
+            : sourceId === "sfacg"
+              ? counts.book ?? 0
+              : counts.music ?? 0;
     const categoryCount = new Set(items.map((item) => item.sourceKind)).size;
+    const secondaryCount =
+      sourceId === "steam"
+        ? recentSteamHours.toFixed(1)
+        : sourceId === "netease" || sourceId === "qqmusic"
+          ? String(categoryCount)
+          : sourceId === "sfacg"
+            ? String(categoryCount)
+            : String(counts.music ?? counts.book ?? 0);
+    const secondaryLabel =
+      sourceId === "steam"
+        ? "近两周小时"
+        : sourceId === "sfacg" ||
+            sourceId === "netease" ||
+            sourceId === "qqmusic"
+          ? "分类"
+          : "其他";
+    const primaryLabel =
+      sourceId === "bangumi"
+        ? "主类"
+        : sourceId === "bilibili"
+          ? "视频"
+          : sourceId === "sfacg"
+            ? "小说"
+            : sourceId === "steam"
+              ? "最近游玩"
+              : "歌单";
     return [
       {
         id: `report-${sourceId}`,
@@ -154,22 +202,15 @@ const reportPlatformsWithData = (
         title: first.title,
         subtitle: `${items.length} 项公开内容`,
         image: first.image,
-        stats: [
-          String(items.length),
-          String(primaryCount),
-          String(sourceId === "netease" || sourceId === "qqmusic" ? categoryCount : counts.music ?? counts.book ?? 0),
-        ],
-        statLabels: [
-          "总数",
-          sourceId === "bangumi"
-            ? "主类"
-            : sourceId === "bilibili"
-              ? "视频"
-              : "歌单",
-          sourceId === "netease" || sourceId === "qqmusic" ? "分类" : "其他",
-        ],
+        stats: [String(items.length), String(primaryCount), secondaryCount],
+        statLabels: ["总数", primaryLabel, secondaryLabel],
         tags: Array.from(new Set(items.map((item) => item.tag))).slice(0, 3),
-        summary: `${label} 已同步 ${items.length} 项内容，最近一项是「${first.title}」。`,
+        summary:
+          sourceId === "steam"
+            ? `${label} 已同步 ${items.length} 个游戏，其中 ${recentSteamCount} 个最近游玩，近两周共 ${recentSteamHours.toFixed(1)} 小时。`
+            : sourceId === "sfacg"
+              ? `${label} 已同步 ${items.length} 部小说，最近一项是「${first.title}」。`
+              : `${label} 已同步 ${items.length} 项内容，最近一项是「${first.title}」。`,
       },
     ];
   });
@@ -182,6 +223,8 @@ const reportPlatformsWithData = (
           "report-bilibili",
           "report-netease",
           "report-qqmusic",
+          "report-steam",
+          "report-sfacg",
         ].includes(card.id),
     ),
     ...sourceCards,
@@ -499,6 +542,12 @@ export const hasSelectedContent = (
       content.qqmusicCollected
     );
   }
+  if (sourceId === "steam") {
+    return content.steamRecentGames || content.steamLibrary;
+  }
+  if (sourceId === "sfacg") {
+    return content.sfacgBooks;
+  }
   return content.githubRepositories;
 };
 
@@ -543,6 +592,17 @@ export const selectedContentLabel = (
     ]
       .filter(Boolean)
       .join("、");
+  }
+  if (sourceId === "steam") {
+    return [
+      content.steamRecentGames ? "最近游玩" : "",
+      content.steamLibrary ? "游戏库" : "",
+    ]
+      .filter(Boolean)
+      .join("、");
+  }
+  if (sourceId === "sfacg") {
+    return content.sfacgBooks ? "开放书架作品" : "";
   }
   if (!content.githubRepositories) return "";
   return content.githubRepositoryScope === "pinned"
@@ -626,6 +686,12 @@ export const libraryItemVisibleForConfig = (
       return config.sources.qqmusic.enabled && content.qqmusicCreated;
     case "qqmusicCollected":
       return config.sources.qqmusic.enabled && content.qqmusicCollected;
+    case "steamRecentGames":
+      return config.sources.steam.enabled && content.steamRecentGames;
+    case "steamLibrary":
+      return config.sources.steam.enabled && content.steamLibrary;
+    case "sfacgBooks":
+      return config.sources.sfacg.enabled && content.sfacgBooks;
     default:
       return config.sources[sourceId].enabled;
   }
@@ -676,6 +742,18 @@ const tileVisibleForConfig = (
       ? sources[sourceId].enabled && sources[sourceId].content[key]
       : sources[sourceId].enabled;
   }
+  if (tile.sourceId === "steam") {
+    if (tile.sourceKind === "steamRecentGames") {
+      return sources.steam.enabled && sources.steam.content.steamRecentGames;
+    }
+    if (tile.sourceKind === "steamLibrary") {
+      return sources.steam.enabled && sources.steam.content.steamLibrary;
+    }
+    return sources.steam.enabled;
+  }
+  if (tile.sourceId === "sfacg") {
+    return sources.sfacg.enabled && sources.sfacg.content.sfacgBooks;
+  }
   return true;
 };
 
@@ -714,7 +792,7 @@ const deriveSiteData = (
     : base.activities.filter(
         (activity) =>
           !activity.id.startsWith("status-") &&
-          !activity.id.startsWith("github-activity-"),
+        !activity.id.startsWith("github-activity-"),
       );
   const nextMusicCatalog = musicCatalogForConfig(musicCatalog, config);
   return mergeSiteData({

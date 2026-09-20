@@ -20,6 +20,8 @@ const sourceIds: DataSourceId[] = [
   "github",
   "netease",
   "qqmusic",
+  "steam",
+  "sfacg",
 ];
 
 type LocalCredentials = Partial<Record<DataSourceId, string>>;

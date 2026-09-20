@@ -14,6 +14,8 @@ export const dataSourceIds = [
   "github",
   "netease",
   "qqmusic",
+  "steam",
+  "sfacg",
 ] as const satisfies readonly DataSourceId[];
 
 export interface DataSyncResult {

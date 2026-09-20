@@ -25,6 +25,8 @@ const sourceIds: DataSourceId[] = [
   "github",
   "netease",
   "qqmusic",
+  "steam",
+  "sfacg",
 ];
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -73,6 +75,9 @@ const emptyContent = (): SourceContentConfig => ({
   qqmusicLiked: false,
   qqmusicCreated: false,
   qqmusicCollected: false,
+  steamRecentGames: false,
+  steamLibrary: false,
+  sfacgBooks: false,
   githubRepositories: false,
   githubRepositoryScope: "all",
   githubRepositorySort: "updated",
@@ -176,6 +181,8 @@ export const createEmptyLocalConfig = (): LocalConfig => ({
     github: emptySource(),
     netease: emptySource(),
     qqmusic: emptySource(),
+    steam: emptySource(),
+    sfacg: emptySource(),
   },
   autoRefresh: emptyAutoRefresh(),
   manualItems: [],
@@ -248,6 +255,9 @@ const normalizeSource = (value: unknown): SourceConfig => {
       qqmusicLiked: boolean("qqmusicLiked"),
       qqmusicCreated: boolean("qqmusicCreated"),
       qqmusicCollected: boolean("qqmusicCollected"),
+      steamRecentGames: boolean("steamRecentGames"),
+      steamLibrary: boolean("steamLibrary"),
+      sfacgBooks: boolean("sfacgBooks"),
       githubRepositories: boolean("githubRepositories"),
       githubRepositoryScope:
         rawContent.githubRepositoryScope === "pinned" ? "pinned" : "all",

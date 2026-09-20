@@ -1,5 +1,7 @@
 import { projectBangumiRaw, syncBangumi } from "./providers/bangumi";
 import { projectBilibiliRaw, syncBilibili } from "./providers/bilibili";
+import { projectSfacgRaw, syncSfacg } from "./providers/sfacg";
+import { projectSteamRaw, syncSteam } from "./providers/steam";
 import {
   musicUserId,
   projectMusicCatalog,
@@ -29,6 +31,10 @@ import type { DataSourceId, LocalConfig } from "../../data/types";
 const sourceIdentity = (sourceId: DataSourceId, config: LocalConfig): string =>
   sourceId === "bilibili"
     ? sourceValue(config.sources.bilibili.userId, /\/(\d+)\/?$/)
+    : sourceId === "steam"
+      ? sourceValue(config.sources.steam.username, /\/(?:profiles|id)\/([^/]+)\/?$/)
+    : sourceId === "sfacg"
+      ? sourceValue(config.sources.sfacg.username, /\/p\/(\d+)(?:\/\d+)?\/?$/)
     : sourceId === "netease" || sourceId === "qqmusic"
       ? musicUserId(
           config.sources[sourceId].username || config.sources[sourceId].userId,
@@ -83,8 +89,12 @@ export const projectSourceRaw = (
       ? projectBangumiRaw(rawData)
       : sourceId === "bilibili"
         ? projectBilibiliRaw(rawData, sourceConfig)
-        : sourceId === "netease" || sourceId === "qqmusic"
+      : sourceId === "netease" || sourceId === "qqmusic"
           ? projectMusicRaw(rawData, sourceId, sourceConfig)
+          : sourceId === "steam"
+            ? projectSteamRaw(rawData, sourceConfig)
+            : sourceId === "sfacg"
+              ? projectSfacgRaw(rawData, sourceConfig)
         : [];
   const repositories =
     sourceId === "github"
@@ -120,8 +130,12 @@ export const syncDataSource = async (
       sourceId === "bilibili"
         ? "未配置 UID"
         : sourceId === "netease" || sourceId === "qqmusic"
-          ? "未配置用户 ID"
-          : "未配置用户名",
+        ? "未配置用户 ID"
+        : sourceId === "steam"
+          ? "未配置 Steam 个人页地址或 SteamID64"
+          : sourceId === "sfacg"
+            ? "未配置 SFACG 开放书架地址"
+        : "未配置用户名",
     );
   }
 
@@ -174,6 +188,40 @@ export const syncDataSource = async (
         },
         rawData: result.rawData,
         ...(result.musicCatalog ? { musicCatalog: result.musicCatalog } : {}),
+        ...projection,
+      };
+    }
+
+    if (sourceId === "steam") {
+      const result = await syncSteam(sourceConfig);
+      const projection = projectSourceRaw(config, sourceId, result.rawData);
+      return {
+        sourceId,
+        status: {
+          id: sourceId,
+          label: sourceLabel(sourceId),
+          status: "success",
+          message: result.message,
+          count: projection.libraryItems.length,
+        },
+        rawData: result.rawData,
+        ...projection,
+      };
+    }
+
+    if (sourceId === "sfacg") {
+      const result = await syncSfacg(sourceConfig);
+      const projection = projectSourceRaw(config, sourceId, result.rawData);
+      return {
+        sourceId,
+        status: {
+          id: sourceId,
+          label: sourceLabel(sourceId),
+          status: "success",
+          message: result.message,
+          count: projection.libraryItems.length,
+        },
+        rawData: result.rawData,
         ...projection,
       };
     }
