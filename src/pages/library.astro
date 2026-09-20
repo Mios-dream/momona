@@ -1,0 +1,11 @@
+---
+import StaticLayout from '../layouts/StaticLayout.astro';
+import AppShell from '../components/app/AppShell.vue';
+import { getDataCenter } from '../lib/dataCenter';
+
+const { siteData, localConfig } = await getDataCenter();
+---
+
+<StaticLayout title="资料库 · Love on the page" description="收藏与媒体的自由画布。">
+  <AppShell page="library" siteData={siteData} localConfig={localConfig} editable={import.meta.env.DEV} client:load />
+</StaticLayout>

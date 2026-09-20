@@ -1,0 +1,11 @@
+---
+import StaticLayout from '../layouts/StaticLayout.astro';
+import AppShell from '../components/app/AppShell.vue';
+import { getDataCenter } from '../lib/dataCenter';
+
+const { siteData, localConfig } = await getDataCenter();
+---
+
+<StaticLayout title="本地设置 · Momona" description="配置数据来源和首页卡片布局。">
+  <AppShell page="settings" siteData={siteData} localConfig={localConfig} editable={import.meta.env.DEV} client:load />
+</StaticLayout>

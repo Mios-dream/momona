@@ -1,0 +1,20 @@
+---
+import StaticLayout from "../layouts/StaticLayout.astro";
+import AppShell from "../components/app/AppShell.vue";
+import { getDataCenter } from "../lib/dataCenter";
+
+const { siteData, localConfig } = await getDataCenter();
+---
+
+<StaticLayout
+  title="Love on the page · Momona"
+  description="一个静态的个人数字生活展示入口。"
+>
+  <AppShell
+    page="home"
+    siteData={siteData}
+    localConfig={localConfig}
+    editable={import.meta.env.DEV}
+    client:load
+  />
+</StaticLayout>

@@ -1,0 +1,11 @@
+---
+import StaticLayout from '../layouts/StaticLayout.astro';
+import AppShell from '../components/app/AppShell.vue';
+import { getDataCenter } from '../lib/dataCenter';
+
+const { siteData, localConfig } = await getDataCenter();
+---
+
+<StaticLayout title="Brew 阅读 · Love on the page" description="静态订阅源和文章阅读空间。">
+  <AppShell page="brew" siteData={siteData} localConfig={localConfig} editable={import.meta.env.DEV} client:load />
+</StaticLayout>

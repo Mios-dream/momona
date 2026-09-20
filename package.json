@@ -1,0 +1,32 @@
+{
+  "name": "momona",
+  "type": "module",
+  "version": "0.0.1",
+  "license": "AGPL-3.0-only",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "momona:sync": "tsx scripts/sync-data.ts",
+    "preview": "astro preview",
+    "astro": "astro"
+  },
+  "dependencies": {
+    "@astrojs/vue": "^7.0.2",
+    "@iconify/vue": "^5.0.2",
+    "@lucide/vue": "^1.45.0",
+    "astro": "^7.3.2",
+    "vue": "^3.5.42"
+  },
+  "allowScripts": {
+    "esbuild": true
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "@types/node": "^26.5.1",
+    "tsx": "^4.20.6",
+    "typescript": "^6.0.3"
+  }
+}
