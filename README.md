@@ -106,6 +106,33 @@ New-Item -ItemType Directory -Force .momona
 Copy-Item .momona/localConfig.example.json .momona/localConfig.json
 ```
 
+### 环境变量配置
+
+也可以通过 `MOMONA_CONFIG_JSON` 提供按 `LocalConfig` 结构组织的 JSON 配置。环境
+变量配置整体优先于 `.momona/localConfig.json`，缺失字段使用默认值，适合在
+GitHub Actions 等环境中由用户自行注入仓库 Secret；各数据源的凭据放在对应来源
+的 `token` 字段中：
+
+```json
+{
+  "sources": {
+    "steam": {
+      "enabled": true,
+      "username": "76561198863810095",
+      "token": "STEAM_WEB_API_KEY",
+      "content": {
+        "steamRecentGames": true,
+        "steamLibrary": true
+      }
+    }
+  }
+}
+```
+
+配置读取时会自动剥离所有 `token`，所以凭据不会进入页面数据或公开配置；执行
+数据同步时才会恢复凭据。`MOMONA_CONFIG_JSON` 只提供配置，不会让 `astro build`
+自动请求远程数据，仍需在构建前按需执行现有的 `pnpm momona:sync`。
+
 ### 开发服务器管理
 
 ```powershell

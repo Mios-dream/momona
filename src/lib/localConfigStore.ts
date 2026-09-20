@@ -13,6 +13,7 @@ const momonaPath = (...segments: string[]): string =>
 export const localConfigPath = momonaPath("localConfig.json");
 
 const credentialsPath = momonaPath("credentials.json");
+const configEnvironmentVariable = "MOMONA_CONFIG_JSON";
 
 const sourceIds: DataSourceId[] = [
   "bangumi",
@@ -34,6 +35,26 @@ const readJson = async (path: string): Promise<unknown> => {
     return JSON.parse(await readFile(path, "utf8")) as unknown;
   } catch {
     return null;
+  }
+};
+
+/** 读取 CI/构建环境提供的完整 JSON 配置；环境配置优先于本地文件。 */
+const readEnvironmentConfig = (): Partial<LocalConfig> | null => {
+  const raw = process.env[configEnvironmentVariable]?.trim();
+  if (!raw) return null;
+
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (!isRecord(parsed)) {
+      throw new Error("配置必须是 JSON 对象");
+    }
+    return parsed as Partial<LocalConfig>;
+  } catch (error) {
+    throw new Error(
+      `${configEnvironmentVariable} 不是有效 JSON：${String(
+        error instanceof Error ? error.message : error,
+      )}`,
+    );
   }
 };
 
@@ -62,9 +83,9 @@ const withoutCredentials = (config: LocalConfig): LocalConfig => {
   return publicConfig;
 };
 
-/** 读取发布配置；公开配置文件中的意外 token 也会在返回前剥离。 */
+/** 读取发布配置；环境或公开配置中的 token 都会在返回前剥离。 */
 export const readLocalConfigFile = async (): Promise<LocalConfig> => {
-  const raw = await readJson(localConfigPath);
+  const raw = readEnvironmentConfig() ?? (await readJson(localConfigPath));
   return withoutCredentials(
     normalizeLocalConfig(
       isRecord(raw) ? raw : createEmptyLocalConfig(),
@@ -72,15 +93,23 @@ export const readLocalConfigFile = async (): Promise<LocalConfig> => {
   );
 };
 
-/** 将用户输入的 token 与忽略文件中的凭据合并，仅供本地同步使用。 */
+/** 将用户输入、环境变量和忽略文件中的 token 合并，仅供同步使用。 */
 export const withLocalCredentials = async (
   config: LocalConfig,
 ): Promise<LocalConfig> => {
+  const environmentConfig = readEnvironmentConfig();
   const credentials = await readCredentials();
   const next = cloneLocalConfig(config);
   for (const sourceId of sourceIds) {
     const token = next.sources[sourceId].token.trim();
-    next.sources[sourceId].token = token || credentials[sourceId] || "";
+    const environmentToken =
+      isRecord(environmentConfig?.sources) &&
+      isRecord(environmentConfig.sources[sourceId]) &&
+      typeof environmentConfig.sources[sourceId].token === "string"
+        ? environmentConfig.sources[sourceId].token.trim()
+        : "";
+    next.sources[sourceId].token =
+      token || environmentToken || credentials[sourceId] || "";
   }
   return next;
 };
