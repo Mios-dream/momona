@@ -409,7 +409,7 @@ export function projectSfacgRaw(
 export async function syncSfacg(
   config: LocalConfig["sources"]["sfacg"],
 ): Promise<ProviderSyncData> {
-  const reference = parseSfacgShelfReference(config.username, config.endpoint);
+  const reference = parseSfacgShelfReference(config.username);
   if (!config.enabled || !reference) {
     return {
       rawData: null,

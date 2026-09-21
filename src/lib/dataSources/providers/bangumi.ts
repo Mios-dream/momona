@@ -124,10 +124,7 @@ async function mapBangumi(
       message: "未配置用户名",
     };
   }
-  const base = (config.endpoint.trim() || "https://api.bgm.tv").replace(
-    /\/$/,
-    "",
-  );
+  const base = "https://api.bgm.tv";
   const payload = await readJson(
     `${base}/v0/users/${encodeURIComponent(username)}/collections?limit=${sourceLimit(config.limit)}`,
     { headers: { Accept: "application/json" } },

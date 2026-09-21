@@ -1,37 +1,36 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import type {
   DataSourceId,
   HoyoGame,
   LocalConfig,
-  ManualLibraryItem,
   ProviderStatus,
-  RepositorySummary,
   SiteData,
   SourceSnapshotInfo,
 } from "../../data/types";
 import {
-  createManualItem,
   emptySourceSnapshotStatuses,
-  sourceCards,
   settingsTabs,
-  typeOptions,
+  sourceCards,
   type SettingsTab,
 } from "../../data/settings";
 import { cloneLocalConfig, normalizeLocalConfig } from "../../data/localConfig";
-import { sourceLabels } from "../../data/sourceCatalog";
 import {
+  selectedSourceContentLabel,
+  sourceLabels,
+} from "../../data/sourceCatalog";
+import {
+  musicPlatformLabel,
   musicResultToSettings,
   normalizeMusicPlaylist,
   parseMusicPlaylistReference,
-  musicPlatformLabel,
 } from "../../lib/music";
 import IconGlyph from "../app/IconGlyph.vue";
 
 interface Props {
-  /** AppShell 提供的构建期配置，避免设置页维护第二份默认状态。 */
+  /** AppShell 提供的构建期配置。 */
   localConfig: LocalConfig;
-  /** AppShell 提供的当前公开快照，用于首屏状态和预览。 */
+  /** AppShell 提供的当前公开快照。 */
   siteData: SiteData;
 }
 
@@ -41,20 +40,6 @@ const emit = defineEmits<{
   /** 保存完成后同步应用壳层，但不再重复发起一次保存请求。 */
   "config-change": [config: LocalConfig, persist?: boolean];
 }>();
-
-interface SourcePreview {
-  sourceId: DataSourceId;
-  status: SourceSnapshotInfo;
-  samples: Array<{
-    id: string;
-    title: string;
-    subtitle: string;
-    cover: string;
-    type: string;
-    url?: string;
-  }>;
-  repositories: RepositorySummary[];
-}
 
 const config = ref<LocalConfig>(cloneLocalConfig(props.localConfig));
 const previewData = ref<SiteData | null>(props.siteData);
@@ -74,75 +59,69 @@ const saveBusy = ref(false);
 const message = ref("");
 const messageTone = ref<"success" | "error" | "neutral">("neutral");
 const syncError = ref<{ title: string; message: string } | null>(null);
-const manualDraft = ref<ManualLibraryItem>(createManualItem());
-const editingManualId = ref<string | null>(null);
 const sourceSnapshotStatuses = ref<Record<DataSourceId, SourceSnapshotInfo>>(
   emptySourceSnapshotStatuses(),
 );
-const selectedSourceId = ref<DataSourceId | null>(null);
-const sourcePreview = ref<SourcePreview | null>(null);
-const sourcePreviewLoading = ref(false);
-const sourceActionBusy = ref<"process" | "clear" | null>(null);
+type SourceFilter = "all" | "enabled" | "disabled";
+
+const selectedSourceId = ref<DataSourceId>(sourceCards[0]?.id ?? "bangumi");
+const sourceFilter = ref<SourceFilter>("all");
+const sourceQuery = ref("");
 const musicBusy = ref(false);
 const musicError = ref("");
 
-/** 读取当前预览快照中的来源同步状态。 */
 const providerStatuses = computed(
   () => previewData.value?.providerStatus ?? [],
 );
-/** 判断是否有来源正在同步。 */
 const anySourceBusy = computed(() =>
   Object.values(sourceBusy.value).some(Boolean),
 );
-/** 汇总保存、同步和快照操作的忙碌状态。 */
 const anyBusy = computed(
   () =>
-    anySourceBusy.value || saveBusy.value || sourceActionBusy.value !== null,
+    anySourceBusy.value || saveBusy.value || gameBusy.value || musicBusy.value,
 );
-/** 判断当前是否处于手动内容编辑状态。 */
-const editingManual = computed(() => editingManualId.value !== null);
-/** 读取配置中的首页游戏组件。 */
 const gameWidget = computed(() =>
   config.value.widgets.find((widget) => widget.type === "game"),
 );
-/** 读取首页游戏组件设置。 */
 const gameSettings = computed(() => gameWidget.value?.settings?.game);
-/** 将游戏标识转换为设置页提示名称。 */
 const gameName = computed(
   () =>
     ({ genshin: "原神", hsr: "崩坏：星穹铁道", zzz: "绝区零" })[
       gameSettings.value?.game ?? "hsr"
     ],
 );
-/** 根据当前编辑状态生成手动条目按钮文案。 */
-const manualActionLabel = computed(() =>
-  editingManual.value ? "更新条目" : "添加条目",
-);
-/** 读取来源管理面板当前选中的来源描述。 */
 const selectedSource = computed(() =>
   selectedSourceId.value
     ? sourceCards.find((source) => source.id === selectedSourceId.value)
     : undefined,
 );
-/** 读取来源管理面板当前选中的快照状态。 */
-const selectedSourceStatus = computed(() =>
-  selectedSourceId.value
-    ? sourceSnapshotStatuses.value[selectedSourceId.value]
-    : undefined,
-);
-
-/** 组合来源和手动内容的同步状态表格行。 */
+const visibleSourceCards = computed(() => {
+  const query = sourceQuery.value.trim().toLocaleLowerCase();
+  return sourceCards.filter((source) => {
+    const sourceConfig = config.value.sources[source.id];
+    if (sourceFilter.value === "enabled" && !sourceConfig.enabled) return false;
+    if (sourceFilter.value === "disabled" && sourceConfig.enabled) return false;
+    if (!query) return true;
+    return `${source.title} ${source.description}`
+      .toLocaleLowerCase()
+      .includes(query);
+  });
+});
+watch(visibleSourceCards, (sources) => {
+  if (
+    sources.length &&
+    !sources.some((source) => source.id === selectedSourceId.value)
+  ) {
+    selectSource(sources[0].id);
+  }
+});
 const statusRows = computed(() =>
-  [
-    ...sourceCards.map((source) => ({
-      id: source.id as DataSourceId | "manual",
-      label: source.title,
-    })),
-    { id: "manual" as const, label: "手动内容" },
-  ].map((row) => ({ ...row, status: statusFor(row.id) })),
+  sourceCards.map((source) => ({
+    id: source.id,
+    label: source.title,
+    status: statusFor(source.id),
+  })),
 );
-
-/** 将公开快照生成时间转换为设置页显示文本。 */
 const snapshotTime = computed(() => {
   const value = previewData.value?.generatedAt;
   if (!value) return "尚未写入页面快照";
@@ -151,12 +130,36 @@ const snapshotTime = computed(() => {
     ? value
     : date.toLocaleString("zh-CN", { hour12: false });
 });
+function selectedAdapterCountFor(sourceId: DataSourceId): number {
+  const source = sourceCards.find((item) => item.id === sourceId);
+  if (!source) return 0;
+  return source.contentOptions.filter(
+    (option) => config.value.sources[sourceId].content[option.key] === true,
+  ).length;
+}
 
-/**
- * 从本地开发接口刷新各来源的快照状态。
- *
- * @returns 请求完成后结束；静态构建环境没有接口时保留空状态。
- */
+function adapterLabel(sourceId: DataSourceId): string {
+  const value = selectedSourceContentLabel(
+    sourceId,
+    config.value.sources[sourceId].content,
+  );
+  return value || "未选择适配内容";
+}
+
+async function requestJson<T>(path: string, body?: unknown): Promise<T> {
+  const response = await fetch(path, {
+    method: body === undefined ? "GET" : "POST",
+    headers:
+      body === undefined ? undefined : { "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  const payload = (await response.json().catch(() => null)) as {
+    message?: string;
+  } | null;
+  if (!response.ok) throw new Error(payload?.message || "本地数据服务不可用");
+  return payload as T;
+}
+
 async function refreshSourceStatus(): Promise<void> {
   try {
     const payload = await requestJson<{ sources?: SourceSnapshotInfo[] }>(
@@ -168,120 +171,38 @@ async function refreshSourceStatus(): Promise<void> {
   } catch {
     // 静态构建中没有本地快照接口，保留空状态。
   }
-};
-
-/**
- * 读取单个来源的快照样例，供来源管理面板预览。
- *
- * @param sourceId - 需要预览的数据来源。
- * @returns 请求完成后结束；失败时清空预览内容。
- */
-async function loadSourcePreview(sourceId: DataSourceId): Promise<void> {
-  sourcePreviewLoading.value = true;
-  try {
-    sourcePreview.value = await requestJson<SourcePreview>(
-      `/__momona/source-preview?sourceId=${encodeURIComponent(sourceId)}`,
-    );
-  } catch {
-    sourcePreview.value = null;
-  } finally {
-    sourcePreviewLoading.value = false;
-  }
 }
 
-/**
- * 打开来源管理面板并加载对应的快照预览。
- *
- * @param sourceId - 用户选择的数据来源。
- * @returns 预览请求完成后结束。
- */
-async function openSourceManager(sourceId: DataSourceId): Promise<void> {
+function selectSource(sourceId: DataSourceId): void {
   selectedSourceId.value = sourceId;
-  await loadSourcePreview(sourceId);
-};
+}
 
-/**
- * 触发来源管理面板中当前来源的同步。
- *
- * @returns 无返回值；具体异步流程由 syncSource 处理。
- */
-function syncSelectedSource(): void {
-  if (selectedSourceId.value) void syncSource(selectedSourceId.value);
-};
-
-/**
- * 关闭来源管理面板并清除预览状态。
- *
- * @returns 无返回值。
- */
-function closeSourceManager(): void {
-  selectedSourceId.value = null;
-  sourcePreview.value = null;
-};
-
-/**
- * 将来源快照状态转换为中文状态文本。
- *
- * @param status - 来源快照状态。
- * @returns 设置页使用的中文状态文案。
- */
 function sourceSnapshotText(status: SourceSnapshotInfo): string {
   if (status.state === "success") return "已就绪";
   if (status.state === "error") return "同步失败";
-  if (status.state === "cleared") return "已清理派生数据";
-  return "暂无快照";
-};
+  if (status.state === "cleared") return "待同步";
+  return "尚未同步";
+}
 
-/**
- * 将来源快照状态转换为 CSS 状态类名。
- *
- * @param status - 来源快照状态。
- * @returns 由状态值组成的 CSS 类名。
- */
 function sourceSnapshotClass(status: SourceSnapshotInfo): string {
   return `is-${status.state}`;
 }
 
-/**
- * 将字节数转换为适合设置页显示的单位文本。
- *
- * @param bytes - 快照文件大小，单位为字节。
- * @returns 带单位的可读文件大小文本。
- */
-function formatBytes(bytes: number): string {
-  if (!bytes) return "未生成";
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-};
-
-/**
- * 将快照时间转换为本地化日期文本。
- *
- * @param value - ISO 时间文本或空值。
- * @returns 本地化日期文本；无法解析时返回原文本。
- */
-function formatSnapshotDate(value: string | null): string {
-  if (!value) return "暂无";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleString("zh-CN", { hour12: false });
-};
-
-/**
- * 从本地开发接口加载配置、页面快照和来源状态。
- *
- * @returns 初始数据加载流程完成后结束。
- */
 async function loadInitialState(): Promise<void> {
   try {
     const payload = await requestJson<{ config?: LocalConfig }>(
       "/__momona/config",
     );
-    if (payload.config) config.value = normalizeLocalConfig(payload.config);
+    if (payload.config) {
+      config.value = normalizeLocalConfig(payload.config);
+      selectedSourceId.value =
+        sourceCards.find((source) => config.value.sources[source.id].enabled)
+          ?.id ??
+        sourceCards[0]?.id ??
+        "bangumi";
+    }
   } catch {
-    // 静态构建中没有本地配置接口，页面继续使用构建时文件数据。
+    // 静态构建中没有本地配置接口，继续使用构建时配置。
   }
 
   try {
@@ -300,22 +221,10 @@ onMounted(() => {
   void loadInitialState();
 });
 
-/**
- * 关闭同步错误提示。
- *
- * @returns 无返回值。
- */
 function closeSyncError(): void {
   syncError.value = null;
 }
 
-/**
- * 将未知异常转换为设置页可展示的同步错误。
- *
- * @param title - 错误区域标题。
- * @param error - 捕获到的未知异常。
- * @returns 无返回值；错误会写入同步错误状态。
- */
 function showSyncError(title: string, error: unknown): void {
   syncError.value = {
     title,
@@ -323,44 +232,11 @@ function showSyncError(title: string, error: unknown): void {
   };
 }
 
-/**
- * 更新页面预览并返回同一份快照，方便保存流程继续使用。
- *
- * @param siteData - 最新公开页面快照。
- * @returns 原样返回传入的页面快照。
- */
 function cachePreview(siteData: SiteData): SiteData {
   previewData.value = siteData;
   return siteData;
 }
 
-/**
- * 请求本地设置接口，并将非成功响应转换为统一异常。
- *
- * @param path - 本地设置接口路径。
- * @param body - 可选的 POST 请求载荷。
- * @returns 解析后的接口响应，类型由调用方指定。
- * @throws 当接口返回非 2xx 状态时抛出接口错误。
- */
-async function requestJson<T>(path: string, body?: unknown): Promise<T> {
-  const response = await fetch(path, {
-    method: body === undefined ? "GET" : "POST",
-    headers:
-      body === undefined ? undefined : { "Content-Type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const payload = (await response.json().catch(() => null)) as {
-    message?: string;
-  } | null;
-  if (!response.ok) throw new Error(payload?.message || "本地数据服务不可用");
-  return payload as T;
-}
-
-/**
- * 读取音乐歌单并把第一首曲目写入播放器设置。
- *
- * @returns 歌单读取流程完成后结束；重复操作会被忽略。
- */
 async function loadMusicPlaylist(): Promise<void> {
   if (musicBusy.value) return;
   const parsed = parseMusicPlaylistReference(
@@ -395,12 +271,6 @@ async function loadMusicPlaylist(): Promise<void> {
   }
 }
 
-/**
- * 将游戏账号查询结果合并到首页游戏组件设置中。
- *
- * @param patch - 需要合并到首页游戏设置的部分字段。
- * @returns 无返回值；不存在游戏组件时直接结束。
- */
 function updateGameWidget(patch: {
   uid?: string;
   game?: HoyoGame;
@@ -409,27 +279,20 @@ function updateGameWidget(patch: {
   >["account"];
 }): void {
   const widget = gameWidget.value;
-  if (!widget) return;
-  const current = widget.settings?.game;
-  if (!current) return;
+  if (!widget || !widget.settings?.game) return;
   config.value.widgets = config.value.widgets.map((item) =>
     item.id === widget.id
       ? {
           ...item,
           settings: {
             ...item.settings,
-            game: { ...current, ...patch },
+            game: { ...item.settings.game, ...patch },
           },
         }
       : item,
   );
 }
 
-/**
- * 请求当前配置的游戏账号公开摘要。
- *
- * @returns 账号请求完成后结束；结果会写回首页游戏组件设置。
- */
 async function syncGameAccount(): Promise<void> {
   const current = gameSettings.value;
   if (!current?.uid.trim() || gameBusy.value) return;
@@ -457,11 +320,6 @@ async function syncGameAccount(): Promise<void> {
   }
 }
 
-/**
- * 请求本地服务根据当前配置保存并生成页面快照。
- *
- * @returns 保存后的公开页面快照。
- */
 async function saveSiteSnapshot(): Promise<SiteData> {
   const result = await requestJson<{ siteData: SiteData }>("/__momona/save", {
     config: config.value,
@@ -469,11 +327,6 @@ async function saveSiteSnapshot(): Promise<SiteData> {
   return cachePreview(result.siteData);
 }
 
-/**
- * 保存设置、刷新预览并通知应用壳层同步运行时配置。
- *
- * @returns 保存流程完成后结束；错误会显示在设置页状态区域。
- */
 async function saveSettings(): Promise<void> {
   saveBusy.value = true;
   closeSyncError();
@@ -483,22 +336,16 @@ async function saveSettings(): Promise<void> {
     const data = await saveSiteSnapshot();
     emit("config-change", cloneLocalConfig(config.value), false);
     messageTone.value = "success";
-    message.value = `页面设置已保存 · ${data.libraryTiles.length} 个资料项`;
+    message.value = `已保存 · ${data.libraryTiles.length} 个资料项`;
   } catch (error) {
     messageTone.value = "error";
-    message.value = `本地配置文件写入失败：${String(error instanceof Error ? error.message : error)}`;
+    message.value = `保存失败：${String(error instanceof Error ? error.message : error)}`;
     showSyncError("保存设置失败", error);
   } finally {
     saveBusy.value = false;
   }
 }
 
-/**
- * 同步指定来源，并在完成后刷新来源状态和预览。
- *
- * @param sourceId - 需要同步的数据来源。
- * @returns 同步流程完成后结束；成功或失败都会刷新来源状态。
- */
 async function syncSource(sourceId: DataSourceId): Promise<void> {
   if (sourceBusy.value[sourceId]) return;
   sourceBusy.value[sourceId] = true;
@@ -506,7 +353,6 @@ async function syncSource(sourceId: DataSourceId): Promise<void> {
   const source = sourceCards.find((item) => item.id === sourceId);
   messageTone.value = "neutral";
   message.value = `正在同步 ${source?.title ?? sourceLabels[sourceId]}`;
-
   try {
     const result = await requestJson<{
       siteData: SiteData;
@@ -518,7 +364,7 @@ async function syncSource(sourceId: DataSourceId): Promise<void> {
     message.value =
       status.status === "error"
         ? `${source?.title ?? sourceLabels[sourceId]} 同步失败；旧数据已保留`
-        : `${source?.title ?? sourceLabels[sourceId]} 已同步并保存 · ${status.count} 项`;
+        : `${source?.title ?? sourceLabels[sourceId]} 已同步 · ${status.count} 项`;
     if (status.status === "error") {
       showSyncError(
         `${source?.title ?? sourceLabels[sourceId]} 同步失败`,
@@ -527,86 +373,14 @@ async function syncSource(sourceId: DataSourceId): Promise<void> {
     }
   } catch (error) {
     messageTone.value = "error";
-    message.value = `${source?.title ?? sourceLabels[sourceId]} 请求失败；设置已保留：${String(error instanceof Error ? error.message : error)}`;
+    message.value = `${source?.title ?? sourceLabels[sourceId]} 请求失败`;
     showSyncError(`${source?.title ?? sourceLabels[sourceId]} 同步失败`, error);
   } finally {
     sourceBusy.value[sourceId] = false;
     await refreshSourceStatus();
-    if (selectedSourceId.value === sourceId) await loadSourcePreview(sourceId);
   }
 }
 
-/**
- * 使用选中来源的原始快照重新生成公开派生数据。
- *
- * @returns 处理流程完成后结束；没有原始快照时显示错误。
- */
-async function processSelectedSource(): Promise<void> {
-  const sourceId = selectedSourceId.value;
-  if (!sourceId || sourceActionBusy.value) return;
-  sourceActionBusy.value = "process";
-  closeSyncError();
-  const source = sourceCards.find((item) => item.id === sourceId);
-  messageTone.value = "neutral";
-  message.value = `正在重新生成 ${source?.title ?? sourceLabels[sourceId]} 资料库`;
-  try {
-    const result = await requestJson<{
-      siteData: SiteData;
-      sourceStatus: ProviderStatus;
-    }>("/__momona/process-source", { config: config.value, sourceId });
-    cachePreview(result.siteData);
-    messageTone.value = "success";
-    message.value = `${source?.title ?? sourceLabels[sourceId]} 资料库已重新生成`;
-  } catch (error) {
-    messageTone.value = "error";
-    message.value = `${source?.title ?? sourceLabels[sourceId]} 没有可处理的原始快照`;
-    showSyncError(`${source?.title ?? sourceLabels[sourceId]} 处理失败`, error);
-  } finally {
-    sourceActionBusy.value = null;
-    await refreshSourceStatus();
-    await loadSourcePreview(sourceId);
-  }
-}
-
-/**
- * 清理选中来源的派生缓存，但保留原始抓取快照。
- *
- * @returns 清理流程完成后结束；完成后重新读取来源状态和预览。
- */
-async function clearSelectedSourceCache(): Promise<void> {
-  const sourceId = selectedSourceId.value;
-  if (!sourceId || sourceActionBusy.value) return;
-  sourceActionBusy.value = "clear";
-  closeSyncError();
-  const source = sourceCards.find((item) => item.id === sourceId);
-  messageTone.value = "neutral";
-  message.value = `正在清理 ${source?.title ?? sourceLabels[sourceId]} 派生缓存`;
-  try {
-    const result = await requestJson<{ siteData: SiteData }>(
-      "/__momona/clear-source-cache",
-      { config: config.value, sourceId },
-    );
-    cachePreview(result.siteData);
-    messageTone.value = "success";
-    message.value = `${source?.title ?? sourceLabels[sourceId]} 派生缓存已清理，原始快照仍保留`;
-  } catch (error) {
-    messageTone.value = "error";
-    message.value = "派生缓存清理失败";
-    showSyncError("清理数据失败", error);
-  } finally {
-    sourceActionBusy.value = null;
-    await refreshSourceStatus();
-    await loadSourcePreview(sourceId);
-  }
-}
-
-/**
- * 将对象序列化为 JSON 并触发浏览器下载。
- *
- * @param filename - 浏览器下载使用的文件名。
- * @param value - 需要序列化的配置或快照对象。
- * @returns 无返回值。
- */
 function downloadJson(filename: string, value: unknown): void {
   const blob = new Blob([JSON.stringify(value, null, 2)], {
     type: "application/json",
@@ -619,11 +393,6 @@ function downloadJson(filename: string, value: unknown): void {
   URL.revokeObjectURL(url);
 }
 
-/**
- * 导出脱敏后的配置和当前公开页面快照。
- *
- * @returns 无返回值；所有来源 token 会在下载前清空。
- */
 function exportConfig(): void {
   const exportedConfig = cloneLocalConfig(config.value);
   for (const source of Object.values(exportedConfig.sources)) source.token = "";
@@ -635,97 +404,10 @@ function exportConfig(): void {
   message.value = "配置文件已导出";
 }
 
-/**
- * 校验并新增或更新一条手动资料库内容。
- *
- * @returns 无返回值；未填写标题时只更新提示，不修改配置。
- */
-function addOrUpdateManualItem(): void {
-  if (!manualDraft.value.title.trim()) {
-    messageTone.value = "error";
-    message.value = "请先填写手动条目标题";
-    return;
-  }
-
-  const id =
-    editingManualId.value ||
-    manualDraft.value.id.trim() ||
-    `manual-${Date.now()}`;
-  const item = {
-    ...manualDraft.value,
-    id,
-    title: manualDraft.value.title.trim(),
-    subtitle: manualDraft.value.subtitle.trim(),
-    cover: manualDraft.value.cover.trim(),
-    url: manualDraft.value.url.trim(),
-  };
-  if (editingManualId.value) {
-    config.value.manualItems = config.value.manualItems.map((entry) =>
-      entry.id === editingManualId.value ? item : entry,
-    );
-    message.value = "手动条目已更新";
-  } else {
-    config.value.manualItems.push(item);
-    message.value = "手动条目已添加";
-  }
-  editingManualId.value = null;
-  manualDraft.value = createManualItem();
-  messageTone.value = "success";
-}
-
-/**
- * 将指定手动条目装载到编辑表单。
- *
- * @param item - 需要编辑的手动资料库条目。
- * @returns 无返回值。
- */
-function editManualItem(item: ManualLibraryItem): void {
-  editingManualId.value = item.id;
-  manualDraft.value = { ...item };
-  activeTab.value = "content";
-};
-
-/**
- * 取消手动条目编辑并恢复空表单。
- *
- * @returns 无返回值。
- */
-function cancelManualEdit(): void {
-  editingManualId.value = null;
-  manualDraft.value = createManualItem();
-};
-
-/**
- * 删除指定手动条目，并在编辑中的条目被删除时退出编辑状态。
- *
- * @param id - 需要删除的手动条目 ID。
- * @returns 无返回值。
- */
-function removeManualItem(id: string): void {
-  config.value.manualItems = config.value.manualItems.filter(
-    (item) => item.id !== id,
-  );
-  if (editingManualId.value === id) cancelManualEdit();
-  messageTone.value = "success";
-  message.value = "手动条目已删除";
-};
-
-/**
- * 从当前页面快照中读取指定来源的同步状态。
- *
- * @param id - 数据来源或手动内容标识。
- * @returns 匹配的同步状态；尚未同步时返回 undefined。
- */
-function statusFor(id: DataSourceId | "manual"): ProviderStatus | undefined {
+function statusFor(id: DataSourceId): ProviderStatus | undefined {
   return providerStatuses.value.find((status) => status.id === id);
 }
 
-/**
- * 将来源同步状态转换为设置页文案。
- *
- * @param status - 可选的来源同步状态。
- * @returns 设置页使用的中文状态文案。
- */
 function statusText(status?: ProviderStatus): string {
   if (!status) return "尚未同步";
   return {
@@ -733,14 +415,8 @@ function statusText(status?: ProviderStatus): string {
     skipped: "未启用",
     error: "同步失败",
   }[status.status];
-};
+}
 
-/**
- * 将来源同步状态转换为 CSS 类名。
- *
- * @param status - 可选的来源同步状态。
- * @returns 由状态值组成的 CSS 类名。
- */
 function statusClass(status?: ProviderStatus): string {
   return `is-${status?.status ?? "unknown"}`;
 }
@@ -750,953 +426,538 @@ function statusClass(status?: ProviderStatus): string {
   <div class="settings-page">
     <header class="settings-header">
       <div class="settings-heading">
-        <span class="settings-eyebrow">MOMONA / LOCAL</span>
-        <h1>本地设置</h1>
-        <p>配置数据来源，组合首页内容</p>
+        <span class="settings-eyebrow">MOMONA / CONTROL CENTER</span>
+        <h1>设置</h1>
+        <p>站点身份、数据管理与同步状态</p>
       </div>
-      <div class="settings-actions">
+      <div class="settings-header-actions">
+        <span
+          v-if="message"
+          :class="['settings-notice', `is-${messageTone}`]"
+          aria-live="polite"
+          >{{ message }}</span
+        >
         <button
           type="button"
           class="settings-primary"
           :disabled="anyBusy"
           @click="saveSettings"
         >
-          <IconGlyph name="save" :size="15" />
-          {{ saveBusy ? "保存中" : "保存设置" }}
+          <IconGlyph name="save" :size="15" />{{
+            saveBusy ? "保存中" : "保存设置"
+          }}
         </button>
       </div>
     </header>
 
-    <nav class="settings-tabs" role="tablist" aria-label="设置分类">
-      <button
-        v-for="tab in settingsTabs"
-        :id="`settings-tab-${tab.id}`"
-        :key="tab.id"
-        type="button"
-        role="tab"
-        :aria-selected="activeTab === tab.id"
-        :aria-controls="`settings-panel-${tab.id}`"
-        :class="['settings-tab', { 'is-active': activeTab === tab.id }]"
-        @click="activeTab = tab.id"
-      >
-        <IconGlyph :name="tab.icon" :size="15" />
-        <span>{{ tab.label }}</span>
-        <small v-if="tab.id === 'sources'">{{ sourceCards.length }}</small>
-        <small v-else-if="tab.id === 'content'">{{
-          config.manualItems.length
-        }}</small>
-      </button>
-    </nav>
-
-    <div class="settings-layout">
-      <section
-        v-if="activeTab === 'profile'"
-        id="settings-panel-profile"
-        class="settings-panel"
-        role="tabpanel"
-        aria-labelledby="settings-tab-profile"
-      >
-        <header class="settings-panel-head">
-          <div>
-            <span class="settings-section-index">01 / PROFILE</span>
-            <h2>个人资料</h2>
-            <p>首页的状态栏和个人信息会从这里读取。</p>
-          </div>
-          <div class="settings-profile-preview">
-            <img
-              :src="config.account.avatar"
-              :alt="config.account.name || '头像预览'"
-            />
-            <span
-              ><strong>{{ config.account.name || "未命名" }}</strong
-              ><small>{{ config.account.motto || "还没有签名" }}</small></span
-            >
-          </div>
-        </header>
-        <div class="settings-form-grid settings-profile-grid">
-          <label
-            >显示名称<input
-              v-model="config.account.name"
-              type="text"
-              placeholder="例如：三三 sama"
-          /></label>
-          <label
-            >英文名 / 用户名<input
-              v-model="config.account.latinName"
-              type="text"
-              placeholder="例如：@miosdream"
-          /></label>
-          <label class="settings-field-wide"
-            >签名<input
-              v-model="config.account.motto"
-              type="text"
-              placeholder="一句想展示在首页的话"
-          /></label>
-          <label class="settings-field-wide"
-            >头像 URL<input
-              v-model="config.account.avatar"
-              type="url"
-              placeholder="/assets/avatar.jpg"
-          /></label>
+    <div class="settings-shell">
+      <nav class="settings-sidebar" role="tablist" aria-label="设置分类">
+        <span class="settings-sidebar-label">配置</span>
+        <button
+          v-for="tab in settingsTabs"
+          :id="`settings-tab-${tab.id}`"
+          :key="tab.id"
+          type="button"
+          role="tab"
+          :aria-selected="activeTab === tab.id"
+          :aria-controls="`settings-panel-${tab.id}`"
+          :class="['settings-tab', { 'is-active': activeTab === tab.id }]"
+          @click="activeTab = tab.id"
+        >
+          <IconGlyph :name="tab.icon" :size="16" />
+          <span>{{ tab.label }}</span>
+        </button>
+        <div class="settings-sidebar-brand" aria-label="momona">
+          <strong>Momona</strong>
         </div>
-        <footer class="settings-panel-foot">
-          <span>修改后点击右上角“保存设置”写入页面快照。</span
-          ><strong>{{ config.account.name || "未命名账号" }}</strong>
-        </footer>
-      </section>
+      </nav>
 
-      <section
-        v-else-if="activeTab === 'sources'"
-        id="settings-panel-sources"
-        class="settings-panel"
-        role="tabpanel"
-        aria-labelledby="settings-tab-sources"
-      >
-        <header class="settings-panel-head">
-          <div>
-            <span class="settings-section-index">02 / SOURCES</span>
-            <h2>数据来源</h2>
-            <p>每个来源独立请求、独立写入；单个网络失败不会覆盖其他来源。</p>
-          </div>
-          <button
-            type="button"
-            class="settings-quiet-action"
-            @click="activeTab = 'status'"
-          >
-            <IconGlyph name="activity" :size="14" />查看状态
-          </button>
-        </header>
-        <div class="settings-source-grid">
-          <article
-            v-for="source in sourceCards"
-            :key="source.id"
-            :class="[
-              'settings-source-card',
-              { 'is-disabled': !config.sources[source.id].enabled },
-            ]"
-          >
-            <header class="settings-source-head">
-              <div class="settings-source-title">
-                <span class="settings-source-icon"
-                  ><IconGlyph :name="source.icon" :size="17"
-                /></span>
-                <span
-                  ><strong>{{ source.title }}</strong
-                  ><small>{{ source.description }}</small></span
-                >
-              </div>
-              <label
-                class="settings-switch"
-                :aria-label="`启用 ${source.title}`"
-              >
-                <input
-                  v-model="config.sources[source.id].enabled"
-                  type="checkbox"
-                />
-                <span></span>
-              </label>
-            </header>
-            <p class="settings-source-hint">{{ source.hint }}</p>
-            <div
-              :class="[
-                'settings-source-snapshot',
-                sourceSnapshotClass(sourceSnapshotStatuses[source.id]),
-              ]"
-            >
-              <span>
-                <small>原始快照</small>
-                <strong>{{
-                  sourceSnapshotStatuses[source.id].rawExists
-                    ? formatBytes(sourceSnapshotStatuses[source.id].rawBytes)
-                    : "未生成"
-                }}</strong>
-              </span>
-              <span>
-                <small>资料库投影</small>
-                <strong>{{
-                  sourceSnapshotStatuses[source.id].derivedExists
-                    ? formatBytes(
-                        sourceSnapshotStatuses[source.id].derivedBytes,
-                      )
-                    : "未生成"
-                }}</strong>
-              </span>
-              <span class="settings-source-snapshot-state">
-                <small>状态</small>
-                <strong>{{
-                  sourceSnapshotText(sourceSnapshotStatuses[source.id])
-                }}</strong>
-              </span>
+      <main class="settings-main">
+        <section
+          v-if="activeTab === 'profile'"
+          id="settings-panel-profile"
+          class="settings-panel"
+          role="tabpanel"
+          aria-labelledby="settings-tab-profile"
+        >
+          <header class="settings-panel-head">
+            <div>
+              <span class="settings-section-index">01 / GENERAL</span>
+              <h2>基础设置</h2>
+              <p>页面标题与个人资料会成为所有页面的统一身份。</p>
             </div>
-            <div class="settings-source-fields">
-              <label class="settings-field-wide"
-                >{{ source.accountLabel
-                }}<input
-                  v-model="config.sources[source.id][source.accountKey]"
-                  type="text"
-                  :placeholder="source.placeholder"
-              /></label>
-              <label
-                >数量<input
-                  v-model.number="config.sources[source.id].limit"
-                  type="number"
-                  min="1"
-                  max="120"
-              /></label>
-              <label
-                >API 地址<input
-                  v-model="config.sources[source.id].endpoint"
-                  type="url"
-                  :placeholder="
-                    source.id === 'bangumi'
-                      ? 'https://api.bgm.tv'
-                      : source.id === 'github'
-                        ? 'https://api.github.com'
-                        : source.id === 'netease'
-                            ? 'https://music.163.com/api'
-                            : source.id === 'qqmusic'
-                              ? 'https://c.y.qq.com'
-                            : source.id === 'steam'
-                                ? 'https://steamcommunity.com'
-                                : source.id === 'sfacg'
-                                  ? 'https://p.sfacg.com'
-                                : 'https://api.bilibili.com'
-                  "
-              /></label>
-              <label v-if="source.token" class="settings-field-wide"
-                >Token（仅本地）<input
-                  v-model="config.sources[source.id].token"
-                  type="password"
-                  autocomplete="off"
-                  :placeholder="
-                    source.id === 'steam'
-                      ? '可选，Steam Web API Key，用于完整游戏库'
-                      : '可选，用于提高 GitHub 限额'
-                  "
-              /></label>
-            </div>
-            <div class="settings-content-options">
-              <div class="settings-content-options-head">
-                <strong>同步内容</strong>
-                <small>{{ source.contentHint }}</small>
-              </div>
-              <label
-                v-for="option in source.contentOptions"
-                :key="option.key"
-                class="settings-content-option"
-              >
-                <input
-                  v-model="config.sources[source.id].content[option.key]"
-                  type="checkbox"
-                />
-                <span>
-                  <strong>{{ option.label }}</strong>
-                  <small>{{ option.description }}</small>
-                </span>
-              </label>
-            </div>
-            <div
-              v-if="
-                source.id === 'github' &&
-                config.sources.github.content.githubRepositories
-              "
-              class="settings-source-scope"
-            >
-              <span class="settings-source-scope-label">仓库范围</span>
-              <div
-                class="settings-source-scope-control"
-                role="radiogroup"
-                aria-label="GitHub 仓库范围"
-              >
-                <label>
-                  <input
-                    v-model="
-                      config.sources.github.content.githubRepositoryScope
-                    "
-                    type="radio"
-                    value="all"
-                  />
-                  <span>全部公开仓库</span>
-                </label>
-                <label>
-                  <input
-                    v-model="
-                      config.sources.github.content.githubRepositoryScope
-                    "
-                    type="radio"
-                    value="pinned"
-                  />
-                  <span>Pinned 仓库</span>
-                </label>
-              </div>
-              <small>Pinned 使用 GitHub GraphQL，需要填写本地 Token。</small>
-              <label class="settings-source-sort"
-                >仓库展示顺序<select
-                  v-model="config.sources.github.content.githubRepositorySort"
-                >
-                  <option value="updated">最近更新</option>
-                  <option value="stars">Star 优先</option>
-                  <option value="forks">Fork 优先</option>
-                  <option value="name">名称排序</option>
-                </select></label
+            <div class="settings-site-preview">
+              <span class="settings-site-favicon"
+                ><img
+                  v-if="config.site.favicon"
+                  :src="config.site.favicon"
+                  alt="网站图标预览" /><IconGlyph
+                  v-else
+                  name="globe"
+                  :size="18"
+              /></span>
+              <span
+                ><strong>{{ config.site.title || "未设置标题" }}</strong
+                ><small>浏览器标签页</small></span
               >
             </div>
-            <footer class="settings-source-foot">
+          </header>
+
+          <section class="settings-section-block">
+            <div class="settings-section-heading">
               <div>
-                <span
-                  :class="[
-                    'settings-source-status',
-                    statusClass(statusFor(source.id)),
-                  ]"
-                  ><i></i>{{ statusText(statusFor(source.id))
-                  }}<small v-if="statusFor(source.id)"
-                    >· {{ statusFor(source.id)?.count }} 项</small
-                  ></span
-                >
+                <h3>页面信息</h3>
+                <p>这些内容只负责网站身份，不影响数据同步。</p>
+              </div>
+              <IconGlyph name="globe" :size="17" />
+            </div>
+            <div class="settings-form-grid settings-form-grid-wide">
+              <label
+                >网站标题<input
+                  v-model="config.site.title"
+                  type="text"
+                  placeholder="Love on the page"
+              /></label>
+              <label
+                >Favicon 地址<input
+                  v-model="config.site.favicon"
+                  type="url"
+                  placeholder="/favicon.svg"
+              /></label>
+              <label class="settings-field-wide"
+                >网站描述<textarea
+                  v-model="config.site.description"
+                  rows="3"
+                  placeholder="一个静态的个人数字生活展示入口。"
+                ></textarea>
+              </label>
+            </div>
+          </section>
+
+          <section
+            class="settings-section-block settings-section-block-separated"
+          >
+            <div class="settings-section-heading">
+              <div>
+                <h3>个人资料</h3>
+                <p>显示在首页状态栏、问候和个人相关卡片中。</p>
+              </div>
+              <IconGlyph name="user" :size="17" />
+            </div>
+            <div class="settings-profile-layout">
+              <div class="settings-profile-preview">
+                <img
+                  :src="config.account.avatar"
+                  :alt="config.account.name || '头像预览'"
+                /><strong>{{ config.account.name || "未命名" }}</strong
+                ><small>{{ config.account.motto || "还没有签名" }}</small>
+              </div>
+              <div class="settings-form-grid settings-form-grid-wide">
+                <label
+                  >显示名称<input
+                    v-model="config.account.name"
+                    type="text"
+                    placeholder="例如：三三 sama"
+                /></label>
+                <label
+                  >英文名 / 用户名<input
+                    v-model="config.account.latinName"
+                    type="text"
+                    placeholder="例如：@miosdream"
+                /></label>
+                <label class="settings-field-wide"
+                  >签名<input
+                    v-model="config.account.motto"
+                    type="text"
+                    placeholder="一句想展示在首页的话"
+                /></label>
+                <label class="settings-field-wide"
+                  >头像地址<input
+                    v-model="config.account.avatar"
+                    type="url"
+                    placeholder="/assets/avatar.jpg"
+                /></label>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section
+          v-else-if="activeTab === 'data'"
+          id="settings-panel-data"
+          class="settings-panel"
+          role="tabpanel"
+          aria-labelledby="settings-tab-data"
+        >
+          <header class="settings-panel-head">
+            <div>
+              <span class="settings-section-index">02 / DATA</span>
+              <h2>数据管理</h2>
+              <p>统一管理来源与同步内容，组件会自动读取统一快照。</p>
+            </div>
+          </header>
+
+          <div class="settings-source-workspace">
+            <aside class="settings-source-index" aria-label="数据来源列表">
+              <header class="settings-source-index-head">
+                <div>
+                  <span class="settings-section-index">PLATFORMS</span>
+                  <h3>数据来源</h3>
+                  <p>选择平台后编辑同步范围。</p>
+                </div>
+              </header>
+              <label class="settings-source-search">
+                <IconGlyph name="search" :size="14" />
+                <input
+                  v-model.trim="sourceQuery"
+                  type="search"
+                  aria-label="搜索数据来源"
+                  placeholder="搜索平台"
+                />
+              </label>
+              <div
+                class="settings-source-filters"
+                role="tablist"
+                aria-label="来源筛选"
+              >
                 <button
                   type="button"
-                  class="settings-source-manage"
-                  :disabled="saveBusy || anySourceBusy"
-                  @click="openSourceManager(source.id)"
+                  role="tab"
+                  :aria-selected="sourceFilter === 'all'"
+                  :class="{ 'is-active': sourceFilter === 'all' }"
+                  @click="sourceFilter = 'all'"
                 >
-                  <IconGlyph name="settings" :size="14" />数据管理
+                  全部
                 </button>
+                <button
+                  type="button"
+                  role="tab"
+                  :aria-selected="sourceFilter === 'enabled'"
+                  :class="{ 'is-active': sourceFilter === 'enabled' }"
+                  @click="sourceFilter = 'enabled'"
+                >
+                  已启用
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  :aria-selected="sourceFilter === 'disabled'"
+                  :class="{ 'is-active': sourceFilter === 'disabled' }"
+                  @click="sourceFilter = 'disabled'"
+                >
+                  未启用
+                </button>
+              </div>
+              <div
+                v-if="visibleSourceCards.length"
+                class="settings-source-list"
+              >
+                <article
+                  v-for="source in visibleSourceCards"
+                  :key="source.id"
+                  :class="[
+                    'settings-source-list-item',
+                    {
+                      'is-selected': selectedSourceId === source.id,
+                      'is-disabled': !config.sources[source.id].enabled,
+                    },
+                  ]"
+                >
+                  <button
+                    type="button"
+                    class="settings-source-select"
+                    :aria-pressed="selectedSourceId === source.id"
+                    @click="selectSource(source.id)"
+                  >
+                    <span class="settings-source-icon"
+                      ><IconGlyph :name="source.icon" :size="16"
+                    /></span>
+                    <span class="settings-source-select-copy"
+                      ><strong>{{ source.title }}</strong
+                      ><small>{{
+                        adapterLabel(source.id) || source.description
+                      }}</small></span
+                    >
+                    <span
+                      :class="[
+                        'settings-source-list-status',
+                        sourceSnapshotClass(sourceSnapshotStatuses[source.id]),
+                      ]"
+                      :title="
+                        sourceSnapshotText(sourceSnapshotStatuses[source.id])
+                      "
+                      ><i></i
+                      ><em>{{
+                        sourceSnapshotText(sourceSnapshotStatuses[source.id])
+                      }}</em></span
+                    >
+                  </button>
+                  <label
+                    class="settings-source-list-switch"
+                    :aria-label="`启用 ${source.title}`"
+                    @click.stop
+                  >
+                    <input
+                      v-model="config.sources[source.id].enabled"
+                      type="checkbox"
+                    />
+                    <span></span>
+                  </label>
+                </article>
+              </div>
+              <p v-else class="settings-source-list-empty">
+                没有匹配的数据来源。
+              </p>
+            </aside>
+
+            <section
+              v-if="selectedSource"
+              class="settings-source-detail"
+              aria-live="polite"
+            >
+              <header class="settings-source-detail-head">
+                <div class="settings-source-detail-title">
+                  <span class="settings-source-icon"
+                    ><IconGlyph :name="selectedSource.icon" :size="18"
+                  /></span>
+                  <div>
+                    <span class="settings-section-index">ACTIVE SOURCE</span>
+                    <h3>{{ selectedSource.title }}</h3>
+                    <p>{{ selectedSource.description }}</p>
+                  </div>
+                </div>
+                <div class="settings-source-detail-actions">
+                  <span
+                    :class="[
+                      'settings-source-status',
+                      statusClass(statusFor(selectedSource.id)),
+                    ]"
+                    ><i></i>{{ statusText(statusFor(selectedSource.id))
+                    }}<small v-if="statusFor(selectedSource.id)"
+                      >· {{ statusFor(selectedSource.id)?.count }} 项</small
+                    ></span
+                  >
+                </div>
+              </header>
+              <div class="settings-source-summary">
+                <span
+                  ><small>同步内容</small
+                  ><strong>{{
+                    adapterLabel(selectedSource.id) || "未选择内容"
+                  }}</strong></span
+                ><span
+                  ><small>来源状态</small
+                  ><strong>{{
+                    sourceSnapshotText(
+                      sourceSnapshotStatuses[selectedSource.id],
+                    )
+                  }}</strong></span
+                ><span
+                  ><small>同步上限</small
+                  ><strong
+                    >{{ config.sources[selectedSource.id].limit }} 项</strong
+                  ></span
+                >
+              </div>
+              <div class="settings-source-fields">
+                <label
+                  >{{ selectedSource.accountLabel
+                  }}<input
+                    v-model="
+                      config.sources[selectedSource.id][
+                        selectedSource.accountKey
+                      ]
+                    "
+                    type="text"
+                    :placeholder="selectedSource.placeholder"
+                /></label>
+                <label
+                  >同步数量上限<input
+                    v-model.number="config.sources[selectedSource.id].limit"
+                    type="number"
+                    min="1"
+                    max="120"
+                /></label>
+                <label v-if="selectedSource.token" class="settings-field-wide"
+                  >Token（仅本地）<input
+                    v-model="config.sources[selectedSource.id].token"
+                    type="password"
+                    autocomplete="off"
+                    :placeholder="
+                      selectedSource.id === 'steam'
+                        ? '可选，Steam Web API Key'
+                        : '可选，用于提高 GitHub 限额'
+                    "
+                /></label>
+              </div>
+              <div class="settings-source-adapter">
+                <header class="settings-source-adapter-head">
+                  <span>同步内容</span
+                  ><span class="settings-adapter-count"
+                    >{{ selectedAdapterCountFor(selectedSource.id) }}/{{
+                      selectedSource.contentOptions.length
+                    }}</span
+                  >
+                </header>
+                <div class="settings-content-options">
+                  <label
+                    v-for="option in selectedSource.contentOptions"
+                    :key="option.key"
+                    class="settings-content-option"
+                    ><input
+                      v-model="
+                        config.sources[selectedSource.id].content[option.key]
+                      "
+                      type="checkbox"
+                    /><span
+                      ><strong>{{ option.label }}</strong
+                      ><small>{{ option.description }}</small></span
+                    ></label
+                  >
+                </div>
+                <div
+                  v-if="selectedSource.id === 'github'"
+                  class="settings-source-scope"
+                >
+                  <span class="settings-source-scope-label">仓库适配</span>
+                  <div
+                    class="settings-source-scope-control"
+                    role="radiogroup"
+                    aria-label="GitHub 仓库范围"
+                  >
+                    <label
+                      ><input
+                        v-model="
+                          config.sources.github.content.githubRepositoryScope
+                        "
+                        type="radio"
+                        value="all"
+                      /><span>全部公开仓库</span></label
+                    ><label
+                      ><input
+                        v-model="
+                          config.sources.github.content.githubRepositoryScope
+                        "
+                        type="radio"
+                        value="pinned"
+                      /><span>Pinned 仓库</span></label
+                    >
+                  </div>
+                  <label class="settings-source-sort"
+                    >仓库展示顺序<select
+                      v-model="
+                        config.sources.github.content.githubRepositorySort
+                      "
+                    >
+                      <option value="updated">最近更新</option>
+                      <option value="stars">Star 优先</option>
+                      <option value="forks">Fork 优先</option>
+                      <option value="name">名称排序</option>
+                    </select></label
+                  >
+                </div>
+              </div>
+              <footer class="settings-source-detail-foot">
                 <button
                   type="button"
                   class="settings-source-sync"
-                  :disabled="saveBusy || sourceBusy[source.id]"
-                  @click="syncSource(source.id)"
+                  :disabled="anyBusy"
+                  @click="syncSource(selectedSource.id)"
                 >
-                  <IconGlyph name="refresh" :size="14" />
-                  {{ sourceBusy[source.id] ? "同步中" : "同步并保存" }}
+                  <IconGlyph name="refresh" :size="14" />{{
+                    sourceBusy[selectedSource.id] ? "同步中" : "立即同步"
+                  }}
                 </button>
-              </div>
-            </footer>
-          </article>
-        </div>
-        <section
-          v-if="selectedSourceId && selectedSource"
-          class="settings-source-management"
-        >
-          <header class="settings-source-management-head">
-            <div>
-              <span class="settings-section-index">DATA MANAGEMENT</span>
-              <h3>{{ selectedSource.title }} 数据管理</h3>
-              <p>
-                原始响应和资料库投影分开保存；这里不会展示
-                Token，也不会把原始响应发送到页面。
-              </p>
-            </div>
-            <button
-              type="button"
-              class="settings-icon-button"
-              aria-label="关闭数据管理"
-              title="关闭数据管理"
-              @click="closeSourceManager"
-            >
-              <IconGlyph name="x" :size="15" />
-            </button>
-          </header>
-
-          <div
-            v-if="sourcePreviewLoading"
-            class="settings-source-preview-empty"
-          >
-            正在读取本地快照状态…
+              </footer>
+            </section>
           </div>
-          <template v-else-if="sourcePreview">
-            <div class="settings-source-management-metrics">
-              <div>
-                <small>原始快照</small>
-                <strong>{{
-                  sourcePreview.status.rawExists
-                    ? formatBytes(sourcePreview.status.rawBytes)
-                    : "未生成"
-                }}</strong>
-                <span>{{
-                  formatSnapshotDate(sourcePreview.status.fetchedAt)
-                }}</span>
-              </div>
-              <div>
-                <small>资料库投影</small>
-                <strong>{{
-                  sourcePreview.status.derivedExists
-                    ? formatBytes(sourcePreview.status.derivedBytes)
-                    : "未生成"
-                }}</strong>
-                <span>{{
-                  formatSnapshotDate(sourcePreview.status.processedAt)
-                }}</span>
-              </div>
-              <div>
-                <small>公开条目</small>
-                <strong>{{ sourcePreview.status.itemCount }}</strong>
-                <span>{{ sourcePreview.status.message }}</span>
-              </div>
-            </div>
-
-            <div
-              v-if="
-                sourcePreview.samples.length ||
-                sourcePreview.repositories.length
-              "
-              class="settings-source-preview-grid"
-            >
-              <div
-                v-if="sourcePreview.samples.length"
-                class="settings-source-preview-group"
-              >
-                <div class="settings-source-preview-label">
-                  <strong>资料库样例</strong><small>最多显示 6 项</small>
-                </div>
-                <ul class="settings-source-sample-list">
-                  <li v-for="sample in sourcePreview.samples" :key="sample.id">
-                    <img
-                      v-if="sample.cover"
-                      :src="sample.cover"
-                      :alt="sample.title"
-                    />
-                    <span v-else class="settings-source-sample-placeholder">
-                      <IconGlyph name="library" :size="14" />
-                    </span>
-                    <span class="settings-source-sample-copy">
-                      <strong>{{ sample.title }}</strong>
-                      <small>{{ sample.type }} · {{ sample.subtitle }}</small>
-                    </span>
-                    <a
-                      v-if="sample.url"
-                      :href="sample.url"
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label="打开来源条目"
-                      title="打开来源条目"
-                    >
-                      <IconGlyph name="external" :size="13" />
-                    </a>
-                  </li>
-                </ul>
-              </div>
-              <div
-                v-if="sourcePreview.repositories.length"
-                class="settings-source-preview-group"
-              >
-                <div class="settings-source-preview-label">
-                  <strong>仓库样例</strong><small>最多显示 6 项</small>
-                </div>
-                <ul class="settings-source-sample-list">
-                  <li
-                    v-for="repository in sourcePreview.repositories"
-                    :key="repository.id"
-                  >
-                    <span class="settings-source-sample-placeholder">
-                      <IconGlyph name="github" :size="14" />
-                    </span>
-                    <span class="settings-source-sample-copy">
-                      <strong>{{ repository.name }}</strong>
-                      <small
-                        >{{ repository.language || "未标注" }} ·
-                        {{ repository.stars }} stars</small
-                      >
-                    </span>
-                    <a
-                      v-if="repository.htmlUrl"
-                      :href="repository.htmlUrl"
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label="打开仓库"
-                      title="打开仓库"
-                    >
-                      <IconGlyph name="external" :size="13" />
-                    </a>
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <p v-else class="settings-source-preview-empty">
-              还没有可展示的资料库样例。先同步该来源，或确认至少勾选了一类同步内容。
-            </p>
-          </template>
-          <p v-else class="settings-source-preview-empty">
-            本地开发服务没有返回快照预览；静态发布环境不会启用数据管理接口。
-          </p>
-
-          <footer class="settings-source-management-foot">
-            <span>清理只删除派生投影，原始快照仍可用于下次重新生成。</span>
-            <div>
-              <button
-                type="button"
-                class="settings-secondary"
-                :disabled="anyBusy"
-                @click="syncSelectedSource"
-              >
-                <IconGlyph name="refresh" :size="14" />刷新原始数据
-              </button>
-              <button
-                type="button"
-                class="settings-secondary"
-                :disabled="anyBusy || !selectedSourceStatus?.rawExists"
-                @click="processSelectedSource"
-              >
-                <IconGlyph name="sparkles" :size="14" />
-                {{
-                  sourceActionBusy === "process" ? "生成中" : "重新生成资料库"
-                }}
-              </button>
-              <button
-                type="button"
-                class="settings-danger-action"
-                :disabled="anyBusy || !selectedSourceStatus?.derivedExists"
-                @click="clearSelectedSourceCache"
-              >
-                <IconGlyph name="trash" :size="14" />
-                {{ sourceActionBusy === "clear" ? "清理中" : "清理派生缓存" }}
-              </button>
-            </div>
-          </footer>
         </section>
-        <footer class="settings-panel-foot">
-          <span
-            >修改来源参数后，点击对应卡片的“同步并保存”。不需要网络时可只点击右上角“保存设置”。</span
-          ><strong>本地 Token 不进入静态页面</strong>
-        </footer>
-      </section>
 
-      <section
-        v-else-if="activeTab === 'components'"
-        id="settings-panel-components"
-        class="settings-panel"
-        role="tabpanel"
-        aria-labelledby="settings-tab-components"
-      >
-        <header class="settings-panel-head">
-          <div>
-            <span class="settings-section-index">03 / COMPONENTS</span>
-            <h2>组件设置</h2>
-            <p>把参考站的游戏 Presence、音乐播放器和报告卡统一接入本地快照。</p>
-          </div>
-          <span class="settings-count-badge"
-            >首页组件
-            {{ config.widgets.filter((item) => item.visible).length }}</span
-          >
-        </header>
-
-        <div class="settings-component-grid">
-          <section class="settings-subpanel">
-            <header class="settings-subpanel-head">
-              <div>
-                <span class="settings-section-index">GAME PRESENCE</span>
-                <h3>游戏资料卡</h3>
-                <p>读取公开展柜摘要，不需要登录凭据。</p>
-              </div>
-              <IconGlyph name="game" :size="18" />
-            </header>
-            <div v-if="gameSettings" class="settings-form-grid">
-              <label
-                >游戏<select
-                  :value="gameSettings.game ?? 'hsr'"
-                  @change="
-                    updateGameWidget({
-                      game: ($event.target as HTMLSelectElement)
-                        .value as HoyoGame,
-                      account: null,
-                    })
-                  "
-                >
-                  <option value="genshin">原神</option>
-                  <option value="hsr">崩坏：星穹铁道</option>
-                  <option value="zzz">绝区零</option>
-                </select></label
-              >
-              <label
-                >UID<input
-                  :value="gameSettings.uid"
-                  inputmode="numeric"
-                  placeholder="6-12 位数字"
-                  @input="
-                    updateGameWidget({
-                      uid: ($event.target as HTMLInputElement).value,
-                      account: null,
-                    })
-                  "
-              /></label>
-            </div>
-            <div class="settings-inline-actions">
-              <button
-                type="button"
-                class="settings-secondary"
-                :disabled="gameBusy || !gameSettings?.uid.trim()"
-                @click="syncGameAccount"
-              >
-                <IconGlyph :name="gameBusy ? 'refresh' : 'cloud'" :size="14" />
-                {{ gameBusy ? "读取中" : `读取${gameName}账号` }}
-              </button>
-              <span v-if="gameSettings?.account" class="settings-inline-status">
-                {{ gameSettings.account.nickname }} · 等级
-                {{
-                  gameSettings.account.score?.value ||
-                  gameSettings.account.level
-                }}
-              </span>
-            </div>
-            <p v-if="gameError" class="settings-inline-error">
-              {{ gameError }}
-            </p>
-            <p v-else class="settings-subpanel-note">
-              成功读取后，展柜头像、等级和成就会同步到首页与平台报告。
-            </p>
-          </section>
-
-          <section class="settings-subpanel">
-            <header class="settings-subpanel-head">
-              <div>
-                <span class="settings-section-index">MUSIC PLAYER</span>
-                <h3>音乐卡片</h3>
-                <p>支持手动曲目，也兼容参考站发布的播放器状态事件。</p>
-              </div>
-              <IconGlyph name="music" :size="18" />
-            </header>
-            <div class="settings-form-grid">
-              <label class="settings-field-wide"
-                >曲目<input
-                  v-model="config.music.title"
-                  type="text"
-                  placeholder="例如：魚"
-              /></label>
-              <label
-                >歌手<input
-                  v-model="config.music.artist"
-                  type="text"
-                  placeholder="例如：あたらよ"
-              /></label>
-              <label
-                >专辑<input
-                  v-model="config.music.album"
-                  type="text"
-                  placeholder="可选"
-              /></label>
-              <label class="settings-field-wide"
-                >封面 URL<input
-                  v-model="config.music.cover"
-                  type="url"
-                  placeholder="/assets/home-music.jpg"
-              /></label>
-              <label class="settings-field-wide"
-                >音频 URL<input
-                  v-model="config.music.audioUrl"
-                  type="url"
-                  placeholder="可选；留空时只同步播放状态"
-              /></label>
-              <label
-                >来源<select v-model="config.music.source">
-                  <option value="manual">手动</option>
-                  <option value="netease">NetEase</option>
-                  <option value="qq">QQ 音乐</option>
-                </select></label
-              >
-              <label
-                >歌单 ID / URL<input
-                  v-model="config.music.playlistId"
-                  type="text"
-                  placeholder="输入 ID 或歌单链接"
-              /></label>
-            </div>
-            <div class="settings-inline-actions">
-              <button
-                type="button"
-                class="settings-secondary"
-                :disabled="musicBusy || !config.music.playlistId.trim()"
-                @click="loadMusicPlaylist"
-              >
-                <IconGlyph
-                  :name="musicBusy ? 'refresh' : 'search'"
-                  :size="14"
-                />
-                {{ musicBusy ? "读取中" : "读取歌单" }}
-              </button>
-              <span v-if="config.music.title" class="settings-inline-status">
-                当前曲目：{{ config.music.title }}
-              </span>
-            </div>
-            <p v-if="musicError" class="settings-inline-error">
-              {{ musicError }}
-            </p>
-            <label class="settings-inline-toggle">
-              <input v-model="config.music.enabled" type="checkbox" />
-              <span>在首页显示音乐卡片</span>
-            </label>
-          </section>
-
-          <section class="settings-subpanel settings-subpanel-wide">
-            <header class="settings-subpanel-head">
-              <div>
-                <span class="settings-section-index">REPORTS</span>
-                <h3>平台报告</h3>
-                <p>报告卡片从已同步的数据源、游戏摘要和当前曲目实时生成。</p>
-              </div>
-              <IconGlyph name="report" :size="18" />
-            </header>
-            <div class="settings-report-summary">
-              <span
-                ><strong>{{ previewData?.reportPlatforms.length ?? 0 }}</strong>
-                张报告卡片</span
-              >
-              <span
-                ><strong>{{ previewData?.repositories.length ?? 0 }}</strong>
-                个仓库</span
-              >
-              <span
-                ><strong>{{ previewData?.libraryTiles.length ?? 0 }}</strong>
-                个资料项</span
-              >
-            </div>
-            <p class="settings-subpanel-note">
-              保存设置后，Reports
-              会优先显示最新同步的平台数据；来源不可用时继续保留上一次快照。
-            </p>
-          </section>
-        </div>
-
-        <footer class="settings-panel-foot">
-          <span
-            >修改组件字段后点击右上角“保存设置”，游戏账号读取需要开发服务器可用。</span
-          >
-          <strong>不会把 Token 写入页面快照</strong>
-        </footer>
-      </section>
-
-      <section
-        v-else-if="activeTab === 'content'"
-        id="settings-panel-content"
-        class="settings-panel"
-        role="tabpanel"
-        aria-labelledby="settings-tab-content"
-      >
-        <header class="settings-panel-head">
-          <div>
-            <span class="settings-section-index">04 / CONTENT</span>
-            <h2>内容管理</h2>
-            <p>补充 API 没有覆盖的作品、视频或音乐，也可以随时编辑。</p>
-          </div>
-          <span class="settings-count-badge"
-            >{{ config.manualItems.length }} 条手动内容</span
-          >
-        </header>
-        <form
-          class="settings-manual-form"
-          @submit.prevent="addOrUpdateManualItem"
+        <section
+          v-else
+          id="settings-panel-status"
+          class="settings-panel"
+          role="tabpanel"
+          aria-labelledby="settings-tab-status"
         >
-          <label
-            >标题<input
-              v-model="manualDraft.title"
-              type="text"
-              placeholder="例如：夏日重现"
-          /></label>
-          <label
-            >类型<select v-model="manualDraft.type">
-              <option
-                v-for="item in typeOptions"
-                :key="item.value"
-                :value="item.value"
-              >
-                {{ item.label }}
-              </option>
-            </select></label
-          >
-          <label
-            >标识（可选）<input
-              v-model="manualDraft.id"
-              type="text"
-              :disabled="editingManual"
-              placeholder="留空自动生成"
-          /></label>
-          <label
-            >副标题<input
-              v-model="manualDraft.subtitle"
-              type="text"
-              placeholder="来源或状态"
-          /></label>
-          <label
-            >封面 URL<input
-              v-model="manualDraft.cover"
-              type="url"
-              placeholder="https://…"
-          /></label>
-          <label
-            >链接<input
-              v-model="manualDraft.url"
-              type="url"
-              placeholder="https://…"
-          /></label>
-          <div class="settings-form-actions">
-            <button type="submit" class="settings-primary">
-              <IconGlyph
-                :name="editingManual ? 'save' : 'sparkles'"
-                :size="15"
-              />{{ manualActionLabel }}
-            </button>
+          <header class="settings-panel-head">
+            <div>
+              <span class="settings-section-index">03 / STATUS</span>
+              <h2>同步状态</h2>
+              <p>查看来源最近一次结果；失败不会清空已有快照。</p>
+            </div>
             <button
-              v-if="editingManual"
               type="button"
               class="settings-secondary"
-              @click="cancelManualEdit"
+              @click="exportConfig"
             >
-              取消编辑
+              <IconGlyph name="fileDown" :size="15" />导出配置
             </button>
+          </header>
+          <div class="settings-status-list">
+            <div
+              v-for="row in statusRows"
+              :key="row.id"
+              class="settings-status-row"
+            >
+              <span
+                :class="['settings-status-dot', statusClass(row.status)]"
+              ></span
+              ><strong>{{ row.label }}</strong
+              ><span class="settings-status-message">{{
+                row.status?.message || "尚未同步"
+              }}</span
+              ><small>{{
+                row.status
+                  ? `${statusText(row.status)} · ${row.status.count} 项`
+                  : "等待操作"
+              }}</small>
+            </div>
           </div>
-        </form>
-        <div v-if="config.manualItems.length" class="settings-manual-list">
-          <article
-            v-for="item in config.manualItems"
-            :key="item.id"
-            class="settings-manual-item"
-          >
-            <img v-if="item.cover" :src="item.cover" :alt="item.title" />
-            <span v-else class="settings-manual-placeholder"
-              ><IconGlyph name="library" :size="16"
-            /></span>
-            <div class="settings-manual-copy">
-              <strong>{{ item.title }}</strong
-              ><small
-                >{{
-                  item.subtitle ||
-                  typeOptions.find((option) => option.value === item.type)
-                    ?.label
-                }}
-                · {{ item.id }}</small
+          <section class="settings-auto-refresh">
+            <div>
+              <span class="settings-section-index">LOCAL AUTOMATION</span>
+              <h3>本地自动刷新</h3>
+              <p>只在开发服务器运行期间按间隔重新同步已启用来源。</p>
+            </div>
+            <div class="settings-auto-refresh-control">
+              <label class="settings-switch" aria-label="启用本地开发自动刷新"
+                ><input
+                  v-model="config.autoRefresh.enabled"
+                  type="checkbox" /><span></span></label
+              ><label
+                >间隔<select v-model.number="config.autoRefresh.intervalHours">
+                  <option :value="6">每 6 小时</option>
+                  <option :value="12">每 12 小时</option>
+                  <option :value="24">每天</option>
+                </select></label
               >
             </div>
-            <a
-              v-if="item.url"
-              class="settings-icon-button"
-              :href="item.url"
-              target="_blank"
-              rel="noreferrer"
-              aria-label="打开条目链接"
-              title="打开条目链接"
-              ><IconGlyph name="external" :size="14"
-            /></a>
-            <button
+          </section>
+          <div class="settings-snapshot-grid">
+            <div>
+              <small>本地配置</small><strong>.momona/localConfig.json</strong>
+            </div>
+            <div>
+              <small>公开快照</small><strong>.momona/generated.json</strong>
+            </div>
+            <div>
+              <small>最近写入</small><strong>{{ snapshotTime }}</strong>
+            </div>
+          </div>
+          <footer class="settings-panel-foot">
+            <span>Token 保存在本地凭据文件，不会进入公开快照。</span
+            ><button
               type="button"
-              class="settings-icon-button"
-              aria-label="编辑条目"
-              title="编辑条目"
-              @click="editManualItem(item)"
+              class="settings-quiet-action"
+              @click="activeTab = 'data'"
             >
-              <IconGlyph name="sliders" :size="14" />
+              管理数据来源 <IconGlyph name="arrowRight" :size="14" />
             </button>
-            <button
-              type="button"
-              class="settings-icon-button"
-              aria-label="删除条目"
-              title="删除条目"
-              @click="removeManualItem(item.id)"
-            >
-              <IconGlyph name="x" :size="14" />
-            </button>
-          </article>
-        </div>
-        <p v-else class="settings-empty-state">
-          还没有手动内容。添加后点击右上角“保存设置”即可写入页面快照。
-        </p>
-      </section>
-
-      <section
-        v-else
-        id="settings-panel-status"
-        class="settings-panel"
-        role="tabpanel"
-        aria-labelledby="settings-tab-status"
-      >
-        <header class="settings-panel-head">
-          <div>
-            <span class="settings-section-index">05 / STATUS</span>
-            <h2>同步状态</h2>
-            <p>查看每个来源最近一次结果；失败来源不会清空已有快照。</p>
-          </div>
-          <button
-            type="button"
-            class="settings-secondary"
-            @click="exportConfig"
-          >
-            <IconGlyph name="fileDown" :size="15" />导出配置
-          </button>
-        </header>
-        <div class="settings-status-list">
-          <div
-            v-for="row in statusRows"
-            :key="row.id"
-            class="settings-status-row"
-          >
-            <span
-              :class="['settings-status-dot', statusClass(row.status)]"
-            ></span>
-            <strong>{{ row.label }}</strong>
-            <span class="settings-status-message">{{
-              row.status?.message || "尚未同步"
-            }}</span>
-            <small>{{
-              row.status
-                ? `${statusText(row.status)} · ${row.status.count} 项`
-                : "等待操作"
-            }}</small>
-          </div>
-        </div>
-        <section class="settings-auto-refresh">
-          <div>
-            <span class="settings-section-index">LOCAL AUTOMATION</span>
-            <h3>本地开发自动刷新</h3>
-            <p>
-              开启后，开发服务器会按间隔重新同步已启用来源；静态发布站点仍需重新构建才会更新。
-            </p>
-          </div>
-          <div class="settings-auto-refresh-control">
-            <label class="settings-switch" aria-label="启用本地开发自动刷新">
-              <input v-model="config.autoRefresh.enabled" type="checkbox" />
-              <span></span>
-            </label>
-            <label>
-              间隔
-              <select v-model.number="config.autoRefresh.intervalHours">
-                <option :value="6">每 6 小时</option>
-                <option :value="12">每 12 小时</option>
-                <option :value="24">每天</option>
-              </select>
-            </label>
-          </div>
+          </footer>
         </section>
-        <div class="settings-snapshot-grid">
-          <div>
-            <small>本地配置</small><strong>.momona/localConfig.json</strong>
-          </div>
-          <div>
-            <small>公开快照</small><strong>.momona/generated.json</strong>
-          </div>
-          <div>
-            <small>最近写入</small><strong>{{ snapshotTime }}</strong>
-          </div>
-        </div>
-        <footer class="settings-panel-foot">
-          <span
-            >页面配置写入项目文件；本地 Token
-            单独保存在被忽略的凭据文件中。</span
-          ><button
-            type="button"
-            class="settings-quiet-action"
-            @click="activeTab = 'sources'"
-          >
-            管理数据来源 <IconGlyph name="arrowRight" :size="14" />
-          </button>
-        </footer>
-      </section>
+      </main>
     </div>
-
-    <footer
-      class="settings-footer"
-      :class="`is-${messageTone}`"
-      aria-live="polite"
-    >
-      {{ message }}
-    </footer>
 
     <div
       v-if="syncError"
@@ -1714,9 +975,8 @@ function statusClass(status?: ProviderStatus): string {
       >
         <header>
           <span class="settings-error-icon"
-            ><IconGlyph name="x" :size="17"
-          /></span>
-          <button
+            ><IconGlyph name="x" :size="17" /></span
+          ><button
             type="button"
             class="settings-icon-button"
             aria-label="关闭错误提示"
@@ -1730,7 +990,7 @@ function statusClass(status?: ProviderStatus): string {
           <span class="settings-section-index">SYNC ERROR</span>
           <h2 id="settings-error-title">{{ syncError.title }}</h2>
           <p>{{ syncError.message }}</p>
-          <small>已有页面数据已保留。检查设置后可以再次同步。</small>
+          <small>已有页面数据已保留，可以检查设置后再次同步。</small>
         </div>
         <footer>
           <button
@@ -1749,55 +1009,29 @@ function statusClass(status?: ProviderStatus): string {
 <style scoped>
 .settings-page {
   position: relative;
-  overflow-x: clip;
-  min-height: 100vh;
-  padding: 48px max(112px, calc(clamp(16px, 6vw, 96px) + 24px)) 76px
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  padding: 44px max(112px, calc(clamp(16px, 6vw, 96px) + 24px)) 72px
     clamp(16px, 6vw, 96px);
+  flex-direction: column;
+  overflow: hidden;
   color: var(--ink);
 }
-
 .settings-header,
-.settings-tabs,
-.settings-layout {
-  width: min(1160px, 100%);
+.settings-shell {
+  width: min(1180px, 100%);
   margin: 0 auto;
 }
-
 .settings-header {
   position: relative;
   display: flex;
-  align-items: flex-end;
-  gap: 15px;
-}
-
-.settings-back,
-.settings-icon-button {
-  display: grid;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  color: var(--muted-strong);
-  background: rgba(255, 255, 255, 0.62);
-  box-shadow: 0 8px 18px rgba(54, 45, 106, 0.08);
-  transition:
-    color 0.18s ease,
-    background 0.18s ease,
-    transform 0.18s ease;
-}
-
-.settings-back {
-  width: 38px;
-  height: 38px;
+  min-height: 63px;
+  margin-bottom: 26px;
   flex: 0 0 auto;
-  border-radius: 12px;
+  align-items: flex-end;
+  gap: 20px;
 }
-
-.settings-back:hover,
-.settings-icon-button:hover:not(:disabled) {
-  color: var(--purple-deep);
-  background: rgba(255, 255, 255, 0.92);
-  transform: translateY(-1px);
-}
-
 .settings-heading {
   min-width: 0;
 }
@@ -1809,8 +1043,8 @@ function statusClass(status?: ProviderStatus): string {
   letter-spacing: 0.13em;
 }
 .settings-heading h1 {
-  margin: 3px 0 4px;
-  font-size: clamp(1.5rem, 3vw, 2.2rem);
+  margin: 4px 0 5px;
+  font-size: clamp(1.55rem, 3vw, 2.2rem);
   line-height: 1;
 }
 .settings-heading p {
@@ -1818,35 +1052,51 @@ function statusClass(status?: ProviderStatus): string {
   color: var(--muted-strong);
   font-size: 0.68rem;
 }
-
-.settings-actions {
-  align-self: flex-end;
+.settings-header-actions {
+  position: absolute;
+  right: 0;
+  bottom: 0;
   display: flex;
-  margin-left: auto;
-  gap: 8px;
+  min-width: 0;
+  margin-left: 0;
+  align-items: center;
+  gap: 11px;
+}
+.settings-notice {
+  max-width: 340px;
+  overflow: hidden;
+  color: var(--muted-strong);
+  font-size: 0.58rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-notice.is-success {
+  color: #26825e;
+}
+.settings-notice.is-error {
+  color: #bd455b;
 }
 .settings-primary,
 .settings-secondary,
 .settings-quiet-action,
 .settings-source-sync {
   display: inline-flex;
-  min-height: 36px;
+  min-height: 35px;
   padding: 0 12px;
   align-items: center;
   justify-content: center;
   gap: 6px;
   border: 1px solid rgba(255, 255, 255, 0.82);
-  border-radius: 10px;
-  font-size: 0.63rem;
-  font-weight: 760;
+  border-radius: 9px;
+  font-size: 0.62rem;
+  font-weight: 750;
   white-space: nowrap;
 }
-
 .settings-primary {
+  border: 0;
   color: #fff;
   background: var(--purple-deep);
   box-shadow: 0 9px 18px rgba(85, 65, 181, 0.2);
-  border: none;
 }
 .settings-primary:hover:not(:disabled) {
   background: #47349d;
@@ -1854,245 +1104,220 @@ function statusClass(status?: ProviderStatus): string {
 .settings-secondary,
 .settings-quiet-action {
   color: var(--purple-deep);
-  background: rgba(255, 255, 255, 0.62);
+  background: rgba(255, 255, 255, 0.64);
 }
 .settings-secondary:hover:not(:disabled),
 .settings-quiet-action:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.92);
+  background: rgba(255, 255, 255, 0.94);
 }
 button:disabled {
   cursor: default;
   opacity: 0.48;
 }
-
-.settings-tabs {
-  display: flex;
-  min-height: 52px;
+.settings-shell {
+  display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-template-columns: 176px minmax(0, 1fr);
   align-items: stretch;
-  gap: 5px;
-  overflow-x: auto;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.65);
-  scrollbar-width: none;
+  gap: 18px;
 }
-.settings-tabs::-webkit-scrollbar {
-  display: none;
+.settings-sidebar {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  align-self: stretch;
+  padding: 10px 8px;
+  flex-direction: column;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.38);
+  box-shadow: 0 14px 32px rgba(54, 45, 106, 0.08);
+  backdrop-filter: blur(18px) saturate(132%);
+}
+.settings-sidebar-label {
+  padding: 6px 10px 9px;
+  color: var(--muted);
+  font-size: 0.53rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
 }
 .settings-tab {
   position: relative;
-  display: inline-flex;
-  min-width: 112px;
-  padding: 0 13px;
+  display: flex;
+  min-height: 42px;
+  padding: 0 10px;
   align-items: center;
-  justify-content: center;
-  gap: 7px;
+  gap: 9px;
   border: 0;
+  border-radius: 9px;
   color: var(--muted-strong);
   background: transparent;
-  font-size: 0.65rem;
+  font-size: 0.63rem;
   font-weight: 720;
-}
-.settings-tab::after {
-  position: absolute;
-  right: 12px;
-  bottom: -1px;
-  left: 12px;
-  height: 2px;
-  background: transparent;
-  content: "";
+  text-align: left;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease;
 }
 .settings-tab:hover {
   color: var(--purple-deep);
+  background: rgba(255, 255, 255, 0.55);
 }
 .settings-tab.is-active {
   color: var(--purple-deep);
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 5px 12px rgba(54, 45, 106, 0.06);
 }
-.settings-tab.is-active::after {
-  background: var(--purple-deep);
-}
-.settings-tab small {
-  display: inline-grid;
-  min-width: 19px;
+.settings-tab.is-active::before {
+  position: absolute;
+  left: -8px;
+  width: 3px;
   height: 19px;
-  padding: 0 4px;
-  place-items: center;
-  border-radius: 10px;
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
-  font-size: 0.52rem;
+  border-radius: 0 3px 3px 0;
+  background: var(--pink);
+  content: "";
+}
+.settings-tab span {
+  flex: 1;
 }
 
-.settings-layout {
-  display: grid;
-  gap: 14px;
-  padding-top: 14px;
-}
-.settings-component-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-.settings-subpanel {
-  min-width: 0;
-  padding: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.38);
-}
-.settings-subpanel-wide {
-  grid-column: 1 / -1;
-}
-.settings-subpanel-head {
+.settings-sidebar-brand {
   display: flex;
-  min-height: 39px;
-  margin-bottom: 16px;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-  color: var(--purple-deep);
-}
-.settings-subpanel-head h3 {
-  margin: 4px 0 4px;
-  color: var(--ink);
-  font-size: 0.88rem;
-}
-.settings-subpanel-head p {
-  margin: 0;
-  color: var(--muted-strong);
-  font-size: 0.58rem;
-}
-.settings-inline-actions {
-  display: flex;
-  min-height: 36px;
-  margin-top: 13px;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 9px;
-}
-.settings-inline-status {
-  min-width: 0;
-  overflow: hidden;
-  color: var(--muted-strong);
-  font-size: 0.58rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.settings-inline-error {
-  margin: 9px 0 0;
-  color: #bd455b;
-  font-size: 0.57rem;
-  overflow-wrap: anywhere;
-}
-.settings-subpanel-note {
-  margin: 12px 0 0;
-  color: var(--muted);
-  font-size: 0.56rem;
-  line-height: 1.45;
-}
-.settings-inline-toggle {
-  display: inline-flex !important;
-  margin-top: 13px;
-  flex-direction: row !important;
-  align-items: center;
-  gap: 7px;
-  cursor: pointer;
-}
-.settings-inline-toggle input {
-  width: 15px !important;
-  height: 15px !important;
-  accent-color: var(--purple);
-}
-.settings-report-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.settings-report-summary span {
-  display: flex;
-  min-height: 49px;
-  padding: 8px 10px;
-  flex-direction: column;
+  align-self: center;
   justify-content: center;
-  gap: 3px;
-  border-radius: 8px;
-  color: var(--muted);
-  background: rgba(255, 255, 255, 0.42);
-  font-size: 0.55rem;
+  margin-top: auto;
+  padding: 13px 10px 5px;
+  border-top: 1px solid rgba(118, 126, 151, 0.1);
 }
-.settings-report-summary strong {
-  color: var(--purple-deep);
-  font-size: 0.9rem;
+.settings-sidebar-brand strong {
+  display: block;
+  color: rgba(93, 105, 128, 0.72);
+  font-size: 2rem;
+  font-weight: bold;
+  letter-spacing: 0.04em;
+  font-family: "Momona Script";
+}
+.settings-main {
+  min-width: 0;
+  min-height: 0;
+  overflow: visible;
 }
 .settings-panel {
-  padding: 22px;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  min-height: 0;
+  padding: 24px;
+  overflow-x: hidden;
+  overflow-y: auto;
   border: 1px solid var(--glass-border);
   border-radius: 16px;
   background: var(--glass);
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(18px) saturate(132%);
+  scrollbar-width: none;
 }
 .settings-panel-head {
   display: flex;
-  min-height: 44px;
+  min-height: 45px;
+  margin-bottom: 24px;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 20px;
+  gap: 18px;
 }
 .settings-panel-head h2 {
-  margin: 4px 0 4px;
-  font-size: 1rem;
+  margin: 5px 0 5px;
+  font-size: 1.05rem;
 }
 .settings-panel-head p {
   margin: 0;
   color: var(--muted-strong);
   font-size: 0.62rem;
+  line-height: 1.45;
 }
-.settings-profile-preview {
+.settings-site-preview {
   display: flex;
-  max-width: 250px;
+  min-width: 175px;
+  padding: 8px 10px;
   align-items: center;
   gap: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.44);
 }
-.settings-profile-preview img {
-  width: 42px;
-  height: 42px;
-  border: 2px solid rgba(255, 255, 255, 0.88);
-  border-radius: 50%;
-  object-fit: cover;
-}
-.settings-profile-preview span {
+.settings-site-preview > span:last-child {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 3px;
 }
-.settings-profile-preview strong,
-.settings-profile-preview small {
+.settings-site-preview strong,
+.settings-site-preview small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.settings-profile-preview strong {
-  font-size: 0.68rem;
+.settings-site-preview strong {
+  font-size: 0.62rem;
 }
-.settings-profile-preview small {
+.settings-site-preview small {
   color: var(--muted);
-  font-size: 0.55rem;
+  font-size: 0.5rem;
 }
-
+.settings-site-favicon {
+  display: grid;
+  width: 31px;
+  height: 31px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 8px;
+  color: var(--purple-deep);
+  background: rgba(117, 100, 222, 0.1);
+  overflow: hidden;
+}
+.settings-site-favicon img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.settings-section-block + .settings-section-block-separated {
+  margin-top: 26px;
+  padding-top: 22px;
+  border-top: 1px solid rgba(118, 126, 151, 0.14);
+}
+.settings-section-heading {
+  display: flex;
+  margin-bottom: 15px;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  color: var(--purple-deep);
+}
+.settings-section-heading h3,
+.settings-extra-head h3 {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-size: 0.79rem;
+}
+.settings-section-heading p,
+.settings-extra-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.56rem;
+  line-height: 1.45;
+}
 .settings-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 11px;
 }
-.settings-profile-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+.settings-form-grid-wide {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 .settings-field-wide {
-  grid-column: span 2;
-}
-.settings-profile-grid .settings-field-wide {
-  grid-column: span 2;
+  grid-column: 1 / -1;
 }
 .settings-page label {
   display: flex;
@@ -2104,20 +1329,33 @@ button:disabled {
   font-weight: 700;
 }
 .settings-page input,
-.settings-page select {
+.settings-page select,
+.settings-page textarea {
   width: 100%;
-  height: 36px;
   min-width: 0;
   padding: 0 10px;
   border: 1px solid rgba(125, 132, 163, 0.18);
-  border-radius: 9px;
+  border-radius: 8px;
   outline: none;
   color: var(--ink);
   background: rgba(255, 255, 255, 0.65);
-  font-size: 0.64rem;
+  font: inherit;
+  font-size: 0.63rem;
+}
+.settings-page input,
+.settings-page select {
+  height: 36px;
+}
+.settings-page textarea {
+  min-height: 70px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+  resize: vertical;
+  line-height: 1.45;
 }
 .settings-page input:focus,
-.settings-page select:focus {
+.settings-page select:focus,
+.settings-page textarea:focus {
   border-color: rgba(117, 100, 222, 0.56);
   box-shadow: 0 0 0 3px rgba(117, 100, 222, 0.1);
 }
@@ -2125,56 +1363,331 @@ button:disabled {
   cursor: not-allowed;
   opacity: 0.6;
 }
-.settings-panel-foot {
-  display: flex;
-  min-height: 31px;
-  margin-top: 19px;
-  padding-top: 12px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  border-top: 1px solid rgba(118, 126, 151, 0.13);
-  color: var(--muted);
-  font-size: 0.57rem;
-}
-.settings-panel-foot strong {
-  color: var(--muted-strong);
-  font-size: 0.57rem;
-  font-weight: 700;
-}
-
-.settings-source-grid {
+.settings-profile-layout {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 11px;
+  grid-template-columns: 114px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
 }
-.settings-source-card {
+.settings-profile-preview {
   display: flex;
   min-width: 0;
+  padding-top: 2px;
   flex-direction: column;
-  padding: 15px;
+  align-items: center;
+  gap: 5px;
+  text-align: center;
+}
+.settings-profile-preview img {
+  width: 68px;
+  height: 68px;
+  border: 3px solid rgba(255, 255, 255, 0.86);
+  border-radius: 50%;
+  object-fit: cover;
+  box-shadow: 0 8px 18px rgba(54, 45, 106, 0.12);
+}
+.settings-profile-preview strong {
+  max-width: 114px;
+  overflow: hidden;
+  font-size: 0.63rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-profile-preview small {
+  max-width: 114px;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.5rem;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+}
+.settings-source-workspace {
+  display: grid;
+  grid-template-columns: 252px minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+.settings-source-index,
+.settings-source-detail,
+.settings-extra-card {
+  min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.72);
   border-radius: 12px;
-  background: rgba(255, 255, 255, 0.43);
-  transition:
-    opacity 0.18s ease,
-    border-color 0.18s ease;
+  background: rgba(255, 255, 255, 0.4);
 }
-.settings-source-card.is-disabled {
-  opacity: 0.72;
+.settings-source-index,
+.settings-source-detail {
+  height: 560px;
+  box-sizing: border-box;
 }
-.settings-source-head {
+.settings-source-index {
   display: flex;
-  min-height: 38px;
+  padding: 13px;
+  flex-direction: column;
+  overflow: hidden;
+}
+.settings-source-index-head {
+  display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  gap: 8px;
+  gap: 10px;
 }
-.settings-source-title {
+.settings-source-index-head h3 {
+  margin: 4px 0 3px;
+  font-size: 0.76rem;
+}
+.settings-source-index-head p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.52rem;
+  line-height: 1.4;
+}
+.settings-source-search {
+  display: flex !important;
+  height: 32px;
+  margin-top: 12px;
+  padding: 0 8px !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid rgba(125, 132, 163, 0.16);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.55);
+}
+.settings-source-search input {
+  height: 100% !important;
+  padding: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+.settings-source-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 8px;
+}
+.settings-source-filters button {
+  display: flex;
+  min-width: 0;
+  min-height: 28px;
+  padding: 0 5px;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 0;
+  border-radius: 7px;
+  color: var(--muted);
+  background: transparent;
+  font-size: 0.49rem;
+  font-weight: 700;
+}
+.settings-source-filters button:hover,
+.settings-source-filters button.is-active {
+  color: var(--purple-deep);
+  background: rgba(117, 100, 222, 0.1);
+}
+.settings-source-list {
+  display: grid;
+  min-height: 0;
+  margin-top: 9px;
+  flex: 1;
+  gap: 4px;
+  overflow: auto;
+  scrollbar-width: none;
+}
+.settings-source-list-item {
+  display: flex;
+  min-width: 0;
+  min-height: 54px;
+  align-items: stretch;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.42);
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease;
+}
+.settings-source-list-item:hover {
+  border-color: rgba(117, 100, 222, 0.2);
+  background: rgba(255, 255, 255, 0.7);
+}
+.settings-source-list-item.is-selected {
+  border-color: rgba(117, 100, 222, 0.36);
+  background: rgba(117, 100, 222, 0.09);
+  box-shadow: inset 3px 0 0 var(--purple);
+}
+.settings-source-list-item.is-disabled {
+  opacity: 0.68;
+}
+.settings-source-select {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  padding: 7px 3px 7px 8px;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  color: var(--ink);
+  background: transparent;
+  text-align: left;
+}
+.settings-source-select:hover {
+  color: var(--purple-deep);
+}
+.settings-source-select-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+.settings-source-select-copy strong,
+.settings-source-select-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-source-select-copy strong {
+  font-size: 0.59rem;
+}
+.settings-source-select-copy small {
+  color: var(--muted);
+  font-size: 0.46rem;
+}
+.settings-source-list-status {
+  display: inline-flex;
+  max-width: 47px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+}
+.settings-source-list-status i {
+  width: 6px;
+  height: 6px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--muted);
+}
+.settings-source-list-status em {
+  overflow: hidden;
+  font-size: 0.44rem;
+  font-style: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-source-list-status.is-success i {
+  background: var(--green);
+}
+.settings-source-list-status.is-error i {
+  background: #df5a70;
+}
+.settings-source-list-status.is-cleared i {
+  background: var(--purple);
+}
+.settings-source-list-switch {
+  position: relative;
+  display: inline-flex !important;
+  width: 30px;
+  height: 18px;
+  margin: auto 8px auto 0;
+  flex: 0 0 auto;
+  flex-direction: row !important;
+  cursor: pointer;
+}
+.settings-source-list-switch input {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.settings-source-list-switch > span {
+  position: relative;
+  display: block;
+  width: 30px;
+  height: 18px;
+  border-radius: 12px;
+  background: rgba(118, 126, 151, 0.25);
+  pointer-events: none;
+  transition: background 0.18s ease;
+}
+.settings-source-list-switch > span::after {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(38, 39, 72, 0.16);
+  content: "";
+  transition: transform 0.18s ease;
+}
+.settings-source-list-switch input:checked + span {
+  background: var(--purple);
+}
+.settings-source-list-switch input:checked + span::after {
+  transform: translateX(12px);
+}
+.settings-source-list-empty {
+  margin: 16px 3px;
+  color: var(--muted);
+  font-size: 0.55rem;
+  text-align: center;
+}
+.settings-source-detail {
+  display: flex;
+  padding: 18px;
+  flex-direction: column;
+}
+.settings-source-detail-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+.settings-source-detail-title {
   display: flex;
   min-width: 0;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
+}
+.settings-source-detail-title > div {
+  min-width: 0;
+}
+.settings-source-detail-title h3 {
+  margin: 4px 0 3px;
+  font-size: 0.88rem;
+}
+.settings-source-detail-title p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.54rem;
+}
+.settings-source-detail-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.settings-source-detail-actions .settings-source-status {
+  white-space: nowrap;
+}
+.settings-source-detail-foot {
+  display: flex;
+  margin-top: auto;
+  padding-top: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  border-top: 1px solid rgba(118, 126, 151, 0.13);
 }
 .settings-source-icon {
   display: grid;
@@ -2186,191 +1699,54 @@ button:disabled {
   color: var(--purple-deep);
   background: rgba(117, 100, 222, 0.11);
 }
-.settings-source-title > span:last-child {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-}
-.settings-source-title strong {
-  font-size: 0.72rem;
-}
-.settings-source-title small {
-  color: var(--muted);
-  font-size: 0.55rem;
-}
-.settings-source-hint {
-  min-height: 31px;
-  margin: 12px 0 13px;
-  color: var(--muted-strong);
-  font-size: 0.57rem;
-  line-height: 1.45;
-}
-.settings-source-snapshot {
+.settings-source-summary {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 5px;
-  margin-bottom: 13px;
-  padding: 7px 0;
+  grid-template-columns: 1.5fr 0.9fr 0.8fr;
+  gap: 7px;
+  margin-bottom: 14px;
+  padding: 8px 0;
   border-top: 1px solid rgba(118, 126, 151, 0.13);
   border-bottom: 1px solid rgba(118, 126, 151, 0.13);
 }
-.settings-source-snapshot span {
+.settings-source-summary span {
   display: flex;
   min-width: 0;
   flex-direction: column;
   gap: 3px;
 }
-.settings-source-snapshot small {
+.settings-source-summary small {
   color: var(--muted);
   font-size: 0.48rem;
 }
-.settings-source-snapshot strong {
+.settings-source-summary strong {
   overflow: hidden;
   color: var(--muted-strong);
-  font-size: 0.56rem;
+  font-size: 0.55rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.settings-source-snapshot-state strong {
-  color: var(--purple-deep);
-}
-.settings-source-snapshot.is-error .settings-source-snapshot-state strong {
-  color: #bd455b;
-}
-.settings-source-snapshot.is-cleared .settings-source-snapshot-state strong {
-  color: var(--muted-strong);
-}
 .settings-source-fields {
   display: grid;
-  grid-template-columns: 74px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 150px;
   gap: 9px;
 }
 .settings-source-fields .settings-field-wide {
   grid-column: 1 / -1;
 }
-.settings-content-options {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+.settings-source-adapter {
   margin-top: 13px;
-  padding-top: 11px;
+  padding-top: 12px;
   border-top: 1px solid rgba(118, 126, 151, 0.13);
 }
-.settings-content-options-head {
+.settings-source-adapter-head {
   display: flex;
-  grid-column: 1 / -1;
-  align-items: baseline;
+  min-height: 26px;
+  align-items: center;
   justify-content: space-between;
   gap: 8px;
-}
-.settings-content-options-head strong {
   color: var(--muted-strong);
-  font-size: 0.57rem;
-}
-.settings-content-options-head small {
-  color: var(--muted);
-  font-size: 0.5rem;
-  font-weight: 500;
-  text-align: right;
-}
-.settings-content-option {
-  display: flex !important;
-  min-height: 37px;
-  padding: 6px 7px;
-  flex-direction: row !important;
-  align-items: center;
-  gap: 7px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.46);
-  cursor: pointer;
-}
-.settings-content-option > input {
-  width: 15px !important;
-  height: 15px !important;
-  flex: 0 0 auto;
-  accent-color: var(--purple);
-}
-.settings-content-option > span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-.settings-content-option strong,
-.settings-content-option small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.settings-content-option strong {
-  color: var(--ink-soft);
   font-size: 0.56rem;
-}
-.settings-content-option small {
-  color: var(--muted);
-  font-size: 0.49rem;
-  font-weight: 500;
-}
-.settings-source-scope {
-  display: grid;
-  gap: 7px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(118, 126, 151, 0.13);
-}
-.settings-source-scope-label {
-  color: var(--muted-strong);
-  font-size: 0.57rem;
-  font-weight: 700;
-}
-.settings-source-scope-control {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
-}
-.settings-source-scope-control label {
-  position: relative;
-  display: flex !important;
-  min-height: 31px;
-  padding: 0 8px;
-  flex-direction: row !important;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(125, 132, 163, 0.16);
-  border-radius: 8px;
-  color: var(--muted-strong);
-  background: rgba(255, 255, 255, 0.42);
-  cursor: pointer;
-  font-size: 0.55rem;
-  transition:
-    color 0.18s ease,
-    border-color 0.18s ease,
-    background 0.18s ease;
-}
-.settings-source-scope-control label:has(input:checked) {
-  border-color: rgba(117, 100, 222, 0.42);
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
-}
-.settings-source-scope-control input {
-  position: absolute;
-  width: 1px !important;
-  height: 1px !important;
-  opacity: 0;
-  pointer-events: none;
-}
-.settings-source-scope > small {
-  color: var(--muted);
-  font-size: 0.5rem;
-}
-.settings-source-sort {
-  max-width: 190px;
-  margin-top: 5px;
-}
-.settings-source-sort select {
-  height: 31px;
-  font-size: 0.56rem;
+  font-weight: 750;
 }
 .settings-switch {
   position: relative;
@@ -2418,29 +1794,13 @@ button:disabled {
 .settings-switch input:checked + span::after {
   transform: translateX(14px);
 }
-.settings-source-foot {
-  display: flex;
-  flex: 1;
-  align-items: end;
-}
-
-.settings-source-foot > div {
-  display: flex;
-  align-items: center;
-  min-height: 36px;
-  margin-top: 14px;
-  justify-content: space-between;
-  gap: 8px;
-  flex: 1;
-}
-
 .settings-source-status {
   display: inline-flex;
   min-width: 0;
   align-items: center;
   gap: 5px;
   color: var(--muted-strong);
-  font-size: 0.56rem;
+  font-size: 0.54rem;
 }
 .settings-source-status i {
   width: 7px;
@@ -2450,7 +1810,7 @@ button:disabled {
 }
 .settings-source-status small {
   color: var(--muted);
-  font-size: 0.53rem;
+  font-size: 0.5rem;
 }
 .settings-source-status.is-success i {
   background: var(--green);
@@ -2459,181 +1819,32 @@ button:disabled {
   background: #df5a70;
 }
 .settings-source-sync {
-  min-height: 31px;
-  padding: 0 9px;
+  min-height: 30px;
+  padding: 0 8px;
+  font-size: 0.54rem;
+}
+.settings-source-sync {
   color: var(--purple-deep);
   background: rgba(255, 255, 255, 0.72);
-  font-size: 0.57rem;
 }
-.settings-source-sync:hover:not(:disabled) {
+.settings-icon-button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 8px;
+  color: var(--muted-strong);
+  background: rgba(255, 255, 255, 0.62);
+}
+.settings-icon-button:hover {
+  color: var(--purple-deep);
   background: #fff;
 }
-.settings-source-manage {
-  min-height: 31px;
-  padding: 0 8px;
-  color: var(--muted-strong);
-  background: rgba(255, 255, 255, 0.42);
-  font-size: 0.57rem;
-}
-.settings-source-manage:hover:not(:disabled) {
-  color: var(--purple-deep);
-  background: rgba(255, 255, 255, 0.82);
-}
-
-.settings-source-management {
-  margin-top: 14px;
-  padding: 16px;
-  border: 1px solid rgba(117, 100, 222, 0.18);
-  border-radius: 12px;
-  background: rgba(249, 248, 255, 0.58);
-}
-.settings-source-management-head {
+.settings-panel-foot {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-.settings-source-management-head h3 {
-  margin: 4px 0;
-  font-size: 0.85rem;
-}
-.settings-source-management-head p {
-  max-width: 640px;
-  margin: 0;
-  color: var(--muted-strong);
-  font-size: 0.57rem;
-  line-height: 1.45;
-}
-.settings-source-management-metrics {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
-  margin-top: 14px;
-}
-.settings-source-management-metrics > div {
-  display: flex;
-  min-width: 0;
-  min-height: 65px;
-  padding: 9px 10px;
-  flex-direction: column;
-  justify-content: center;
-  gap: 3px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.56);
-}
-.settings-source-management-metrics small,
-.settings-source-management-metrics span {
-  color: var(--muted);
-  font-size: 0.5rem;
-}
-.settings-source-management-metrics strong {
-  color: var(--purple-deep);
-  font-size: 0.72rem;
-}
-.settings-source-management-metrics span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.settings-source-preview-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-  margin-top: 14px;
-}
-.settings-source-preview-group {
-  min-width: 0;
-}
-.settings-source-preview-label {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 8px;
-  margin-bottom: 7px;
-}
-.settings-source-preview-label strong {
-  color: var(--muted-strong);
-  font-size: 0.58rem;
-}
-.settings-source-preview-label small {
-  color: var(--muted);
-  font-size: 0.5rem;
-}
-.settings-source-sample-list {
-  display: grid;
-  gap: 5px;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.settings-source-sample-list li {
-  display: flex;
-  min-width: 0;
-  min-height: 39px;
-  padding: 5px 7px;
-  align-items: center;
-  gap: 7px;
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.5);
-}
-.settings-source-sample-list img,
-.settings-source-sample-placeholder {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 6px;
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
-  object-fit: cover;
-}
-.settings-source-sample-copy {
-  display: flex;
-  min-width: 0;
-  flex: 1;
-  flex-direction: column;
-  gap: 2px;
-}
-.settings-source-sample-copy strong,
-.settings-source-sample-copy small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.settings-source-sample-copy strong {
-  color: var(--ink-soft);
-  font-size: 0.56rem;
-}
-.settings-source-sample-copy small {
-  color: var(--muted);
-  font-size: 0.49rem;
-}
-.settings-source-sample-list a {
-  display: grid;
-  width: 25px;
-  height: 25px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 6px;
-  color: var(--muted-strong);
-}
-.settings-source-sample-list a:hover {
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
-}
-.settings-source-preview-empty {
-  margin: 14px 0 0;
-  padding: 14px;
-  border: 1px dashed rgba(118, 126, 151, 0.26);
-  border-radius: 8px;
-  color: var(--muted);
-  font-size: 0.57rem;
-  line-height: 1.5;
-}
-.settings-source-management-foot {
-  display: flex;
-  margin-top: 14px;
+  margin-top: 15px;
   padding-top: 12px;
   align-items: center;
   justify-content: space-between;
@@ -2642,128 +1853,163 @@ button:disabled {
   color: var(--muted);
   font-size: 0.54rem;
 }
-.settings-source-management-foot > div {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 6px;
-}
-.settings-danger-action {
-  display: inline-flex;
-  min-height: 31px;
-  padding: 0 9px;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  border: 1px solid rgba(189, 69, 91, 0.18);
-  border-radius: 9px;
-  color: #a83f55;
-  background: rgba(255, 243, 246, 0.78);
-  font-size: 0.56rem;
-  font-weight: 720;
-}
-.settings-danger-action:hover:not(:disabled) {
-  background: rgba(255, 232, 237, 0.96);
-}
-
-.settings-count-badge {
-  display: inline-flex;
-  min-height: 27px;
-  padding: 0 9px;
-  align-items: center;
-  border-radius: 8px;
+.settings-adapter-count {
+  min-width: 30px;
+  padding: 5px 7px;
+  border-radius: 7px;
   color: var(--purple-deep);
   background: rgba(117, 100, 222, 0.1);
-  font-size: 0.56rem;
-  font-weight: 750;
+  font-size: 0.52rem;
+  text-align: center;
 }
-.settings-manual-form {
+.settings-content-options {
   display: grid;
-  grid-template-columns: 2fr 1fr 1.2fr 1.5fr;
-  gap: 11px;
-  align-items: end;
-}
-.settings-manual-form label:nth-child(5) {
-  grid-column: span 2;
-}
-.settings-form-actions {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
-.settings-form-actions button {
-  min-height: 36px;
-}
-.settings-manual-list {
-  display: grid;
-  margin-top: 16px;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 7px;
+  gap: 6px;
+  margin-top: 13px;
+  padding-top: 11px;
+  border-top: 1px solid rgba(118, 126, 151, 0.13);
 }
-.settings-manual-item {
-  display: flex;
-  min-width: 0;
-  min-height: 55px;
-  padding: 6px;
+.settings-content-option {
+  display: flex !important;
+  min-height: 38px;
+  padding: 6px 7px;
+  flex-direction: row !important;
   align-items: center;
-  gap: 8px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.52);
+  gap: 7px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.46);
+  cursor: pointer;
 }
-.settings-manual-item img,
-.settings-manual-placeholder {
-  display: grid;
-  width: 42px;
-  height: 42px;
+.settings-content-option > input {
+  width: 15px !important;
+  height: 15px;
   flex: 0 0 auto;
-  place-items: center;
-  border-radius: 7px;
-  object-fit: cover;
-  color: var(--purple-deep);
-  background: rgba(231, 228, 247, 0.7);
+  accent-color: var(--purple);
 }
-.settings-manual-copy {
+.settings-content-option > span {
   display: flex;
   min-width: 0;
-  flex: 1;
   flex-direction: column;
-  gap: 3px;
+  gap: 2px;
 }
-.settings-manual-copy strong,
-.settings-manual-copy small {
+.settings-content-option strong,
+.settings-content-option small {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.settings-manual-copy strong {
-  font-size: 0.63rem;
+.settings-content-option strong {
+  color: var(--ink-soft);
+  font-size: 0.55rem;
 }
-.settings-manual-copy small {
+.settings-content-option small {
   color: var(--muted);
+  font-size: 0.48rem;
+  font-weight: 500;
+}
+.settings-source-scope {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(118, 126, 151, 0.13);
+}
+.settings-source-scope-label {
+  color: var(--muted-strong);
+  font-size: 0.56rem;
+  font-weight: 700;
+}
+.settings-source-scope-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+.settings-source-scope-control label {
+  position: relative;
+  display: flex !important;
+  min-height: 31px;
+  padding: 0 8px;
+  flex-direction: row !important;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid rgba(125, 132, 163, 0.16);
+  border-radius: 8px;
+  color: var(--muted-strong);
+  background: rgba(255, 255, 255, 0.42);
+  cursor: pointer;
   font-size: 0.53rem;
 }
-.settings-manual-item .settings-icon-button {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 auto;
-  padding: 0;
-  border-radius: 8px;
+.settings-source-scope-control label:has(input:checked) {
+  border-color: rgba(117, 100, 222, 0.42);
+  color: var(--purple-deep);
+  background: rgba(117, 100, 222, 0.1);
 }
-.settings-empty-state {
-  margin: 18px 0 0;
-  padding: 18px;
-  border: 1px dashed rgba(118, 126, 151, 0.26);
-  border-radius: 10px;
-  color: var(--muted);
-  font-size: 0.62rem;
-  text-align: center;
+.settings-source-scope-control input {
+  position: absolute;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0;
+  pointer-events: none;
 }
-
-.settings-icon-button {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border-radius: 9px;
+.settings-source-sort {
+  max-width: 190px;
+  margin-top: 5px;
+}
+.settings-source-sort select {
+  height: 31px;
+  font-size: 0.55rem;
+}
+.settings-extra-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+  margin-top: 13px;
+}
+.settings-extra-head {
+  margin-bottom: 14px;
+}
+.settings-extra-head > svg {
+  color: var(--purple-deep);
+}
+.settings-inline-actions {
+  display: flex;
+  min-height: 31px;
+  margin-top: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.settings-inline-status {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted-strong);
+  font-size: 0.55rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.settings-inline-error {
+  margin: 9px 0 0;
+  color: #bd455b;
+  font-size: 0.55rem;
+  overflow-wrap: anywhere;
+}
+.settings-inline-toggle {
+  display: inline-flex !important;
+  margin: 0 !important;
+  flex-direction: row !important;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.settings-inline-toggle input {
+  width: 15px !important;
+  height: 15px;
+  accent-color: var(--purple);
+}
+.settings-inline-toggle span {
+  color: var(--muted-strong);
+  font-size: 0.55rem;
 }
 .settings-status-list {
   display: grid;
@@ -2771,17 +2017,17 @@ button:disabled {
 }
 .settings-status-row {
   display: grid;
-  grid-template-columns: 8px 78px minmax(0, 1fr) auto;
+  grid-template-columns: 8px 82px minmax(0, 1fr) auto;
+  min-height: 39px;
+  padding: 0 10px;
   align-items: center;
   gap: 9px;
-  min-height: 38px;
-  padding: 0 10px;
   border-radius: 9px;
   background: rgba(255, 255, 255, 0.46);
-  font-size: 0.58rem;
+  font-size: 0.57rem;
 }
 .settings-status-row strong {
-  font-size: 0.6rem;
+  font-size: 0.59rem;
 }
 .settings-status-message {
   overflow: hidden;
@@ -2791,7 +2037,7 @@ button:disabled {
 }
 .settings-status-row small {
   color: var(--muted);
-  font-size: 0.54rem;
+  font-size: 0.52rem;
   white-space: nowrap;
 }
 .settings-status-dot {
@@ -2840,13 +2086,12 @@ button:disabled {
 }
 .settings-snapshot-grid {
   display: grid;
-  margin-top: 16px;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+  margin-top: 16px;
 }
 .settings-snapshot-grid div {
   display: flex;
-  min-width: 0;
   min-height: 58px;
   padding: 10px;
   flex-direction: column;
@@ -2857,39 +2102,14 @@ button:disabled {
 }
 .settings-snapshot-grid small {
   color: var(--muted);
-  font-size: 0.52rem;
+  font-size: 0.51rem;
 }
 .settings-snapshot-grid strong {
   overflow: hidden;
-  font-size: 0.6rem;
+  font-size: 0.59rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-
-.settings-footer {
-  position: fixed;
-  right: 18px;
-  bottom: 18px;
-  z-index: 20;
-  min-height: 32px;
-  max-width: min(540px, calc(100vw - 36px));
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.78);
-  border-radius: 9px;
-  color: var(--muted-strong);
-  background: rgba(255, 255, 255, 0.72);
-  box-shadow: 0 10px 24px rgba(54, 45, 106, 0.12);
-  font-size: 0.58rem;
-  text-align: right;
-  backdrop-filter: blur(14px);
-}
-.settings-footer.is-success {
-  color: #26825e;
-}
-.settings-footer.is-error {
-  color: #bd455b;
-}
-
 .settings-modal-backdrop {
   position: fixed;
   z-index: 40;
@@ -2934,192 +2154,157 @@ button:disabled {
   display: block;
   margin: 0;
   color: var(--muted-strong);
-  font-size: 0.63rem;
+  font-size: 0.62rem;
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
 .settings-error-modal small {
   margin-top: 9px;
   color: var(--muted);
-  font-size: 0.55rem;
+  font-size: 0.54rem;
 }
 .settings-error-modal > footer {
   display: flex;
   justify-content: flex-end;
   margin-top: 8px;
 }
-
-@media (max-width: 1040px) {
-  .settings-source-grid {
-    grid-template-columns: 1fr;
-  }
-  .settings-source-card {
-    display: grid;
-    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr) auto;
-    column-gap: 16px;
-  }
-  .settings-source-head {
-    grid-row: span 2;
-  }
-  .settings-source-hint {
-    min-height: 0;
-    margin: 0;
-  }
-  .settings-source-snapshot,
-  .settings-source-management {
-    grid-column: 2 / -1;
-  }
-  .settings-source-fields {
-    grid-column: 2 / -1;
-  }
-  .settings-content-options {
-    grid-column: 2 / -1;
-  }
-  .settings-source-scope {
-    grid-column: 2 / -1;
-  }
-  .settings-source-foot {
-    grid-column: 2 / -1;
+@media (max-width: 1060px) {
+  .settings-source-workspace {
+    grid-template-columns: 220px minmax(0, 1fr);
   }
 }
-
 @media (max-width: 820px) {
   .settings-page {
     padding: 76px 14px 96px;
   }
   .settings-header {
-    flex-wrap: nowrap;
+    flex-direction: column;
+    align-items: flex-start;
   }
-  .settings-heading {
+  .settings-header-actions {
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    margin-left: 0;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+  }
+  .settings-notice {
+    min-width: 0;
+    max-width: none;
     flex: 1 1 auto;
-    max-width: calc(100% - 100px);
   }
-  .settings-actions {
-    position: static;
-    width: auto;
-    margin: 0 0 0 auto;
+  .settings-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .settings-sidebar {
+    display: grid;
+    height: auto;
+    flex: 0 0 auto;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 3px;
+    padding: 6px;
+  }
+  .settings-sidebar-label,
+  .settings-sidebar-brand {
+    display: none;
+  }
+  .settings-tab {
+    min-height: 42px;
+    padding: 0 4px;
+    flex-direction: column;
+    justify-content: center;
+    gap: 3px;
+    font-size: 0.5rem;
+    text-align: center;
+  }
+  .settings-tab span {
     flex: 0 0 auto;
   }
-
+  .settings-tab.is-active::before {
+    top: auto;
+    right: 22%;
+    bottom: -6px;
+    left: 22%;
+    width: auto;
+    height: 3px;
+    border-radius: 3px 3px 0 0;
+  }
   .settings-panel {
     padding: 15px;
-  }
-  .settings-component-grid {
-    grid-template-columns: 1fr;
-  }
-  .settings-subpanel-wide {
-    grid-column: auto;
   }
   .settings-panel-head {
     flex-direction: column;
   }
-  .settings-profile-preview {
-    max-width: 100%;
+  .settings-site-preview {
+    align-self: flex-start;
   }
-  .settings-profile-grid,
-  .settings-form-grid {
+  .settings-source-workspace {
     grid-template-columns: 1fr;
   }
-  .settings-field-wide,
-  .settings-profile-grid .settings-field-wide {
+  .settings-source-index,
+  .settings-source-detail {
+    height: auto;
+    min-height: 0;
+  }
+  .settings-source-index {
+    max-height: min(360px, 42dvh);
+  }
+  .settings-source-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: auto;
+  }
+  .settings-source-detail-head {
+    flex-direction: column;
+  }
+  .settings-source-detail-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .settings-profile-layout,
+  .settings-extra-grid {
+    grid-template-columns: 1fr;
+  }
+  .settings-profile-preview {
+    flex-direction: row;
+    text-align: left;
+  }
+  .settings-profile-preview img {
+    width: 52px;
+    height: 52px;
+  }
+  .settings-profile-preview strong,
+  .settings-profile-preview small {
+    max-width: none;
+  }
+  .settings-form-grid,
+  .settings-form-grid-wide {
+    grid-template-columns: 1fr;
+  }
+  .settings-field-wide {
     grid-column: auto;
   }
-  .settings-source-card {
-    display: flex;
-  }
   .settings-source-fields {
-    grid-template-columns: 70px minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr);
   }
   .settings-source-fields .settings-field-wide {
     grid-column: 1 / -1;
   }
-  .settings-content-options {
-    grid-column: auto;
-  }
-  .settings-source-scope {
-    grid-column: auto;
-  }
-  .settings-source-foot {
-    margin-top: 12px;
-  }
-  .settings-source-management {
-    grid-column: auto;
-  }
-  .settings-source-management-metrics,
-  .settings-source-preview-grid {
-    grid-template-columns: 1fr;
-  }
-  .settings-source-management-foot,
+  .settings-panel-foot,
   .settings-auto-refresh {
     align-items: flex-start;
     flex-direction: column;
   }
-  .settings-source-management-foot > div,
-  .settings-auto-refresh-control {
-    width: 100%;
-    justify-content: flex-start;
-  }
-  .settings-manual-form {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  .settings-manual-form label:nth-child(5) {
-    grid-column: span 2;
-  }
-  .settings-form-actions {
-    grid-column: 1 / -1;
-  }
-  .settings-manual-list {
-    grid-template-columns: 1fr;
-  }
   .settings-snapshot-grid {
     grid-template-columns: 1fr;
   }
-  .settings-report-summary {
-    grid-template-columns: 1fr;
-  }
-  .settings-panel-foot {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-  .settings-footer {
-    right: 14px;
-    bottom: 12px;
-    left: 14px;
-    max-width: none;
-    text-align: center;
-  }
-}
-
-@media (max-width: 520px) {
-  .settings-tabs {
-    margin-right: -14px;
-    margin-left: -14px;
-    padding: 0 8px;
-  }
-  .settings-tab {
-    min-width: 88px;
-    padding: 0 6px;
-    gap: 5px;
-    white-space: nowrap;
-  }
-  .settings-source-fields,
-  .settings-manual-form,
-  .settings-content-options {
-    grid-template-columns: 1fr;
-  }
-  .settings-source-snapshot {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-  .settings-source-fields .settings-field-wide,
-  .settings-manual-form label:nth-child(5),
-  .settings-form-actions {
-    grid-column: auto;
-  }
-  .settings-form-actions {
-    flex-wrap: wrap;
-  }
-  .settings-form-actions button {
-    flex: 1;
+  .settings-auto-refresh-control {
+    width: 100%;
+    justify-content: flex-start;
   }
   .settings-status-row {
     grid-template-columns: 8px 1fr auto;
@@ -3128,6 +2313,38 @@ button:disabled {
   }
   .settings-status-message {
     grid-column: 2 / -1;
+  }
+}
+@media (max-width: 520px) {
+  .settings-header {
+    gap: 8px;
+  }
+  .settings-heading h1 {
+    font-size: 1.45rem;
+  }
+  .settings-header-actions .settings-primary {
+    padding-inline: 9px;
+  }
+  .settings-source-list {
+    grid-template-columns: 1fr;
+  }
+  .settings-source-fields,
+  .settings-content-options {
+    grid-template-columns: 1fr;
+  }
+  .settings-source-detail {
+    padding: 13px;
+  }
+  .settings-source-detail-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .settings-source-detail-foot {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .settings-source-detail-foot .settings-source-sync {
+    width: 100%;
   }
 }
 </style>

@@ -184,7 +184,6 @@ function getSourceLabel(tile: LibraryTile): string {
     qqmusic: "QQ 音乐",
     steam: "Steam",
     sfacg: "SFACG",
-    manual: "手动内容",
   };
   if (tile.sourceId && sourceLabels[tile.sourceId]) {
     return sourceLabels[tile.sourceId] as string;

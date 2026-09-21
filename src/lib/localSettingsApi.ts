@@ -12,15 +12,10 @@ import {
   dataSourceIds,
   hasSelectedContent,
   mergeSourceSiteData,
-  projectSourceRaw,
   syncDataSource,
 } from "./dataSources/index";
 import {
-  clearSourceDerived,
-  markSourceProcessed,
-  readSourceRawSnapshot,
   readAllSourceSnapshotInfo,
-  readSourceProjection,
   readSourceSnapshotInfo,
   recordSourceStatus,
   saveSourceSnapshot,
@@ -95,7 +90,7 @@ function sourceIdFromPayload(payload: unknown): DataSourceId {
 /**
  * 创建开发服务器使用的本地设置 API；所有写操作共用一个串行队列。
  *
- * @returns 提供配置读取、来源同步、快照处理和手动内容保存能力的 API 对象。
+ * @returns 提供配置读取、来源同步和快照处理能力的 API 对象。
  */
 export function createLocalSettingsApi() {
   const snapshot = createSiteSnapshotStore();
@@ -226,38 +221,6 @@ export function createLocalSettingsApi() {
     },
 
     /**
-     * 读取一个来源的快照状态和少量预览内容。
-     *
-     * @param rawSourceId - 请求载荷中的未知来源标识。
-     * @returns 来源状态以及最多六条资料库和仓库样例。
-     * @throws 当来源未注册时抛出请求错误。
-     */
-    async readSourcePreview(rawSourceId: unknown) {
-      if (
-        typeof rawSourceId !== "string" ||
-        !dataSourceIds.includes(rawSourceId as DataSourceId)
-      ) {
-        throw new LocalSettingsRequestError("未知数据来源");
-      }
-      const sourceId = rawSourceId as DataSourceId;
-      const status = await readSourceSnapshotInfo(sourceId);
-      const projection = await readSourceProjection(sourceId);
-      return {
-        sourceId,
-        status,
-        samples: (projection?.libraryItems ?? []).slice(0, 6).map((item) => ({
-          id: item.id,
-          title: item.title,
-          subtitle: item.subtitle,
-          cover: item.cover,
-          type: item.itemType,
-          url: item.url,
-        })),
-        repositories: (projection?.repositories ?? []).slice(0, 6),
-      };
-    },
-
-    /**
      * 保存配置并根据配置重新投影当前页面数据。
      *
      * @param payload - 包含本地配置的未知请求载荷。
@@ -296,94 +259,6 @@ export function createLocalSettingsApi() {
         statuses: siteData.providerStatus,
         sourceStatus: result.status,
         sourceInfo,
-        saved: true,
-      };
-    },
-
-    /**
-     * 使用已有原始快照重新生成一个来源的公开投影。
-     *
-     * @param payload - 包含配置和来源标识的未知请求载荷。
-     * @returns 重新处理后的来源状态、快照信息和页面数据。
-     */
-    async processSource(payload: unknown) {
-      const config = configFromPayload(payload);
-      const sourceId = sourceIdFromPayload(payload);
-      const rawSnapshot = await readSourceRawSnapshot(sourceId);
-      if (!rawSnapshot) {
-        throw new LocalSettingsRequestError("没有可处理的原始快照", 409);
-      }
-      // 处理操作复用已保存的原始响应，并由当前配置重新决定哪些字段公开。
-      const projection = projectSourceRaw(config, sourceId, rawSnapshot.rawData);
-      const result = {
-        sourceId,
-        rawData: rawSnapshot.rawData,
-        libraryItems: projection.libraryItems,
-        ...(projection.musicCatalog ? { musicCatalog: projection.musicCatalog } : {}),
-        repositories: projection.repositories,
-        status: {
-          id: sourceId,
-          label: sourceId,
-          status: "success" as const,
-          message: "已根据本地快照重新生成资料库投影",
-          count: projection.libraryItems.length + projection.repositories.length,
-        },
-      };
-      const resultData = await enqueueWrite(async () => {
-        const storedConfig = await writeLocalConfigFile(config);
-        const sourceInfo = await markSourceProcessed(
-          sourceId,
-          resultProjection(result as Awaited<ReturnType<typeof syncDataSource>>),
-        );
-        const siteData = await snapshot.update((current) =>
-          mergeSourceSiteData(current, config, result),
-        );
-        return { storedConfig, sourceInfo, siteData };
-      });
-      return {
-        siteData: resultData.siteData,
-        config: resultData.storedConfig,
-        sourceStatus: result.status,
-        sourceInfo: resultData.sourceInfo,
-        saved: true,
-      };
-    },
-
-    /**
-     * 清理来源的派生快照，同时保留原始快照。
-     *
-     * @param payload - 包含配置和来源标识的未知请求载荷。
-     * @returns 清理后的来源状态、快照信息和页面数据。
-     */
-    async clearSourceCache(payload: unknown) {
-      const config = configFromPayload(payload);
-      const sourceId = sourceIdFromPayload(payload);
-      const result = {
-        sourceId,
-        rawData: null,
-        libraryItems: [],
-        repositories: [],
-        status: {
-          id: sourceId,
-          label: sourceId,
-          status: "skipped" as const,
-          message: "资料库派生缓存已清理",
-          count: 0,
-        },
-      };
-      const resultData = await enqueueWrite(async () => {
-        const storedConfig = await writeLocalConfigFile(config);
-        const sourceInfo = await clearSourceDerived(sourceId);
-        const siteData = await snapshot.update((current) =>
-          mergeSourceSiteData(current, config, result),
-        );
-        return { storedConfig, sourceInfo, siteData };
-      });
-      return {
-        siteData: resultData.siteData,
-        config: resultData.storedConfig,
-        sourceStatus: result.status,
-        sourceInfo: resultData.sourceInfo,
         saved: true,
       };
     },

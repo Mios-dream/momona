@@ -213,6 +213,13 @@ export interface SiteProfile {
   avatar: string;
 }
 
+/** 站点级展示设置；它只影响页面身份，不参与来源同步。 */
+export interface SiteSettings {
+  title: string;
+  description: string;
+  favicon: string;
+}
+
 /** GitHub 仓库的统一展示字段。 */
 export interface RepositorySummary {
   id: string;
@@ -228,7 +235,7 @@ export interface RepositorySummary {
 
 /** 每个数据源最近一次同步的结果。 */
 export interface ProviderStatus {
-  id: DataSourceId | "manual";
+  id: DataSourceId;
   label: string;
   status: "success" | "skipped" | "error";
   message: string;
@@ -279,7 +286,6 @@ export interface SourceConfig {
   username: string;
   userId: string;
   token: string;
-  endpoint: string;
   limit: number;
   content: SourceContentConfig;
 }
@@ -319,25 +325,15 @@ export type GitHubRepositoryScope = "all" | "pinned";
 /** GitHub 首页和报告中的仓库展示顺序。 */
 export type GitHubRepositorySort = "stars" | "updated" | "forks" | "name";
 
-/** 设置页可手动添加的资料项。 */
-export interface ManualLibraryItem {
-  id: string;
-  title: string;
-  type: LibraryFilter;
-  subtitle: string;
-  cover: string;
-  url: string;
-}
-
 /** 只保存在本地的站点配置；token 不会写入生成后的 SiteData。 */
 export interface LocalConfig {
   version: 1;
+  site: SiteSettings;
   account: SiteProfile;
   socialLinks: SocialLink[];
   friends: FriendLink[];
   sources: Record<DataSourceId, SourceConfig>;
   autoRefresh: AutoRefreshConfig;
-  manualItems: ManualLibraryItem[];
   music: MusicSettings;
   widgets: HomeWidget[];
 }
@@ -362,7 +358,7 @@ export interface LibraryItem {
   cover: string;
   platform: string;
   url?: string;
-  sourceId?: DataSourceId | "manual";
+  sourceId?: DataSourceId;
   sourceKind?: SourceContentKey;
   metadata?: Record<string, unknown>;
   /** Bangumi 条目的个人评分。 */
@@ -623,7 +619,7 @@ export interface LibraryTile {
   /** 可选的来源链接，供动态条目继续访问原平台。 */
   url?: string;
   /** 真实数据来源；固定内容不填写。 */
-  sourceId?: DataSourceId | "manual";
+  sourceId?: DataSourceId;
   /** 来源内的内容类别，用于配置过滤，不依赖展示 ID 的前缀。 */
   sourceKind?: SourceContentKey;
   /** Bangumi 条目的个人评分。 */

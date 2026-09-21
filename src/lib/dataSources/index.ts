@@ -4,7 +4,6 @@ import {
   buildSiteDataFromResults,
   filterLibraryItemsForConfig,
   hasSelectedContent,
-  mapManualItem,
   mergeSourceSiteData,
   selectedContentLabel,
   sourceLabel as projectSourceLabel,
@@ -168,7 +167,6 @@ export async function collectSiteData(
 export {
   applyLocalConfigToSiteData,
   hasSelectedContent,
-  mapManualItem,
   mergeSourceSiteData,
   selectedContentLabel,
   sourceLabels,

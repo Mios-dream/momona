@@ -270,22 +270,9 @@ export const localSettingsServerPlugin = {
       register("/__momona/snapshot", "GET", () => api.readSnapshot());
       register("/__momona/config", "GET", () => api.readConfig());
       register("/__momona/source-status", "GET", () => api.readSourceStatus());
-      register("/__momona/source-preview", "GET", (_payload, request) => {
-        const requestUrl = new URL(
-          request.url,
-          `http://${request.headers.host || "localhost"}`,
-        );
-        return api.readSourcePreview(requestUrl.searchParams.get("sourceId") || "");
-      });
       register("/__momona/save", "POST", (payload) => api.save(payload));
       register("/__momona/sync-source", "POST", (payload) =>
         api.syncSource(payload),
-      );
-      register("/__momona/process-source", "POST", (payload) =>
-        api.processSource(payload),
-      );
-      register("/__momona/clear-source-cache", "POST", (payload) =>
-        api.clearSourceCache(payload),
       );
       register("/__momona/sync", "POST", (payload) => api.sync(payload));
       register("/__momona/save-friends", "POST", (payload) =>

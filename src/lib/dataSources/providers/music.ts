@@ -760,10 +760,7 @@ async function fetchNetease(
   config: LocalConfig["sources"]["netease"],
   userId: string,
 ): Promise<MusicSourceRawData> {
-  const base = (config.endpoint.trim() || "https://music.163.com/api").replace(
-    /\/$/,
-    "",
-  );
+  const base = "https://music.163.com/api";
   const listLimit = Math.min(1000, Math.max(100, sourceLimit(config.limit) * 3));
   const payload = await readJson(
     `${base}/user/playlist?uid=${encodeURIComponent(userId)}&limit=${listLimit}&offset=0`,
@@ -830,10 +827,7 @@ async function fetchQq(
   config: LocalConfig["sources"]["qqmusic"],
   userId: string,
 ): Promise<MusicSourceRawData> {
-  const base = (config.endpoint.trim() || "https://c.y.qq.com").replace(
-    /\/$/,
-    "",
-  );
+  const base = "https://c.y.qq.com";
   const size = Math.min(100, Math.max(20, sourceLimit(config.limit) * 2));
   const categories = [0, 1, 2];
   const payloads = await Promise.all(

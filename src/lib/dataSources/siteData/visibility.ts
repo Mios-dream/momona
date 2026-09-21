@@ -140,7 +140,7 @@ export function libraryItemVisibleForConfig(
   config: LocalConfig,
 ): boolean {
   const sourceId = item.sourceId;
-  if (!sourceId || sourceId === "manual") return true;
+  if (!sourceId || (sourceId as string) === "manual") return true;
   return sourceContentEnabled(config, sourceId, item.sourceKind);
 }
 
@@ -193,49 +193,22 @@ export function tileVisibleForConfig(
 }
 
 /**
- * 从当前配置中提取手动条目的稳定 ID。
- *
- * @param config - 当前完整本地配置。
- * @returns 手动条目的稳定 ID 集合。
- */
-export function manualIds(config: LocalConfig): Set<string> {
-  return new Set(config.manualItems.map((item, index) => item.id || `manual-${index}`));
-}
-
-/**
- * 移除手动卡片和当前配置已隐藏的远程卡片。
+ * 移除旧版手动卡片和当前配置已隐藏的远程卡片。
  *
  * @param tiles - 当前页面快照中的资料库卡片。
  * @param config - 当前完整本地配置。
  * @returns 可以继续进入公开页面的卡片列表。
  */
-export function removeManualAndHiddenTiles(
+export function removeHiddenTiles(
   tiles: LibraryTile[],
   config: LocalConfig,
 ): LibraryTile[] {
-  const ids = manualIds(config);
   return tiles.filter(
     (tile) =>
-      !ids.has(tile.id) &&
+      String(tile.sourceId) !== "manual" &&
       !tile.id.startsWith("manual-") &&
       tileVisibleForConfig(tile, config),
   );
-}
-
-/**
- * 生成手动内容在来源状态列表中的状态。
- *
- * @param config - 当前完整本地配置。
- * @returns 手动内容对应的同步状态。
- */
-function manualStatus(config: LocalConfig): ProviderStatus {
-  return {
-    id: "manual",
-    label: "手动内容",
-    status: config.manualItems.length ? "success" : "skipped",
-    message: config.manualItems.length ? "已加入手动条目" : "没有手动条目",
-    count: config.manualItems.length,
-  };
 }
 
 /**
@@ -279,7 +252,6 @@ export function statusList(
       }
     );
   }),
-    manualStatus(config),
   ];
 }
 

@@ -334,10 +334,7 @@ async function mapBilibili(
       message: "未配置 UID",
     };
   }
-  const base = (config.endpoint.trim() || "https://api.bilibili.com").replace(
-    /\/$/,
-    "",
-  );
+  const base = "https://api.bilibili.com";
   const groups: Array<{
     key: keyof BilibiliRawData;
     task: Promise<BilibiliGroupResult>;

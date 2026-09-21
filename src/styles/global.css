@@ -243,6 +243,21 @@ img {
   margin: 0;
 }
 
+html.is-settings-view,
+body.is-settings-view {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-frame[data-page="settings"],
+.app-frame[data-page="settings"] .app-shell,
+.app-frame[data-page="settings"] .page-view {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .page-transition-enter-active,
 .page-transition-leave-active {
   transition:

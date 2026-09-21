@@ -6,9 +6,21 @@ interface Props {
   title: string;
   /** 页面摘要。 */
   description: string;
+  /** 配置中的站点标题，作为所有页面的统一标题后缀。 */
+  siteTitle?: string;
+  /** 配置中的站点描述，覆盖当前路由默认摘要。 */
+  siteDescription?: string;
+  /** 配置中的 favicon 地址。 */
+  favicon?: string;
 }
 
-const { title, description } = Astro.props;
+const { title, description, siteTitle, siteDescription, favicon } = Astro.props;
+const normalizedSiteTitle = siteTitle?.trim();
+const browserTitle = normalizedSiteTitle && !title.includes(normalizedSiteTitle)
+  ? `${title} · ${normalizedSiteTitle}`
+  : title;
+const browserDescription = siteDescription?.trim() || description;
+const faviconUrl = favicon?.trim() || "/favicon.svg";
 ---
 
 <!doctype html>
@@ -19,10 +31,10 @@ const { title, description } = Astro.props;
       name="viewport"
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
-    <meta name="description" content={description} />
+    <meta name="description" content={browserDescription} />
     <meta name="theme-color" content="#d5dbf3" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>{title}</title>
+    <link rel="icon" data-momona-favicon href={faviconUrl} />
+    <title>{browserTitle}</title>
   </head>
   <body>
     <slot />

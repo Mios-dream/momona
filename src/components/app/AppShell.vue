@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
-import { appPageTitles, getAppPageFromPath } from "../../data/routes";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { getAppPageFromPath } from "../../data/routes";
 import { cloneLocalConfig, normalizeLocalConfig } from "../../data/localConfig";
 import { applyLocalConfigToSiteData } from "../../lib/dataSources/index";
 import type {
@@ -59,6 +59,41 @@ const pageTitle = computed(() => {
   };
   return titles[currentPage.value];
 });
+
+/** 当前站点用于浏览器标题和页面图标的统一身份。 */
+const siteTitle = computed(
+  () => runtimeConfig.value.site.title.trim() || "Love on the page",
+);
+
+/** 将当前页面和站点标题组合为浏览器标题。 */
+const browserTitle = computed(() =>
+  currentPage.value === "home"
+    ? siteTitle.value
+    : `${pageTitle.value} · ${siteTitle.value}`,
+);
+
+/** 把本地配置中的页面身份同步到浏览器文档。 */
+function syncDocumentHead(): void {
+  document.title = browserTitle.value;
+  const faviconUrl = runtimeConfig.value.site.favicon.trim() || "/favicon.svg";
+  let favicon = document.querySelector<HTMLLinkElement>(
+    "link[data-momona-favicon]",
+  );
+  if (!favicon) {
+    favicon = document.createElement("link");
+    favicon.rel = "icon";
+    favicon.dataset.momonaFavicon = "true";
+    document.head.appendChild(favicon);
+  }
+  favicon.href = faviconUrl;
+}
+
+/** 锁定设置页的文档滚动，让设置内容使用自己的滚动容器。 */
+function syncSettingsViewportLock(): void {
+  const isSettings = currentPage.value === "settings";
+  document.documentElement.classList.toggle("is-settings-view", isSettings);
+  document.body.classList.toggle("is-settings-view", isSettings);
+}
 
 const parallaxX = ref(0);
 const parallaxY = ref(0);
@@ -152,7 +187,7 @@ function navigateWithinApp(url: URL, replace = false): void {
   }
 
   currentPage.value = nextPage;
-  document.title = appPageTitles[nextPage];
+  syncDocumentHead();
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
@@ -204,7 +239,7 @@ function handlePopState(): void {
     window.location.pathname,
     currentPage.value,
   );
-  document.title = appPageTitles[currentPage.value];
+  syncDocumentHead();
   window.scrollTo({ top: 0, behavior: "auto" });
 }
 
@@ -269,6 +304,7 @@ function handleHomeConfigChange(
     runtimeSiteData.value,
     config,
   );
+  syncDocumentHead();
   if (persist) scheduleConfigSave(config);
 }
 
@@ -310,11 +346,25 @@ function handleMusicConfigChange(event: Event): void {
   });
   runtimeConfig.value = config;
   runtimeSiteData.value = applyLocalConfigToSiteData(runtimeSiteData.value, config);
+  syncDocumentHead();
   scheduleConfigSave(config);
 }
 
+watch(
+  () => [
+    currentPage.value,
+    runtimeConfig.value.site.title,
+    runtimeConfig.value.site.favicon,
+  ],
+  syncDocumentHead,
+);
+
+watch(currentPage, syncSettingsViewportLock);
+
 onMounted(() => {
   currentPage.value = getAppPageFromPath(window.location.pathname, props.page);
+  syncDocumentHead();
+  syncSettingsViewportLock();
 
   const prefersReducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
@@ -333,6 +383,8 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
+  document.documentElement.classList.remove("is-settings-view");
+  document.body.classList.remove("is-settings-view");
   window.removeEventListener("pointermove", handlePointerMove);
   window.removeEventListener("pointerleave", handlePointerLeave);
   window.removeEventListener("scroll", handleScroll);

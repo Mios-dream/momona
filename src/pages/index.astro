@@ -7,8 +7,11 @@ const { siteData, localConfig } = await getDataCenter();
 ---
 
 <StaticLayout
-  title="Love on the page · Momona"
-  description="一个静态的个人数字生活展示入口。"
+  title="Love on the page"
+  description="Momona 期待和你相遇的每一天。"
+  siteTitle={localConfig.site.title}
+  siteDescription={localConfig.site.description}
+  favicon={localConfig.site.favicon}
 >
   <AppShell
     page="home"

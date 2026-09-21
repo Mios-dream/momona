@@ -6,6 +6,6 @@ import { getDataCenter } from '../lib/dataCenter';
 const { siteData, localConfig } = await getDataCenter();
 ---
 
-<StaticLayout title="友联 · Love on the page" description="和喜欢写字的人，在网络上相遇。">
+<StaticLayout title="友联" description="和喜欢写字的人，在网络上相遇。" siteTitle={localConfig.site.title} siteDescription={localConfig.site.description} favicon={localConfig.site.favicon}>
   <AppShell page="friends" siteData={siteData} localConfig={localConfig} editable={import.meta.env.DEV} client:load />
 </StaticLayout>

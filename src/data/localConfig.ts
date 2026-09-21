@@ -9,11 +9,11 @@ import { dataSourceIds } from "./sourceCatalog";
 import type {
   HomeWidget,
   IconName,
-  LibraryFilter,
   LinkWidgetSettings,
   LocalConfig,
   MusicSettings,
   SiteProfile,
+  SiteSettings,
   SocialLink,
   SourceConfig,
   SourceContentConfig,
@@ -46,7 +46,9 @@ function text(value: unknown): string {
  * @returns 值属于允许的图标集合时返回 true。
  */
 function isIconName(value: unknown): value is IconName {
-  return typeof value === "string" && widgetIconOptions.includes(value as IconName);
+  return (
+    typeof value === "string" && widgetIconOptions.includes(value as IconName)
+  );
 }
 
 /**
@@ -76,6 +78,15 @@ function defaultProfile(): SiteProfile {
   };
 }
 
+/** 创建站点首次启动时使用的页面身份设置。 */
+function defaultSiteSettings(): SiteSettings {
+  return {
+    title: "Love on the page",
+    description: "Momona 期待和你相遇的每一天。",
+    favicon: "/favicon.svg",
+  };
+}
+
 /**
  * 创建空的播放器配置。
  *
@@ -102,25 +113,25 @@ function emptyMusic(): MusicSettings {
  */
 function emptyContent(): SourceContentConfig {
   return {
-  bangumiAnime: false,
-  bangumiGames: false,
-  bangumiBooks: false,
-  bangumiMusic: false,
-  bilibiliVideos: false,
-  bilibiliFavorites: false,
-  bilibiliBangumi: false,
-  neteaseLiked: false,
-  neteaseCreated: false,
-  neteaseCollected: false,
-  qqmusicLiked: false,
-  qqmusicCreated: false,
-  qqmusicCollected: false,
-  steamRecentGames: false,
-  steamLibrary: false,
-  sfacgBooks: false,
-  githubRepositories: false,
-  githubRepositoryScope: "all",
-  githubRepositorySort: "updated",
+    bangumiAnime: false,
+    bangumiGames: false,
+    bangumiBooks: false,
+    bangumiMusic: false,
+    bilibiliVideos: false,
+    bilibiliFavorites: false,
+    bilibiliBangumi: false,
+    neteaseLiked: false,
+    neteaseCreated: false,
+    neteaseCollected: false,
+    qqmusicLiked: false,
+    qqmusicCreated: false,
+    qqmusicCollected: false,
+    steamRecentGames: false,
+    steamLibrary: false,
+    sfacgBooks: false,
+    githubRepositories: false,
+    githubRepositoryScope: "all",
+    githubRepositorySort: "updated",
   };
 }
 
@@ -135,7 +146,6 @@ function emptySource(): SourceConfig {
     username: "",
     userId: "",
     token: "",
-    endpoint: "",
     limit: 24,
     content: emptyContent(),
   };
@@ -188,56 +198,56 @@ function defaultLinkWidget(
  */
 function defaultHomeWidgets(): HomeWidget[] {
   return [
-  createHomeWidget("greeting", "greeting"),
-  defaultLinkWidget("social-qq", 3, 1, {
-    title: "QQ",
-    subtitle: "",
-    href: "https://im.qq.com/",
-    platform: "qq",
-    icon: "user",
-    tone: "blue",
-    openInNewTab: true,
-  }),
-  defaultLinkWidget("social-github", 4, 1, {
-    title: "GitHub",
-    subtitle: "查看项目",
-    href: "https://github.com/",
-    platform: "github",
-    icon: "github",
-    tone: "ink",
-    openInNewTab: true,
-  }),
-  defaultLinkWidget("social-mail", 3, 2, {
-    title: "Email",
-    subtitle: "写一封信",
-    href: "mailto:hello@example.com",
-    platform: "email",
-    icon: "at",
-    tone: "indigo",
-    openInNewTab: true,
-  }),
-  defaultLinkWidget("social-steam", 4, 2, {
-    title: "Steam",
-    subtitle: "游戏收藏",
-    href: "https://store.steampowered.com/",
-    platform: "steam",
-    icon: "game",
-    tone: "violet",
-    openInNewTab: true,
-  }),
-  createHomeWidget("feed", "feed"),
-  createHomeWidget("collection", "collection"),
-  createHomeWidget("friend", "friend"),
-  createHomeWidget("agent", "agent"),
-  createHomeWidget("weather", "weather"),
-  createHomeWidget("media", "media"),
-  createHomeWidget("game", "game"),
-  createHomeWidget("music", "music"),
-  {
-    ...createHomeWidget("github", "github"),
-    col: 13,
-    row: 3,
-  },
+    createHomeWidget("greeting", "greeting"),
+    defaultLinkWidget("social-qq", 3, 1, {
+      title: "QQ",
+      subtitle: "",
+      href: "https://im.qq.com/",
+      platform: "qq",
+      icon: "user",
+      tone: "blue",
+      openInNewTab: true,
+    }),
+    defaultLinkWidget("social-github", 4, 1, {
+      title: "GitHub",
+      subtitle: "查看项目",
+      href: "https://github.com/",
+      platform: "github",
+      icon: "github",
+      tone: "ink",
+      openInNewTab: true,
+    }),
+    defaultLinkWidget("social-mail", 3, 2, {
+      title: "Email",
+      subtitle: "写一封信",
+      href: "mailto:hello@example.com",
+      platform: "email",
+      icon: "at",
+      tone: "indigo",
+      openInNewTab: true,
+    }),
+    defaultLinkWidget("social-steam", 4, 2, {
+      title: "Steam",
+      subtitle: "游戏收藏",
+      href: "https://store.steampowered.com/",
+      platform: "steam",
+      icon: "game",
+      tone: "violet",
+      openInNewTab: true,
+    }),
+    createHomeWidget("feed", "feed"),
+    createHomeWidget("collection", "collection"),
+    createHomeWidget("friend", "friend"),
+    createHomeWidget("agent", "agent"),
+    createHomeWidget("weather", "weather"),
+    createHomeWidget("media", "media"),
+    createHomeWidget("game", "game"),
+    createHomeWidget("music", "music"),
+    {
+      ...createHomeWidget("github", "github"),
+      col: 13,
+      row: 3,
+    },
   ];
 }
 
@@ -248,23 +258,33 @@ function defaultHomeWidgets(): HomeWidget[] {
  */
 export function createEmptyLocalConfig(): LocalConfig {
   return {
-  version: 1,
-  account: defaultProfile(),
-  socialLinks: [],
-  friends: [],
-  sources: {
-    bangumi: emptySource(),
-    bilibili: emptySource(),
-    github: emptySource(),
-    netease: emptySource(),
-    qqmusic: emptySource(),
-    steam: emptySource(),
-    sfacg: emptySource(),
-  },
-  autoRefresh: emptyAutoRefresh(),
-  manualItems: [],
-  music: emptyMusic(),
-  widgets: defaultHomeWidgets(),
+    version: 1,
+    site: defaultSiteSettings(),
+    account: defaultProfile(),
+    socialLinks: [],
+    friends: [],
+    sources: {
+      bangumi: emptySource(),
+      bilibili: emptySource(),
+      github: emptySource(),
+      netease: emptySource(),
+      qqmusic: emptySource(),
+      steam: emptySource(),
+      sfacg: emptySource(),
+    },
+    autoRefresh: emptyAutoRefresh(),
+    music: emptyMusic(),
+    widgets: defaultHomeWidgets(),
+  };
+}
+
+/** 规范化站点级页面身份设置。 */
+function normalizeSiteSettings(value: unknown): SiteSettings {
+  const record = isRecord(value) ? value : {};
+  return {
+    title: text(record.title) || "Love on the page",
+    description: text(record.description) || "一个静态的个人数字生活展示入口。",
+    favicon: text(record.favicon) || "/favicon.svg",
   };
 }
 
@@ -340,7 +360,6 @@ function normalizeSource(value: unknown): SourceConfig {
     username: text(record.username),
     userId: text(record.userId),
     token: text(record.token),
-    endpoint: text(record.endpoint),
     limit: Number.isFinite(parsedLimit)
       ? Math.min(120, Math.max(1, Math.round(parsedLimit)))
       : 24,
@@ -414,41 +433,6 @@ function normalizeAutoRefresh(value: unknown): LocalConfig["autoRefresh"] {
   };
 }
 
-const libraryFilters: LibraryFilter[] = [
-  "all",
-  "game",
-  "video",
-  "music",
-  "anime",
-  "book",
-];
-
-/**
- * 过滤并规范化用户手动维护的资料库条目。
- *
- * @param value - 文件或接口中的未知手动条目列表。
- * @returns 仅包含合法类型和标题的手动条目列表。
- */
-function normalizeManualItems(value: unknown): LocalConfig["manualItems"] {
-  if (!Array.isArray(value)) return [];
-  return value.flatMap((entry, index) => {
-    if (!isRecord(entry)) return [];
-    const title = text(entry.title);
-    const type = text(entry.type) as LibraryFilter;
-    if (!title || !libraryFilters.includes(type)) return [];
-    return [
-      {
-        id: text(entry.id) || `manual-${index}`,
-        title,
-        type,
-        subtitle: text(entry.subtitle),
-        cover: text(entry.cover),
-        url: text(entry.url),
-      },
-    ];
-  });
-}
-
 /**
  * 对本地配置文件或导入文件做结构校验；缺失内容保持为空。
  *
@@ -469,6 +453,7 @@ export function normalizeLocalConfig(
 
   return {
     version: 1,
+    site: normalizeSiteSettings(input?.site),
     account: normalizeProfile(input?.account),
     socialLinks,
     friends: Array.isArray(input?.friends)
@@ -479,7 +464,6 @@ export function normalizeLocalConfig(
       : [],
     sources,
     autoRefresh: normalizeAutoRefresh(input?.autoRefresh),
-    manualItems: normalizeManualItems(input?.manualItems),
     music: normalizeMusic(input?.music),
     widgets: normalizeHomeWidgets(input?.widgets, []),
   };

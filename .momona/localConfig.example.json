@@ -1,5 +1,10 @@
 {
   "version": 1,
+  "site": {
+    "title": "Love on the page",
+    "description": "Momona 期待和你相遇的每一天。",
+    "favicon": "/favicon.svg"
+  },
   "account": {
     "name": "Momona Demo",
     "latinName": "@momona",
@@ -14,7 +19,6 @@
       "username": "",
       "userId": "",
       "token": "",
-      "endpoint": "",
       "limit": 24,
       "content": {
         "githubRepositories": true,
@@ -27,7 +31,6 @@
     "enabled": false,
     "intervalHours": 24
   },
-  "manualItems": [],
   "music": {
     "enabled": false,
     "source": "manual",

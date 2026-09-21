@@ -183,10 +183,7 @@ async function mapGithub(
       repositories: [],
       message: "未配置用户名",
     };
-  const base = (config.endpoint.trim() || "https://api.github.com").replace(
-    /\/$/,
-    "",
-  );
+  const base = "https://api.github.com";
   const isPinned = config.content.githubRepositoryScope === "pinned";
   const headers: HeadersInit = { Accept: "application/vnd.github+json" };
   if (config.token.trim()) headers.Authorization = `Bearer ${config.token.trim()}`;

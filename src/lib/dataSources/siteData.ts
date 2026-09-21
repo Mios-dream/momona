@@ -4,7 +4,6 @@ import type {
   LibraryItem,
   LibraryTile,
   LocalConfig,
-  ManualLibraryItem,
   MusicCatalog,
   ProviderStatus,
   RepositorySummary,
@@ -26,7 +25,7 @@ import {
 } from "./siteData/media";
 import {
   filterLibraryItemsForConfig,
-  removeManualAndHiddenTiles,
+  removeHiddenTiles,
   statusList,
 } from "./siteData/visibility";
 
@@ -37,30 +36,6 @@ export {
   sourceLabel,
   sourceLabels,
 } from "./siteData/visibility";
-
-/**
- * 将设置页的手动条目转换为来源无关的资料库条目。
- *
- * @param item - 设置页中的手动条目。
- * @param index - 条目在配置数组中的索引，用于生成缺省 ID。
- * @returns 统一资料库条目。
- */
-export function mapManualItem(
-  item: ManualLibraryItem,
-  index: number,
-): LibraryItem {
-  const type = item.type === "all" ? "book" : item.type;
-  return {
-    id: item.id || `manual-${index}`,
-    itemType: type,
-    title: item.title,
-    subtitle: item.subtitle,
-    cover: item.cover,
-    platform: "手动内容",
-    url: item.url || undefined,
-    sourceId: "manual",
-  };
-}
 
 /**
  * 将统一资料条目转换为画布和首页共用的展示卡片。
@@ -96,7 +71,7 @@ function deriveSiteData(
     config.sources.github.content.githubRepositorySort,
   );
   const collections = libraryTiles.length
-    ? libraryTiles.some((tile) => tile.sourceId || tile.id.startsWith("manual-"))
+    ? libraryTiles.some((tile) => tile.sourceId)
       ? collectionsFromTiles(libraryTiles)
       : base.collections
     : [];
@@ -150,8 +125,7 @@ export function applyLocalConfigToSiteData(
   config: LocalConfig,
 ): SiteData {
   const base = mergeSiteData(current ?? {});
-  const withoutHidden = removeManualAndHiddenTiles(base.libraryTiles, config);
-  const manualTiles = tilesFromItems(config.manualItems.map(mapManualItem));
+  const withoutHidden = removeHiddenTiles(base.libraryTiles, config);
   const repositories =
     config.sources.github.enabled &&
     config.sources.github.content.githubRepositories
@@ -160,7 +134,7 @@ export function applyLocalConfigToSiteData(
   return deriveSiteData(
     base,
     config,
-    [...withoutHidden, ...manualTiles],
+    withoutHidden,
     repositories,
     statusList(base.providerStatus, config),
     musicCatalogForConfig(base.musicCatalog, config),
@@ -191,16 +165,12 @@ export function mergeSourceSiteData(
     result.status.status === "error"
       ? sourceTiles
       : tilesFromItems(filterLibraryItemsForConfig(result.libraryItems, config));
-  const retainedTiles = removeManualAndHiddenTiles(base.libraryTiles, config)
+  const retainedTiles = removeHiddenTiles(base.libraryTiles, config)
     .filter(
       (tile) =>
         tile.sourceId !== result.sourceId && !tile.id.startsWith(sourcePrefix),
     );
-  const libraryTiles = [
-    ...retainedTiles,
-    ...retainedSourceTiles,
-    ...tilesFromItems(config.manualItems.map(mapManualItem)),
-  ];
+  const libraryTiles = [...retainedTiles, ...retainedSourceTiles];
   // 仓库只由 GitHub 结果更新；其他来源以及 GitHub 失败都沿用现有数据。
   const repositories =
     result.sourceId === "github" && result.status.status !== "error"
@@ -258,8 +228,7 @@ export function buildSiteDataFromResults(
       config,
     ),
   );
-  const manualTiles = tilesFromItems(config.manualItems.map(mapManualItem));
-  const libraryTiles = [...remoteTiles, ...manualTiles];
+  const libraryTiles = remoteTiles;
   const musicCatalog = results.reduce(
     (catalog, result) =>
       mergeMusicCatalog(

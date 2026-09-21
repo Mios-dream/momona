@@ -1,8 +1,6 @@
 import type {
   DataSourceId,
   IconName,
-  LibraryFilter,
-  ManualLibraryItem,
   SourceContentConfig,
   SourceSnapshotInfo,
 } from "./types";
@@ -15,8 +13,6 @@ export interface SourceCard {
   title: string;
   /** 来源用途简介。 */
   description: string;
-  /** 输入框下方的使用提示。 */
-  hint: string;
   /** 账号输入项的标签。 */
   accountLabel: string;
   /** 账号值在来源配置中的字段名。 */
@@ -27,8 +23,6 @@ export interface SourceCard {
   token: boolean;
   /** 来源卡片使用的语义图标。 */
   icon: IconName;
-  /** 内容选项区域的说明。 */
-  contentHint: string;
   /** 可选同步内容。 */
   contentOptions: Array<{
     key: keyof SourceContentConfig;
@@ -40,9 +34,7 @@ export interface SourceCard {
 /** 设置页的一级标签。 */
 export type SettingsTab =
   | "profile"
-  | "sources"
-  | "components"
-  | "content"
+  | "data"
   | "status";
 
 /** 设置页展示的来源配置目录。 */
@@ -51,13 +43,11 @@ export const sourceCards: SourceCard[] = [
     id: "bangumi",
     title: "Bangumi",
     description: "追番、游戏、书籍、音乐",
-    hint: "只同步勾选的作品类型；未勾选内容不会写入页面。",
     accountLabel: "用户名或用户页 URL",
     accountKey: "username",
     placeholder: "例如：miosdream 或 https://bgm.tv/user/…",
     token: false,
     icon: "bookMarked",
-    contentHint: "未勾选类型不会写入页面快照。",
     contentOptions: [
       { key: "bangumiAnime", label: "追番", description: "动画与番剧收藏" },
       { key: "bangumiGames", label: "游戏", description: "游戏收藏" },
@@ -69,13 +59,11 @@ export const sourceCards: SourceCard[] = [
     id: "bilibili",
     title: "Bilibili",
     description: "投稿、收藏、追番",
-    hint: "未勾选的类别不会请求对应 API，也不会写入页面快照。",
     accountLabel: "UID 或空间 URL",
     accountKey: "userId",
     placeholder: "例如：205296924 或 https://space.bilibili.com/…",
     token: false,
     icon: "video",
-    contentHint: "未勾选类别不会请求对应 API，也不会写入页面快照。",
     contentOptions: [
       { key: "bilibiliVideos", label: "投稿视频", description: "你发布的公开视频" },
       { key: "bilibiliFavorites", label: "收藏夹内容", description: "公开收藏夹中的视频" },
@@ -86,13 +74,11 @@ export const sourceCards: SourceCard[] = [
     id: "github",
     title: "GitHub",
     description: "仓库与统计",
-    hint: "读取公开仓库；同步失败时保留上一次公开快照。",
     accountLabel: "用户名或个人页 URL",
     accountKey: "username",
     placeholder: "例如：Mios-dream 或 https://github.com/…",
     token: true,
     icon: "github",
-    contentHint: "关闭后不会请求或展示仓库；范围可在下方选择。",
     contentOptions: [
       { key: "githubRepositories", label: "公开仓库", description: "个人主页中的公开仓库" },
     ],
@@ -101,13 +87,11 @@ export const sourceCards: SourceCard[] = [
     id: "steam",
     title: "Steam",
     description: "最近游玩、游戏库",
-    hint: "公开个人页可以读取最近游戏和近两周时长；完整游戏库需要 Steam Web API Key。",
     accountLabel: "个人页 URL 或 SteamID64",
     accountKey: "username",
     placeholder: "例如：76561198863810095 或 Steam 个人页链接",
     token: true,
     icon: "game",
-    contentHint: "无 Key 时使用公开个人页的最近游戏；填写 Key 后可同步完整游戏库。",
     contentOptions: [
       { key: "steamRecentGames", label: "最近游玩", description: "最近游戏、近两周时长和最后游玩日期" },
       { key: "steamLibrary", label: "游戏库", description: "Steam 账号拥有的游戏及累计游玩时长" },
@@ -117,13 +101,11 @@ export const sourceCards: SourceCard[] = [
     id: "sfacg",
     title: "SFACG",
     description: "菠萝包轻小说开放书架",
-    hint: "只读取公开书架页面，不需要登录；请输入 p.sfacg.com 的书架地址。",
     accountLabel: "开放书架地址",
     accountKey: "username",
     placeholder: "例如：https://p.sfacg.com/p/8933368/",
     token: false,
     icon: "bookMarked",
-    contentHint: "公开书架中的小说会作为书籍写入资料库。",
     contentOptions: [
       { key: "sfacgBooks", label: "开放书架作品", description: "书架中的小说标题、作者和封面" },
     ],
@@ -132,13 +114,11 @@ export const sourceCards: SourceCard[] = [
     id: "netease",
     title: "网易云音乐",
     description: "喜欢、创建、收藏歌单",
-    hint: "只读取公开歌单列表；未勾选的分类不会写入资料库。",
     accountLabel: "用户 ID 或个人页 URL",
     accountKey: "username",
     placeholder: "例如：32953014 或网易云用户页链接",
     token: false,
     icon: "music",
-    contentHint: "公开歌单可按分类选择展示。",
     contentOptions: [
       { key: "neteaseLiked", label: "喜欢的音乐", description: "我喜欢的音乐歌单" },
       { key: "neteaseCreated", label: "创建的歌单", description: "自己创建的公开歌单" },
@@ -149,13 +129,11 @@ export const sourceCards: SourceCard[] = [
     id: "qqmusic",
     title: "QQ 音乐",
     description: "喜欢、创建、收藏歌单",
-    hint: "只读取公开歌单列表；平台未公开的收藏不会被写入页面。",
     accountLabel: "QQ 音乐用户 ID",
     accountKey: "username",
     placeholder: "例如：10000 或 QQ 音乐个人页链接",
     token: false,
     icon: "radio",
-    contentHint: "公开歌单可按分类选择展示。",
     contentOptions: [
       { key: "qqmusicLiked", label: "喜欢的音乐", description: "平台公开的喜欢歌单" },
       { key: "qqmusicCreated", label: "创建的歌单", description: "自己创建的公开歌单" },
@@ -170,33 +148,10 @@ export const settingsTabs: Array<{
   label: string;
   icon: IconName;
 }> = [
-  { id: "profile", label: "个人资料", icon: "user" },
-  { id: "sources", label: "数据来源", icon: "globe" },
-  { id: "components", label: "组件设置", icon: "sliders" },
-  { id: "content", label: "内容管理", icon: "library" },
+  { id: "profile", label: "基础设置", icon: "settings" },
+  { id: "data", label: "数据管理", icon: "globe" },
   { id: "status", label: "同步状态", icon: "activity" },
 ];
-
-/** 资料库内容过滤器的显示选项。 */
-export const typeOptions: Array<{
-  value: Exclude<LibraryFilter, "all">;
-  label: string;
-}> = [
-  { value: "anime", label: "追番" },
-  { value: "game", label: "游戏" },
-  { value: "book", label: "书籍" },
-  { value: "video", label: "视频" },
-  { value: "music", label: "音乐" },
-];
-
-/**
- * 创建一份用于表单编辑的空手动条目。
- *
- * @returns 可直接绑定到设置表单的空手动条目。
- */
-export function createManualItem(): ManualLibraryItem {
-  return { id: "", title: "", type: "anime", subtitle: "", cover: "", url: "" };
-}
 
 /**
  * 创建单个来源尚未同步时使用的空快照状态。

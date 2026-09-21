@@ -761,10 +761,7 @@ export async function syncSteam(
     };
   }
 
-  const communityBase = (config.endpoint.trim() || "https://steamcommunity.com").replace(
-    /\/$/,
-    "",
-  );
+  const communityBase = "https://steamcommunity.com";
   const token = config.token.trim();
   const apiEndpoint = "https://api.steampowered.com";
   let publicProfile: (SteamRawData["profile"] & {
