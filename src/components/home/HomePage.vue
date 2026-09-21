@@ -795,6 +795,17 @@ onBeforeUnmount(() => {
       </div>
     </div>
 
+    <Transition name="home-editor-backdrop">
+      <button
+        v-if="isEditing && selectedWidget"
+        class="home-editor-backdrop"
+        type="button"
+        tabindex="-1"
+        aria-label="关闭组件配置"
+        @click="selectedWidgetId = null"
+      ></button>
+    </Transition>
+
     <Transition name="home-editor-panel">
       <HomeWidgetEditor
         v-if="isEditing && selectedWidget"
@@ -952,6 +963,29 @@ onBeforeUnmount(() => {
   outline-offset: 2px;
 }
 
+.home-editor-backdrop {
+  position: fixed;
+  z-index: 44;
+  inset: 0;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  background: rgba(42, 45, 74, 0.18);
+  cursor: pointer;
+  backdrop-filter: blur(3px) saturate(110%);
+  -webkit-backdrop-filter: blur(3px) saturate(110%);
+}
+
+.home-editor-backdrop-enter-active,
+.home-editor-backdrop-leave-active {
+  transition: opacity 0.24s ease;
+}
+
+.home-editor-backdrop-enter-from,
+.home-editor-backdrop-leave-to {
+  opacity: 0;
+}
+
 :deep(.home-editor-panel-enter-active),
 :deep(.home-editor-panel-leave-active) {
   will-change: opacity, transform;
@@ -963,10 +997,12 @@ onBeforeUnmount(() => {
 :deep(.home-editor-panel-enter-from),
 :deep(.home-editor-panel-leave-to) {
   opacity: 0;
-  transform: translate3d(28px, 0, 0) scale(0.985);
+  transform: translate3d(-50%, calc(-50% + 28px), 0) scale(0.985);
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .home-editor-backdrop-enter-active,
+  .home-editor-backdrop-leave-active,
   :deep(.home-editor-panel-enter-active),
   :deep(.home-editor-panel-leave-active) {
     transition-duration: 0.01ms;
@@ -1464,7 +1500,7 @@ onBeforeUnmount(() => {
 
   :deep(.home-editor-panel-enter-from),
   :deep(.home-editor-panel-leave-to) {
-    transform: translate3d(0, 24px, 0) scale(0.985);
+    transform: translate3d(-50%, calc(-50% + 24px), 0) scale(0.985);
   }
 
   .home-edit-toolbar {

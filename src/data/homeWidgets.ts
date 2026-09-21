@@ -77,7 +77,7 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
   definition("feed", "动态摘要", "轮播式内容摘要", 5, 1, 4, 2, 2, 1),
   definition(
     "collection",
-    "收藏统计",
+    "bangumi收藏统计",
     "最近收藏的封面与统计",
     9,
     1,
@@ -87,9 +87,9 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     1,
   ),
   definition("friend", "友链", "一个外部站点入口", 13, 1, 2, 2, 1, 1),
-  definition("agent", "Agent 人设", "角色与人设展示", 15, 1, 2, 2, 1, 1),
+  definition("agent", "看板娘", "角色与人设展示", 15, 1, 2, 2, 1, 1),
   definition("weather", "天气", "当前天气摘要", 1, 3, 2, 2, 2, 1),
-  definition("media", "媒体收藏", "最近播放与收藏", 3, 3, 4, 2, 2, 1),
+  definition("media", "网易云音乐", "最近播放与收藏", 3, 3, 4, 2, 2, 1),
   definition(
     "game",
     "游戏资料",
@@ -102,7 +102,7 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     1,
     { settingsKind: "game", defaultVisible: true },
   ),
-  definition("music", "正在播放", "音乐播放状态", 11, 3, 2, 2, 1, 1),
+  definition("music", "音乐播放器", "音乐播放状态", 11, 3, 2, 2, 1, 1),
   definition(
     "activities",
     "最近活动",
@@ -226,13 +226,25 @@ export function inferLinkPlatform(
   const value = `${title} ${href}`.toLocaleLowerCase();
   if (value.includes("github")) return "github";
   if (value.includes("bilibili") || value.includes("哔哩")) return "bilibili";
-  if (value.includes("netease") || value.includes("163.com") || value.includes("网易云")) {
+  if (
+    value.includes("netease") ||
+    value.includes("163.com") ||
+    value.includes("网易云")
+  ) {
     return "netease";
   }
-  if (value.includes("qqmusic") || value.includes("y.qq.com") || value.includes("qq音乐")) {
+  if (
+    value.includes("qqmusic") ||
+    value.includes("y.qq.com") ||
+    value.includes("qq音乐")
+  ) {
     return "qqmusic";
   }
-  if (value.startsWith("mailto:") || value.includes("email") || value.includes("邮箱")) {
+  if (
+    value.startsWith("mailto:") ||
+    value.includes("email") ||
+    value.includes("邮箱")
+  ) {
     return "email";
   }
   if (value.includes("steam")) return "steam";
@@ -347,7 +359,9 @@ export function createHomeWidget(
  * @returns 值属于图标名称集合时返回 true。
  */
 function isIconName(value: unknown): value is IconName {
-  return typeof value === "string" && widgetIconOptions.includes(value as IconName);
+  return (
+    typeof value === "string" && widgetIconOptions.includes(value as IconName)
+  );
 }
 
 /**

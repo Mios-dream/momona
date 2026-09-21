@@ -396,7 +396,8 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <aside
+  <Teleport to="body">
+    <aside
     ref="panelElement"
     class="control-panel"
     :class="{ 'is-expanded': isExpanded, 'is-playlist-open': isPlaylistOpen }"
@@ -682,13 +683,14 @@ onBeforeUnmount(() => {
         </div>
       </Transition>
     </div>
-  </aside>
+    </aside>
+  </Teleport>
 </template>
 
 <style scoped>
 .control-panel {
   position: fixed;
-  z-index: 35;
+  z-index: 70;
   top: 16px;
   right: 16px;
   width: min(400px, calc(100vw - 32px));

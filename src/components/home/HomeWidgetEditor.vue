@@ -569,9 +569,10 @@ function requestGame(): void {
 .home-editor-panel {
   position: fixed;
   z-index: 45;
-  top: auto;
-  right: 18px;
-  bottom: 18px;
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: 50%;
   display: flex;
   min-height: min(300px, calc(100svh - 94px));
   width: min(378px, calc(100vw - 36px));
@@ -583,6 +584,7 @@ function requestGame(): void {
   background: var(--glass);
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(18px) saturate(132%);
+  transform: translate(-50%, -50%);
   isolation: isolate;
 }
 
@@ -902,14 +904,14 @@ function requestGame(): void {
 
 @media (max-width: 820px) {
   .home-editor-panel {
-    top: auto;
-    right: 12px;
-    bottom: 96px;
-    left: 12px;
-    width: auto;
+    top: 50%;
+    right: auto;
+    bottom: auto;
+    left: 50%;
     min-height: min(300px, calc(100svh - 116px));
     max-height: min(680px, calc(100svh - 116px));
     border-radius: 13px;
+    transform: translate(-50%, -50%);
   }
 
   .editor-panel-head {
