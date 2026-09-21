@@ -1,12 +1,6 @@
-import { dirname, resolve } from "node:path";
-import {
-  mkdir,
-  readFile,
-  rename,
-  stat,
-  unlink,
-  writeFile,
-} from "node:fs/promises";
+import { resolve } from "node:path";
+import { stat, unlink } from "node:fs/promises";
+import { dataSourceIds } from "../data/sourceCatalog";
 import type {
   DataSourceId,
   LibraryItem,
@@ -15,16 +9,11 @@ import type {
   SourceSnapshotInfo,
   SourceSnapshotState,
 } from "../data/types";
-
-const sourceIds: DataSourceId[] = [
-  "bangumi",
-  "bilibili",
-  "github",
-  "netease",
-  "qqmusic",
-  "steam",
-  "sfacg",
-];
+import {
+  isRecord,
+  readJsonFile,
+  writeJsonFileAtomically,
+} from "./persistence/jsonFile";
 const sourcesDirectory = resolve(process.cwd(), ".momona", "sources");
 const statusPath = resolve(process.cwd(), ".momona", "source-status.json");
 
@@ -53,41 +42,57 @@ export interface SourceRawSnapshot {
   rawData: unknown;
 }
 
-const publicProjection = (projection: SourceProjection): SourceProjection => ({
-  libraryItems: projection.libraryItems.map(({ metadata: _metadata, ...item }) => item),
-  ...(projection.musicCatalog ? { musicCatalog: projection.musicCatalog } : {}),
-  repositories: projection.repositories,
-});
+/**
+ * 去除页面不需要公开的原始 metadata 字段。
+ *
+ * @param projection - 来源的统一公开投影。
+ * @returns 去除私有 metadata 后的公开投影。
+ */
+function publicProjection(projection: SourceProjection): SourceProjection {
+  return {
+    libraryItems: projection.libraryItems.map(({ metadata: _metadata, ...item }) => item),
+    ...(projection.musicCatalog ? { musicCatalog: projection.musicCatalog } : {}),
+    repositories: projection.repositories,
+  };
+}
 
-const statusDefaults = (): PersistedStatusFile => ({
-  version: 1,
-  sources: {},
-});
+/**
+ * 创建来源状态文件的空结构。
+ *
+ * @returns 新版本来源状态文件的默认结构。
+ */
+function statusDefaults(): PersistedStatusFile {
+  return { version: 1, sources: {} };
+}
 
-const sourceRawPath = (sourceId: DataSourceId): string =>
-  `${sourcesDirectory}/${sourceId}.raw.json`;
+/**
+ * 返回来源原始快照文件路径。
+ *
+ * @param sourceId - 数据来源标识。
+ * @returns 来源原始快照的绝对路径。
+ */
+function sourceRawPath(sourceId: DataSourceId): string {
+  return `${sourcesDirectory}/${sourceId}.raw.json`;
+}
 
-const sourceDerivedPath = (sourceId: DataSourceId): string =>
-  `${sourcesDirectory}/${sourceId}.derived.json`;
+/**
+ * 返回来源派生投影文件路径。
+ *
+ * @param sourceId - 数据来源标识。
+ * @returns 来源派生投影的绝对路径。
+ */
+function sourceDerivedPath(sourceId: DataSourceId): string {
+  return `${sourcesDirectory}/${sourceId}.derived.json`;
+}
 
-const readJson = async (path: string): Promise<unknown> => {
-  try {
-    return JSON.parse(await readFile(path, "utf8")) as unknown;
-  } catch {
-    return null;
-  }
-};
-
-const writeJsonAtomically = async (path: string, value: unknown): Promise<void> => {
-  await mkdir(dirname(path), { recursive: true });
-  const temporaryPath = `${path}.${process.pid}.tmp`;
-  await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, "utf8");
-  await rename(temporaryPath, path);
-};
-
-const readStatusFile = async (): Promise<PersistedStatusFile> => {
-  const value = await readJson(statusPath);
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+/**
+ * 读取来源状态文件，并为旧版本或损坏文件提供空状态。
+ *
+ * @returns 规范化后的来源状态文件。
+ */
+async function readStatusFile(): Promise<PersistedStatusFile> {
+  const value = await readJsonFile(statusPath);
+  if (!isRecord(value)) {
     return statusDefaults();
   }
   const record = value as Partial<PersistedStatusFile>;
@@ -98,14 +103,27 @@ const readStatusFile = async (): Promise<PersistedStatusFile> => {
         ? record.sources
         : {},
   };
-};
+}
 
-const writeStatusFile = async (value: PersistedStatusFile): Promise<void> =>
-  writeJsonAtomically(statusPath, value);
+/**
+ * 写入来源状态文件。
+ *
+ * @param value - 需要持久化的来源状态文件。
+ * @returns 文件写入完成后结束的异步任务。
+ */
+async function writeStatusFile(value: PersistedStatusFile): Promise<void> {
+  await writeJsonFileAtomically(statusPath, value);
+}
 
-const fileInfo = async (
+/**
+ * 读取文件是否存在、大小和修改时间。
+ *
+ * @param path - 需要检查的文件绝对路径。
+ * @returns 文件存在状态、字节数和更新时间。
+ */
+async function fileInfo(
   path: string,
-): Promise<{ exists: boolean; bytes: number; updatedAt: string | null }> => {
+): Promise<{ exists: boolean; bytes: number; updatedAt: string | null }> {
   try {
     const details = await stat(path);
     return {
@@ -116,21 +134,34 @@ const fileInfo = async (
   } catch {
     return { exists: false, bytes: 0, updatedAt: null };
   }
-};
+}
 
-const defaultStatus = (): PersistedSourceStatus => ({
-  state: "never",
-  message: "尚未同步",
-  itemCount: 0,
-  fetchedAt: null,
-  processedAt: null,
-});
+/**
+ * 创建单个来源的初始同步状态。
+ *
+ * @returns 尚未同步的来源状态。
+ */
+function defaultStatus(): PersistedSourceStatus {
+  return {
+    state: "never",
+    message: "尚未同步",
+    itemCount: 0,
+    fetchedAt: null,
+    processedAt: null,
+  };
+}
 
-export const readSourceProjection = async (
+/**
+ * 读取来源的公开派生投影。
+ *
+ * @param sourceId - 数据来源标识。
+ * @returns 公开派生投影；文件不存在或结构无效时返回 null。
+ */
+export async function readSourceProjection(
   sourceId: DataSourceId,
-): Promise<SourceProjection | null> => {
-  const value = await readJson(sourceDerivedPath(sourceId));
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+): Promise<SourceProjection | null> {
+  const value = await readJsonFile(sourceDerivedPath(sourceId));
+  if (!isRecord(value)) return null;
   const record = value as Partial<SourceProjection>;
   return {
     libraryItems: Array.isArray(record.libraryItems)
@@ -144,13 +175,19 @@ export const readSourceProjection = async (
       ? (record.repositories as RepositorySummary[])
       : [],
   };
-};
+}
 
-export const readSourceRawSnapshot = async (
+/**
+ * 读取来源的私有原始响应快照。
+ *
+ * @param sourceId - 数据来源标识。
+ * @returns 私有原始快照；文件不存在或结构无效时返回 null。
+ */
+export async function readSourceRawSnapshot(
   sourceId: DataSourceId,
-): Promise<SourceRawSnapshot | null> => {
-  const value = await readJson(sourceRawPath(sourceId));
-  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+): Promise<SourceRawSnapshot | null> {
+  const value = await readJsonFile(sourceRawPath(sourceId));
+  if (!isRecord(value)) return null;
   const record = value as {
     sourceId?: unknown;
     fetchedAt?: unknown;
@@ -161,25 +198,31 @@ export const readSourceRawSnapshot = async (
     fetchedAt: typeof record.fetchedAt === "string" ? record.fetchedAt : null,
     rawData: record.rawData,
   };
-};
+}
 
-export const saveSourceSnapshot = async (input: {
+/**
+ * 保存来源原始响应、公开投影和成功状态。
+ *
+ * @param input - 来源 ID、原始数据、公开投影和状态消息。
+ * @returns 写入完成后的来源快照状态。
+ */
+export async function saveSourceSnapshot(input: {
   sourceId: DataSourceId;
   rawData: unknown;
   projection: SourceProjection;
   message: string;
   fetchedAt?: string;
-}): Promise<SourceSnapshotInfo> => {
+}): Promise<SourceSnapshotInfo> {
   const fetchedAt = input.fetchedAt ?? new Date().toISOString();
   const processedAt = new Date().toISOString();
   const projection = publicProjection(input.projection);
-  await writeJsonAtomically(sourceRawPath(input.sourceId), {
+  await writeJsonFileAtomically(sourceRawPath(input.sourceId), {
     version: 1,
     sourceId: input.sourceId,
     fetchedAt,
     rawData: input.rawData,
   });
-  await writeJsonAtomically(sourceDerivedPath(input.sourceId), {
+  await writeJsonFileAtomically(sourceDerivedPath(input.sourceId), {
     version: 1,
     sourceId: input.sourceId,
     processedAt,
@@ -196,13 +239,20 @@ export const saveSourceSnapshot = async (input: {
   };
   await writeStatusFile(statuses);
   return readSourceSnapshotInfo(input.sourceId);
-};
+}
 
-export const recordSourceStatus = async (
+/**
+ * 更新来源状态文件，并保留未覆盖的历史字段。
+ *
+ * @param sourceId - 数据来源标识。
+ * @param status - 需要更新的状态字段。
+ * @returns 更新完成后的来源快照状态。
+ */
+export async function recordSourceStatus(
   sourceId: DataSourceId,
   status: Pick<PersistedSourceStatus, "state" | "message"> &
     Partial<Pick<PersistedSourceStatus, "itemCount" | "fetchedAt" | "processedAt">>,
-): Promise<SourceSnapshotInfo> => {
+): Promise<SourceSnapshotInfo> {
   const statuses = await readStatusFile();
   const previous = statuses.sources[sourceId] ?? defaultStatus();
   statuses.sources[sourceId] = {
@@ -211,11 +261,17 @@ export const recordSourceStatus = async (
   };
   await writeStatusFile(statuses);
   return readSourceSnapshotInfo(sourceId);
-};
+}
 
-export const readSourceSnapshotInfo = async (
+/**
+ * 汇总来源状态和两类快照文件的实际磁盘信息。
+ *
+ * @param sourceId - 数据来源标识。
+ * @returns 来源状态和原始、派生快照文件信息。
+ */
+export async function readSourceSnapshotInfo(
   sourceId: DataSourceId,
-): Promise<SourceSnapshotInfo> => {
+): Promise<SourceSnapshotInfo> {
   const [statuses, raw, derived] = await Promise.all([
     readStatusFile(),
     fileInfo(sourceRawPath(sourceId)),
@@ -236,16 +292,30 @@ export const readSourceSnapshotInfo = async (
     fetchedAt: saved.fetchedAt,
     processedAt: saved.processedAt,
   };
-};
+}
 
-export const readAllSourceSnapshotInfo = async (): Promise<SourceSnapshotInfo[]> =>
-  Promise.all(sourceIds.map((sourceId) => readSourceSnapshotInfo(sourceId)));
+/**
+ * 读取所有来源的快照状态，顺序与来源目录保持一致。
+ *
+ * @returns 按来源目录顺序排列的快照状态列表。
+ */
+export async function readAllSourceSnapshotInfo(): Promise<SourceSnapshotInfo[]> {
+  return Promise.all(dataSourceIds.map((sourceId) => readSourceSnapshotInfo(sourceId)));
+}
 
-export const markSourceProcessed = async (
+/**
+ * 使用已保存的原始快照重新生成公开派生投影。
+ *
+ * @param sourceId - 数据来源标识。
+ * @param projection - 重新生成的公开投影。
+ * @param message - 处理完成后写入状态的消息。
+ * @returns 更新完成后的来源快照状态。
+ */
+export async function markSourceProcessed(
   sourceId: DataSourceId,
   projection: SourceProjection,
   message = "资料库投影已更新",
-): Promise<SourceSnapshotInfo> => {
+): Promise<SourceSnapshotInfo> {
   const existing = await readSourceRawSnapshot(sourceId);
   if (!existing) {
     return recordSourceStatus(sourceId, {
@@ -255,7 +325,7 @@ export const markSourceProcessed = async (
   }
   const processedAt = new Date().toISOString();
   const publicData = publicProjection(projection);
-  await writeJsonAtomically(sourceDerivedPath(sourceId), {
+  await writeJsonFileAtomically(sourceDerivedPath(sourceId), {
     version: 1,
     sourceId,
     processedAt,
@@ -267,15 +337,21 @@ export const markSourceProcessed = async (
     itemCount: publicData.libraryItems.length + publicData.repositories.length,
     processedAt,
   });
-};
+}
 
-export const clearSourceDerived = async (
+/**
+ * 清除来源公开派生缓存，但保留可重新处理的原始快照。
+ *
+ * @param sourceId - 数据来源标识。
+ * @returns 清理完成后的来源快照状态。
+ */
+export async function clearSourceDerived(
   sourceId: DataSourceId,
-): Promise<SourceSnapshotInfo> => {
+): Promise<SourceSnapshotInfo> {
   try {
     await unlink(sourceDerivedPath(sourceId));
   } catch {
-    // The cache may already be absent; status still becomes explicit.
+    // 缓存可能已经不存在，但状态仍需要明确记录为已清理。
   }
   return recordSourceStatus(sourceId, {
     state: "cleared",
@@ -283,4 +359,4 @@ export const clearSourceDerived = async (
     itemCount: 0,
     processedAt: null,
   });
-};
+}

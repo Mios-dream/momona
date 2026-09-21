@@ -23,6 +23,11 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   track: undefined,
+  /**
+   * 为缺少播放器目录的首页提供空目录默认值。
+   *
+   * @returns 没有歌单的音乐目录。
+   */
   catalog: () => ({ playlists: [] }),
   editable: false,
 });
@@ -101,13 +106,19 @@ const playbackProgress = computed(() => {
   return Math.min(100, Math.max(0, (currentTime / duration) * 100));
 });
 
-const formatPlaybackTime = (value?: number): string => {
+/**
+ * 将播放器秒数格式化为分钟和秒。
+ *
+ * @param value - 播放器当前时间或总时长，单位为秒。
+ * @returns 两位分钟和两位秒数组成的时间文本；输入无效时返回占位文本。
+ */
+function formatPlaybackTime(value?: number): string {
   if (!Number.isFinite(value) || Number(value) < 0) return "--:--";
   const totalSeconds = Math.floor(Number(value));
   const minutes = Math.floor(totalSeconds / 60);
   const seconds = String(totalSeconds % 60).padStart(2, "0");
   return `${String(minutes).padStart(2, "0")}:${seconds}`;
-};
+}
 
 const currentTimeLabel = computed(() =>
   formatPlaybackTime(playerState.value.currentTime),
@@ -145,13 +156,18 @@ const playbackModeIcon = computed<IconName>(() => {
 
 const playbackModes: MusicPlaybackMode[] = ["sequential", "one", "shuffle"];
 
-const cyclePlaybackMode = (): void => {
+/**
+ * 按顺序切换顺序播放、单曲循环和随机播放模式。
+ *
+ * @returns 无返回值；切换结果通过窗口事件通知播放器宿主。
+ */
+function cyclePlaybackMode(): void {
   const currentIndex = playbackModes.indexOf(playbackMode.value);
   const nextMode = playbackModes[(currentIndex + 1) % playbackModes.length];
   window.dispatchEvent(
     new CustomEvent("music-player-mode", { detail: nextMode }),
   );
-};
+}
 
 const collapsedLabel = computed(() => {
   if (activeCollapsedItem.value === "weather") {
@@ -208,29 +224,58 @@ const collapsedIcon = computed(() => {
   return "messageCircle";
 });
 
-const publishPlayerToggle = (): void => {
+/**
+ * 发布播放器播放或暂停事件。
+ *
+ * @returns 无返回值。
+ */
+function publishPlayerToggle(): void {
   window.dispatchEvent(new CustomEvent("music-player-toggle"));
-};
+}
 
-const publishPlayerEvent = (name: string, detail?: number): void => {
+/**
+ * 发布带可选数值载荷的播放器控制事件。
+ *
+ * @param name - 浏览器窗口事件名称。
+ * @param detail - 事件携带的数值，例如跳转到的秒数。
+ * @returns 无返回值。
+ */
+function publishPlayerEvent(name: string, detail?: number): void {
   window.dispatchEvent(new CustomEvent(name, { detail }));
-};
+}
 
-const seekPlayback = (event: Event): void => {
+/**
+ * 读取进度滑块值并请求播放器跳转。
+ *
+ * @param event - 进度输入框产生的 DOM 事件。
+ * @returns 无返回值；非法数值会被直接忽略。
+ */
+function seekPlayback(event: Event): void {
   const value = Number((event.target as HTMLInputElement).value);
   if (Number.isFinite(value)) publishPlayerEvent("music-player-seek", value);
-};
+}
 
-const handlePlayerState = (event: Event): void => {
+/**
+ * 接收播放器宿主发布的最新播放状态。
+ *
+ * @param event - 携带播放器状态的自定义事件。
+ * @returns 无返回值。
+ */
+function handlePlayerState(event: Event): void {
   const next = (event as CustomEvent<PlayerState>).detail;
   if (next && typeof next === "object") playerState.value = next;
-};
+}
 
-const loadQuote = async (): Promise<void> => {
+/**
+ * 请求一条远程一言，并在请求失败时保留本地回退文案。
+ *
+ * @returns 一个在请求和状态更新完成后结束的异步任务。
+ */
+async function loadQuote(): Promise<void> {
   quoteRequest = new AbortController();
   const timer = window.setTimeout(() => quoteRequest?.abort(), 8_000);
   try {
-    const response = await fetch("https://v1.hitokoto.cn/?c=i&encode=json", {
+    const response = await fetch("https://v1.hitokoto.cn/?c=a&c=b&c=c&encode=json", {
       signal: quoteRequest.signal,
     });
     if (!response.ok) throw new Error("一言请求失败");
@@ -251,51 +296,83 @@ const loadQuote = async (): Promise<void> => {
             : "一言",
     };
   } catch {
-    // The local fallback keeps the console useful when the quote service is unavailable.
+    // 语录服务不可用时，使用本地回退文本，保证控制台区域仍然有内容。
   } finally {
     window.clearTimeout(timer);
     quoteRequest = null;
   }
-};
+}
 
-const rotateCollapsedItem = (): void => {
+/**
+ * 在控制台收起状态下轮换一言、天气和问候内容。
+ *
+ * @returns 无返回值；展开状态下不会轮换。
+ */
+function rotateCollapsedItem(): void {
   if (isExpanded.value) return;
   const items: CollapsedItem[] = ["quote", "weather", "greeting"];
   const currentIndex = items.indexOf(activeCollapsedItem.value);
   activeCollapsedItem.value = items[(currentIndex + 1) % items.length];
-};
+}
 
-const startRotation = (): void => {
+/**
+ * 启动收起状态内容轮换定时器。
+ *
+ * @returns 无返回值。
+ */
+function startRotation(): void {
   if (rotationTimer !== null) window.clearInterval(rotationTimer);
   rotationTimer = window.setInterval(rotateCollapsedItem, 4_800);
-};
+}
 
-const stopRotation = (): void => {
+/**
+ * 停止收起状态内容轮换定时器。
+ *
+ * @returns 无返回值。
+ */
+function stopRotation(): void {
   if (rotationTimer !== null) {
     window.clearInterval(rotationTimer);
     rotationTimer = null;
   }
-};
+}
 
-const toggleExpanded = (): void => {
+/**
+ * 切换控制台展开状态，并同步轮换定时器。
+ *
+ * @returns 无返回值。
+ */
+function toggleExpanded(): void {
   isExpanded.value = !isExpanded.value;
   if (isExpanded.value) stopRotation();
   else startRotation();
-};
+}
 
-const handleKeydown = (event: KeyboardEvent): void => {
+/**
+ * 使用 Escape 键关闭已展开的控制台。
+ *
+ * @param event - 键盘事件。
+ * @returns 无返回值。
+ */
+function handleKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape" && isExpanded.value) {
     isExpanded.value = false;
     startRotation();
   }
-};
+}
 
-const handleDocumentPointerDown = (event: PointerEvent): void => {
+/**
+ * 点击控制台外部时关闭展开面板。
+ *
+ * @param event - 文档级指针事件。
+ * @returns 无返回值。
+ */
+function handleDocumentPointerDown(event: PointerEvent): void {
   if (!isExpanded.value || !(event.target instanceof Node)) return;
   if (panelElement.value?.contains(event.target)) return;
   isExpanded.value = false;
   startRotation();
-};
+}
 
 onMounted(async () => {
   window.addEventListener("music-player-state-change", handlePlayerState);

@@ -13,6 +13,11 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   track: undefined,
+  /**
+   * 为没有音乐快照的首页组件提供空目录默认值。
+   *
+   * @returns 没有歌单的音乐目录。
+   */
   catalog: () => ({ playlists: [] }),
   editable: false,
 });
@@ -44,14 +49,25 @@ const sourceLabel = computed(() => {
   return "手动音乐";
 });
 
-const handleState = (event: Event): void => {
+/**
+ * 接收播放器状态并更新首页音乐卡片。
+ *
+ * @param event - 携带播放器状态的自定义事件。
+ * @returns 无返回值；无效状态会被忽略。
+ */
+function handleState(event: Event): void {
   const next = (event as CustomEvent<State>).detail;
   if (next && typeof next === "object") state.value = next;
-};
+}
 
-const toggle = (): void => {
+/**
+ * 发布播放器播放或暂停事件。
+ *
+ * @returns 无返回值。
+ */
+function toggle(): void {
   window.dispatchEvent(new CustomEvent("music-player-toggle"));
-};
+}
 
 onMounted(() => {
   window.addEventListener("music-player-state-change", handleState);

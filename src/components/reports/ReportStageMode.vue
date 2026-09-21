@@ -46,21 +46,36 @@ const CONTROL_CHARS = /[\u0000-\u001F\u007F-\u009F]/g;
 const MARKDOWN_SYMBOLS = /[*_~`]/g;
 const PUNCTUATION = /([。！？.!?，,])/g;
 
-const cleanText = (value: string): string =>
-  value
+/**
+ * 清理摘要中的控制符、Markdown 符号和多余空白。
+ *
+ * @param value - 原始报告摘要。
+ * @returns 可直接展示在舞台模式中的纯文本。
+ */
+function cleanText(value: string): string {
+  return value
     .replace(CONTROL_CHARS, "")
     .replace(MARKDOWN_SYMBOLS, "")
     .replace(/\s+/g, " ")
     .trim();
+}
 
-const splitSentences = (value: string): string[] =>
-  value
+/**
+ * 按中英文标点将摘要拆分为舞台逐句播放的行。
+ *
+ * @param value - 已清理的摘要文本。
+ * @returns 最多五行、去除空白后的舞台播放文本。
+ */
+function splitSentences(value: string): string[] {
+  return value
     .replace(PUNCTUATION, "$1\uFFFF")
     .split("\uFFFF")
     .map((line) => line.trim())
     .filter(Boolean)
     .slice(0, 5);
+}
 
+/** 将报告卡片数据组织成洞察、回响和细节三个章节。 */
 const chapters = computed<StageChapter[]>(() => {
   const card = props.card;
   if (!card) return [];
@@ -95,29 +110,49 @@ const chapters = computed<StageChapter[]>(() => {
   return result;
 });
 
+/** 读取当前播放章节。 */
 const currentChapter = computed(() => chapters.value[chapterIndex.value]);
+/** 返回当前章节标题。 */
 const currentChapterLabel = computed(() => currentChapter.value?.title ?? "");
+/** 返回舞台模式当前章节编号。 */
 const stageActLabel = computed(
   () => `ACT ${chapterIndex.value + 1}/${Math.max(chapters.value.length, 1)}`,
 );
 
-const clearTimer = (timer: number | null): void => {
+/**
+ * 清理浏览器定时器，允许空值以便重复调用。
+ *
+ * @param timer - 需要清除的定时器 ID，空值表示没有待清理任务。
+ * @returns 无返回值。
+ */
+function clearTimer(timer: number | null): void {
   if (timer !== null) window.clearTimeout(timer);
-};
+}
 
-const clearPlayback = (): void => {
+/**
+ * 清除逐行和章节两个播放定时器。
+ *
+ * @returns 无返回值；清理后两个定时器引用都会归零。
+ */
+function clearPlayback(): void {
   clearTimer(lineTimer);
   clearTimer(chapterTimer);
   lineTimer = null;
   chapterTimer = null;
-};
+}
 
+/** 根据章节行数计算最短播放时长。 */
 const chapterDuration = computed(() => {
   const lineCount = currentChapter.value?.lines.length ?? 1;
   return Math.max(7600, 1550 + lineCount * 1350);
 });
 
-const revealNextLine = (): void => {
+/**
+ * 显示当前章节的下一行，并安排后续逐行显示。
+ *
+ * @returns 无返回值；舞台关闭或暂停时不会继续显示。
+ */
+function revealNextLine(): void {
   const lines = currentChapter.value?.lines ?? [];
   if (nextLineIndex >= lines.length || props.paused || !props.open) return;
 
@@ -133,9 +168,15 @@ const revealNextLine = (): void => {
   if (nextLineIndex < lines.length) {
     lineTimer = window.setTimeout(revealNextLine, 1350);
   }
-};
+}
 
-const scheduleChapterEnd = (delay: number): void => {
+/**
+ * 安排章节结束回调，并保存暂停所需的截止时间。
+ *
+ * @param delay - 当前章节剩余的播放毫秒数。
+ * @returns 无返回值；舞台关闭或暂停时不会创建定时器。
+ */
+function scheduleChapterEnd(delay: number): void {
   clearTimer(chapterTimer);
   if (props.paused || !props.open) return;
   chapterRemaining = delay;
@@ -151,51 +192,82 @@ const scheduleChapterEnd = (delay: number): void => {
       emit("complete");
     }
   }, delay);
-};
+}
 
-const startChapter = (): void => {
+/**
+ * 初始化当前章节的逐行播放和结束计时。
+ *
+ * @returns 无返回值；会清理上一章节遗留的两个计时器。
+ */
+function startChapter(): void {
   clearPlayback();
   chapterRemaining = chapterDuration.value;
   if (props.paused || !props.open) return;
   lineTimer = window.setTimeout(revealNextLine, 520);
   scheduleChapterEnd(chapterRemaining);
-};
+}
 
-const pausePlayback = (): void => {
+/**
+ * 暂停舞台播放并记录剩余章节时间。
+ *
+ * @returns 无返回值；剩余时间供恢复播放时继续使用。
+ */
+function pausePlayback(): void {
   if (chapterTimer !== null) {
     chapterRemaining = Math.max(0, chapterDeadline - Date.now());
   }
   clearPlayback();
-};
+}
 
-const resumePlayback = (): void => {
+/**
+ * 从记录的剩余时间继续舞台播放。
+ *
+ * @returns 无返回值；舞台未打开时不会重新安排计时器。
+ */
+function resumePlayback(): void {
   if (!props.open) return;
   if (nextLineIndex < (currentChapter.value?.lines.length ?? 0)) {
     lineTimer = window.setTimeout(revealNextLine, 260);
   }
   scheduleChapterEnd(chapterRemaining || chapterDuration.value);
-};
+}
 
-const resetPlayback = (): void => {
+/**
+ * 重置章节、行索引和所有播放定时器。
+ *
+ * @returns 无返回值；舞台仍打开时会从第一章重新开始。
+ */
+function resetPlayback(): void {
   clearPlayback();
   chapterIndex.value = 0;
   visibleLines.value = [];
   nextLineIndex = 0;
   chapterRemaining = 0;
   if (props.open) startChapter();
-};
+}
 
-const togglePause = (): void => {
+/**
+ * 切换舞台暂停状态并通知父组件。
+ *
+ * @returns 无返回值；实际状态由父组件通过 props 回传。
+ */
+function togglePause(): void {
   emit("update:paused", !props.paused);
-};
+}
 
-const handleKeydown = (event: KeyboardEvent): void => {
+/**
+ * 处理舞台模式的 Escape 关闭和空格暂停快捷操作。
+ *
+ * @param event - 浏览器键盘事件。
+ * @returns 无返回值；空格键会阻止页面滚动。
+ */
+function handleKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape") emit("close");
   if (event.key === " ") {
     event.preventDefault();
     togglePause();
   }
-};
+}
 
 watch(
   () => [props.open, props.card?.id] as const,
@@ -800,7 +872,7 @@ onBeforeUnmount(() => {
   }
 }
 
-/* Keep the stage composition aligned with the report strip instead of treating it as a modal. */
+/* 让舞台模式与报告卡片条保持同一版式层级，不额外制造独立弹窗布局。 */
 .report-stage-mode {
   z-index: 40;
   background: transparent;

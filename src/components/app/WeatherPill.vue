@@ -19,16 +19,26 @@ const loading = ref(true);
 /**
  * 展开或收起右上角的天气信息菜单。
  */
-const toggleWeatherMenu = (): void => {
+/**
+ * 切换天气详情菜单的展开状态。
+ *
+ * @returns 无返回值。
+ */
+function toggleWeatherMenu(): void {
   isOpen.value = !isOpen.value;
-};
+}
 
 /**
  * 关闭天气信息菜单。
  */
-const closeWeatherMenu = (): void => {
+/**
+ * 关闭天气详情菜单。
+ *
+ * @returns 无返回值。
+ */
+function closeWeatherMenu(): void {
   isOpen.value = false;
-};
+}
 
 onMounted(async () => {
   weather.value = await getWeatherInfo();

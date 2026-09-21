@@ -14,13 +14,14 @@ import {
 } from '../../data/friends';
 import type { FriendLink } from '../../data/types';
 import { usePanZoom } from '../../composables/usePanZoom';
-import { packItems } from '../../composables/usePackedLayout';
+import {
+  createFriendWallLayout,
+  type PositionedFriend,
+} from './friendWallLayout';
 import FriendAvatar from '../app/FriendAvatar.vue';
 import IconGlyph from '../app/IconGlyph.vue';
 
 type FriendTone = FriendLink['tone'];
-type FriendShape = 'portrait' | 'square' | 'wide';
-
 interface FriendDraft {
   nickname: string;
   href: string;
@@ -31,30 +32,6 @@ interface FriendDraft {
   tone: FriendTone;
 }
 
-interface PositionedFriend {
-  friend: FriendLink;
-  width: number;
-  height: number;
-  left: number;
-  top: number;
-  shape: FriendShape;
-  tilt: number;
-  delay: number;
-}
-
-interface FriendWallSlot {
-  width: number;
-  height: number;
-  shape: FriendShape;
-  tilt: number;
-}
-
-interface FriendLayout {
-  canvasWidth: number;
-  canvasHeight: number;
-  friends: PositionedFriend[];
-}
-
 interface Props {
   /** 构建阶段从本地配置文件注入的友联数据。 */
   friends?: FriendLink[];
@@ -63,6 +40,11 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  /**
+   * 为静态页面提供空友联列表默认值。
+   *
+   * @returns 空友联数组。
+   */
   friends: () => [],
   editable: false,
 });
@@ -96,6 +78,11 @@ const {
   zoomOut,
 } = usePanZoom();
 
+/**
+ * 创建友联编辑表单的空白状态。
+ *
+ * @returns 带默认色调和空字段的友联编辑草稿。
+ */
 function createDraft(): FriendDraft {
   return {
     nickname: '',
@@ -108,44 +95,67 @@ function createDraft(): FriendDraft {
   };
 }
 
+/** 读取当前正在编辑的友联。 */
 const currentFriend = computed(() =>
   editingId.value
     ? friends.value.find((friend) => friend.id === editingId.value) ?? null
     : null,
 );
 
+/** 生成友联编辑器标题。 */
 const editorTitle = computed(() =>
   editingId.value ? '编辑这张友联卡' : '添加一位新朋友',
 );
 
+/** 生成友联编辑器的辅助标题。 */
 const editorEyebrow = computed(() =>
   editingId.value ? 'EDIT FRIEND' : 'NEW FRIEND',
 );
 
+/** 生成友联数量统计文案。 */
 const statsLabel = computed(() =>
   friends.value.length ? `${friends.value.length} 位朋友在这里` : '暂无友联',
 );
 
-const getFriendHost = (href: string): string => {
+/**
+ * 从友联地址中提取可读的域名。
+ *
+ * @param href - 友联站点地址。
+ * @returns 去掉 www 前缀的域名；地址无效时返回原文本。
+ */
+function getFriendHost(href: string): string {
   try {
     return new URL(href).hostname.replace(/^www\./, '');
   } catch {
     return href;
   }
-};
+}
 
-const makeId = (nickname: string): string => {
+/**
+ * 根据昵称和当前时间生成新友联的稳定编辑 ID。
+ *
+ * @param nickname - 新友联昵称。
+ * @returns 可用于编辑和持久化的唯一 ID。
+ */
+function makeId(nickname: string): string {
   const base = nickname
     .toLowerCase()
     .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
     .replace(/^-|-$/g, '') || 'friend';
   return `${base}-${Date.now().toString(36)}`;
-};
+}
 
-const persistFriends = async (
+/**
+ * 将友联列表保存到本地开发服务，失败时回滚界面状态。
+ *
+ * @param nextFriends - 需要保存的最新友联列表。
+ * @param previousFriends - 保存失败时恢复的旧友联列表。
+ * @returns 保存成功时返回 true，非编辑模式或保存失败时返回 false。
+ */
+async function persistFriends(
   nextFriends: FriendLink[],
   previousFriends: FriendLink[],
-): Promise<boolean> => {
+): Promise<boolean> {
   if (!props.editable) return false;
   try {
     const response = await fetch('/__momona/save-friends', {
@@ -164,25 +174,42 @@ const persistFriends = async (
     showToast(String(error instanceof Error ? error.message : error));
     return false;
   }
-};
+}
 
-const showToast = (message: string): void => {
+/**
+ * 显示短暂的友联操作提示，并取消上一次定时器。
+ *
+ * @param message - 需要显示的提示文本。
+ * @returns 无返回值。
+ */
+function showToast(message: string): void {
   toastMessage.value = message;
   if (toastTimer !== null) window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => {
     toastMessage.value = '';
     toastTimer = null;
   }, 2400);
-};
+}
 
-const openCreate = (): void => {
+/**
+ * 打开新增友联表单。
+ *
+ * @returns 无返回值；表单会重置为默认草稿。
+ */
+function openCreate(): void {
   editingId.value = null;
   deletePending.value = false;
   draft.value = createDraft();
   editorOpen.value = true;
-};
+}
 
-const openEdit = (friend: FriendLink): void => {
+/**
+ * 将已有友联装载到编辑表单。
+ *
+ * @param friend - 需要编辑的友联。
+ * @returns 无返回值。
+ */
+function openEdit(friend: FriendLink): void {
   editingId.value = friend.id;
   deletePending.value = false;
   draft.value = {
@@ -195,14 +222,24 @@ const openEdit = (friend: FriendLink): void => {
     tone: friend.tone,
   };
   editorOpen.value = true;
-};
+}
 
-const closeEditor = (): void => {
+/**
+ * 关闭友联编辑器并清理删除确认状态。
+ *
+ * @returns 无返回值。
+ */
+function closeEditor(): void {
   editorOpen.value = false;
   deletePending.value = false;
-};
+}
 
-const saveFriend = async (): Promise<void> => {
+/**
+ * 校验并保存新增或编辑后的友联。
+ *
+ * @returns 保存流程完成后结束；字段不完整或非编辑模式时直接结束。
+ */
+async function saveFriend(): Promise<void> {
   if (!props.editable) return;
   const nickname = draft.value.nickname.trim();
   const signature = draft.value.signature.trim();
@@ -237,13 +274,23 @@ const saveFriend = async (): Promise<void> => {
   if (!(await persistFriends(nextFriends, previousFriends))) return;
   showToast(editingId.value ? '友联卡片已更新' : '新的友联已加入');
   closeEditor();
-};
+}
 
-const requestDelete = (): void => {
+/**
+ * 进入删除确认状态。
+ *
+ * @returns 无返回值。
+ */
+function requestDelete(): void {
   deletePending.value = true;
-};
+}
 
-const confirmDelete = async (): Promise<void> => {
+/**
+ * 删除当前友联，并在保存失败时恢复原列表。
+ *
+ * @returns 删除保存流程完成后结束。
+ */
+async function confirmDelete(): Promise<void> {
   if (!editingId.value || !props.editable) return;
   const previousFriends = cloneFriendLinks(friends.value);
   const nextFriends = friends.value.filter(
@@ -253,89 +300,55 @@ const confirmDelete = async (): Promise<void> => {
   if (!(await persistFriends(nextFriends, previousFriends))) return;
   closeEditor();
   showToast('友联已移除');
-};
+}
 
-const updateViewportMode = (): void => {
+/**
+ * 根据窗口宽度切换友联墙的桌面或移动排版。
+ *
+ * @returns 无返回值；布局计算会从响应式视口模式重新派生。
+ */
+function updateViewportMode(): void {
   compactViewport.value = window.innerWidth <= 820;
-};
+}
 
-const desktopCardVariants: FriendWallSlot[] = [
-  { width: 430, height: 230, shape: 'wide', tilt: -1.1 },
-  { width: 300, height: 290, shape: 'portrait', tilt: 0.8 },
-  { width: 385, height: 220, shape: 'wide', tilt: -0.55 },
-  { width: 300, height: 300, shape: 'portrait', tilt: 1.05 },
-  { width: 330, height: 290, shape: 'portrait', tilt: -0.85 },
-  { width: 430, height: 220, shape: 'wide', tilt: 0.55 },
-  { width: 350, height: 260, shape: 'square', tilt: -0.95 },
-  { width: 440, height: 220, shape: 'wide', tilt: 0.7 },
-  { width: 420, height: 220, shape: 'wide', tilt: 0.7 },
-  { width: 300, height: 300, shape: 'portrait', tilt: -0.9 },
-  { width: 430, height: 220, shape: 'wide', tilt: -0.45 },
-  { width: 300, height: 300, shape: 'portrait', tilt: 0.95 },
-];
-
-const mobileCardVariants: FriendWallSlot[] = [
-  { width: 346, height: 236, shape: 'wide', tilt: -0.8 },
-  { width: 322, height: 300, shape: 'portrait', tilt: 0.65 },
-  { width: 340, height: 244, shape: 'wide', tilt: -0.45 },
-  { width: 330, height: 318, shape: 'square', tilt: 0.85 },
-];
-
-const createFlowLayout = (
-  items: FriendLink[],
-  compact: boolean,
-): FriendLayout => {
-  const variants = compact ? mobileCardVariants : desktopCardVariants;
-  const canvasWidth = compact ? 430 : 2100;
-  const packedItems = packItems(
-    items.map((friend, index) => {
-      const slot = variants[index % variants.length];
-      return {
-        friend,
-        width: slot.width,
-        height: slot.height,
-        shape: slot.shape,
-        tilt: slot.tilt,
-        delay: Math.min(index * 42, 420),
-      };
-    }),
-    {
-      canvasWidth,
-      gap: compact ? 16 : 26,
-      padding: compact ? 20 : 86,
-      minHeight: compact ? 900 : 900,
-    },
-  );
-
-  return {
-    canvasWidth,
-    canvasHeight: packedItems.height,
-    friends: packedItems.items,
-  };
-};
-
+/** 响应友联数据和视口模式变化重新计算墙面布局。 */
 const displayedLayout = computed(() =>
-  createFlowLayout(friends.value, compactViewport.value),
+  createFriendWallLayout(friends.value, compactViewport.value),
 );
 
+/** 组合画布缩放样式和排版后的固定尺寸。 */
 const canvasFrameStyle = computed(() => ({
   ...canvasStyle.value,
   width: `${displayedLayout.value.canvasWidth}px`,
   height: `${displayedLayout.value.canvasHeight}px`,
 }));
 
-const getFriendStyle = (item: PositionedFriend): Record<string, string> => ({
-  left: `${item.left}px`,
-  top: `${item.top}px`,
-  width: `${item.width}px`,
-  height: `${item.height}px`,
-  '--friend-tilt': `${item.tilt}deg`,
-  '--friend-delay': `${item.delay}ms`,
-});
+/**
+ * 将排版卡片转换为绝对定位所需的 CSS 样式。
+ *
+ * @param item - 已完成排版的友联卡片。
+ * @returns 供模板 style 绑定使用的 CSS 属性对象。
+ */
+function getFriendStyle(item: PositionedFriend): Record<string, string> {
+  return {
+    left: `${item.left}px`,
+    top: `${item.top}px`,
+    width: `${item.width}px`,
+    height: `${item.height}px`,
+    '--friend-tilt': `${item.tilt}deg`,
+    '--friend-delay': `${item.delay}ms`,
+  };
+}
 
-const openCard = (friend: FriendLink): void => {
+/**
+ * 在可编辑模式下通过点击卡片打开编辑器。
+ *
+ * @param friend - 用户点击的友联。
+ * @returns 无返回值；公开模式下保持卡片浏览行为。
+ */
+function openCard(friend: FriendLink): void {
   if (props.editable) openEdit(friend);
-};
+}
 
 watch(
   () => props.friends,

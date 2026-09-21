@@ -73,7 +73,12 @@ const imageLoading = computed(() => {
   return false;
 });
 
-const checkImage = (): void => {
+/**
+ * 检查主图和回退图的已加载状态，兼容浏览器未触发事件的缓存图片。
+ *
+ * @returns 无返回值。
+ */
+function checkImage(): void {
   const image = imageElement.value;
   if (image?.complete) {
     if (image.naturalWidth === 0) imageFailed.value = true;
@@ -85,35 +90,60 @@ const checkImage = (): void => {
     if (fallbackImage.naturalWidth === 0) fallbackImageFailed.value = true;
     else fallbackImageLoaded.value = true;
   }
-};
+}
 
-const scheduleImageCheck = (): void => {
+/**
+ * 将图片状态检查延迟到当前渲染周期之后。
+ *
+ * @returns 无返回值。
+ */
+function scheduleImageCheck(): void {
   if (typeof window === "undefined") return;
   if (imageCheckTimer !== null) window.clearTimeout(imageCheckTimer);
   imageCheckTimer = window.setTimeout(() => {
     imageCheckTimer = null;
     checkImage();
   }, 0);
-};
+}
 
-const handleImageError = (): void => {
+/**
+ * 标记主图加载失败，并安排回退图状态检查。
+ *
+ * @returns 无返回值。
+ */
+function handleImageError(): void {
   imageLoaded.value = false;
   imageFailed.value = true;
   scheduleImageCheck();
-};
+}
 
-const handleFallbackImageError = (): void => {
+/**
+ * 标记回退图也加载失败，使组件展示语义图标。
+ *
+ * @returns 无返回值。
+ */
+function handleFallbackImageError(): void {
   fallbackImageLoaded.value = false;
   fallbackImageFailed.value = true;
-};
+}
 
-const handleImageLoad = (): void => {
+/**
+ * 记录主图已加载完成。
+ *
+ * @returns 无返回值。
+ */
+function handleImageLoad(): void {
   imageLoaded.value = true;
-};
+}
 
-const handleFallbackImageLoad = (): void => {
+/**
+ * 记录回退图已加载完成。
+ *
+ * @returns 无返回值。
+ */
+function handleFallbackImageLoad(): void {
   fallbackImageLoaded.value = true;
-};
+}
 
 watch([source, fallbackSource], () => {
   imageFailed.value = false;

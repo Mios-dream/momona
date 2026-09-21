@@ -18,9 +18,14 @@ const emit = defineEmits<{
 /**
  * 将卡片点击事件转发给 Brew 页面。
  */
-const handleOpen = (): void => {
+/**
+ * 向父组件发送来源打开事件。
+ *
+ * @returns 无返回值。
+ */
+function handleOpen(): void {
   emit('open', props.source);
-};
+}
 </script>
 
 <template>

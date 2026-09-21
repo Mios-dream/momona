@@ -42,6 +42,10 @@ import HomeMediaPairCard from "./HomeMediaPairCard.vue";
 import HomeMusicCard from "./HomeMusicCard.vue";
 import HomeWeatherCard from "./HomeWeatherCard.vue";
 import HomeWidgetEditor from "./HomeWidgetEditor.vue";
+import {
+  findNearestWidgetPosition,
+  widgetStyle,
+} from "../../utils/homeGrid";
 
 interface Props {
   siteData: SiteData;
@@ -98,6 +102,7 @@ const editToolbarWidth = ref<number | null>(null);
 const editToolbarActionsWidth = ref(0);
 let editToolbarResizeObserver: ResizeObserver | null = null;
 
+/** 计算编辑工具栏所需的动态宽度样式。 */
 const editToolbarStyle = computed<Record<string, string>>(() => {
   const style: Record<string, string> = {
     "--home-edit-actions-width": `${editToolbarActionsWidth.value}px`,
@@ -108,7 +113,12 @@ const editToolbarStyle = computed<Record<string, string>>(() => {
   return style;
 });
 
-const measureEditToolbar = (): void => {
+/**
+ * 根据工具栏内容测量编辑操作区，避免展开时布局跳动。
+ *
+ * @returns 无返回值；元素未挂载时跳过测量。
+ */
+function measureEditToolbar(): void {
   const content = editToolbarContent.value;
   const leading = editToolbarLeading.value;
   const actions = editToolbarActions.value;
@@ -121,21 +131,31 @@ const measureEditToolbar = (): void => {
   const leadingWidth = leading.getBoundingClientRect().width;
   const visibleActionsWidth = isEditing.value ? actionsWidth + 4 : 0;
   editToolbarWidth.value = Math.ceil(leadingWidth + visibleActionsWidth + 10);
-};
+}
 
+/** 读取当前正在编辑的首页组件。 */
 const selectedWidget = computed(() =>
   editorConfig.value.widgets.find(
     (widget) => widget.id === selectedWidgetId.value,
   ),
 );
 
-const widgetDisplayName = (widget: HomeWidget): string =>
-  widget.type === "link"
+/**
+ * 返回组件在编辑提示中使用的显示名称。
+ *
+ * @param widget - 需要生成名称的首页组件配置。
+ * @returns 链接组件的自定义标题或组件默认标签。
+ */
+function widgetDisplayName(widget: HomeWidget): string {
+  return widget.type === "link"
     ? widget.settings?.link?.title?.trim() || widget.label
     : widget.label;
+}
 
+/** 暴露首页组件目录供编辑器渲染。 */
 const widgetCatalogDefinitions = computed(() => homeWidgetDefinitions);
 
+/** 根据编辑状态选择配置组件或公开快照中的可见组件。 */
 const activeWidgets = computed(() => {
   const widgets = isEditing.value
     ? editorConfig.value.widgets
@@ -145,6 +165,7 @@ const activeWidgets = computed(() => {
   );
 });
 
+/** 计算当前首页网格需要的行数。 */
 const gridRowCount = computed(() =>
   Math.max(
     HOME_GRID_ROWS,
@@ -152,7 +173,13 @@ const gridRowCount = computed(() =>
   ),
 );
 
-const widgetProps = (widget: HomeWidget): Record<string, unknown> => {
+/**
+ * 将统一组件配置映射为具体首页组件所需的 props。
+ *
+ * @param widget - 当前要渲染的首页组件配置。
+ * @returns 传给具体 Vue 组件的属性对象。
+ */
+function widgetProps(widget: HomeWidget): Record<string, unknown> {
   switch (widget.type) {
     case "feed":
       return { repositories: props.siteData.repositories };
@@ -203,46 +230,46 @@ const widgetProps = (widget: HomeWidget): Record<string, unknown> => {
     default:
       return {};
   }
-};
+}
 
-const safeCol = (widget: HomeWidget): number =>
-  Math.min(HOME_GRID_COLUMNS - widget.colSpan + 1, Math.max(1, widget.col));
-
-const safeRow = (widget: HomeWidget): number => Math.max(1, widget.row);
-
-const widgetStyle = (
-  widget: HomeWidget,
-  index = 0,
-): Record<string, string> => ({
-  "--widget-index": String(index),
-  "--widget-col-start": String(safeCol(widget)),
-  "--widget-row-start": String(safeRow(widget)),
-  "--widget-col-span": String(widget.colSpan),
-  "--widget-row-span": String(widget.rowSpan),
-  "--widget-mobile-col-span": String(widget.mobileColSpan),
-  "--widget-mobile-row-span": String(widget.mobileRowSpan),
-});
-
-const emitConfigChange = (
+/**
+ * 规范化编辑配置，并通知应用壳层更新运行时页面数据。
+ *
+ * @param nextConfig - 编辑器产生的下一份本地配置。
+ * @param notice - 需要在编辑器中显示的短提示。
+ * @param persist - 是否请求应用壳层持久化配置。
+ * @returns 无返回值；事件载荷始终使用深拷贝后的规范化配置。
+ */
+function emitConfigChange(
   nextConfig: LocalConfig,
   notice = "",
   persist = false,
-): void => {
+): void {
   const normalized = normalizeLocalConfig(nextConfig);
   editorConfig.value = normalized;
   emit("config-change", cloneLocalConfig(normalized), persist);
   if (notice) editorNotice.value = notice;
-};
+}
 
-const startEditing = (): void => {
+/**
+ * 打开首页编辑器并复制一份可回滚的本地配置。
+ *
+ * @returns 无返回值。
+ */
+function startEditing(): void {
   editorConfig.value = cloneLocalConfig(
     props.localConfig ?? createEmptyLocalConfig(),
   );
   isEditing.value = true;
   editorNotice.value = "";
-};
+}
 
-const stopEditing = (): void => {
+/**
+ * 结束首页编辑，将编辑结果持久化并清理选择状态。
+ *
+ * @returns 无返回值；未处于编辑模式时直接结束。
+ */
+function stopEditing(): void {
   if (!isEditing.value) return;
   emitConfigChange(editorConfig.value, "", true);
   isEditing.value = false;
@@ -250,22 +277,40 @@ const stopEditing = (): void => {
   selectedWidgetId.value = null;
   draggingWidgetId.value = null;
   editorNotice.value = "";
-};
+}
 
-const openWidgetEditor = (widget: HomeWidget): void => {
+/**
+ * 选中一个首页组件并打开对应设置面板。
+ *
+ * @param widget - 用户点击的首页组件配置。
+ * @returns 无返回值；非编辑模式下忽略点击。
+ */
+function openWidgetEditor(widget: HomeWidget): void {
   if (!isEditing.value) return;
   selectedWidgetId.value = widget.id;
   gameError.value = "";
-};
+}
 
-const updateWidget = (widget: HomeWidget): void => {
+/**
+ * 用编辑器返回的组件配置替换当前组件。
+ *
+ * @param widget - 编辑器返回的最新组件配置。
+ * @returns 无返回值；变更通过统一配置事件提交。
+ */
+function updateWidget(widget: HomeWidget): void {
   const next = editorConfig.value.widgets.map((item) =>
     item.id === widget.id ? widget : item,
   );
   emitConfigChange({ ...editorConfig.value, widgets: next });
-};
+}
 
-const removeWidget = (widget: HomeWidget): void => {
+/**
+ * 从首页布局中移除一个组件。
+ *
+ * @param widget - 需要移除的首页组件配置。
+ * @returns 无返回值；同时清理当前选中状态。
+ */
+function removeWidget(widget: HomeWidget): void {
   selectedWidgetId.value = null;
   emitConfigChange(
     {
@@ -276,73 +321,24 @@ const removeWidget = (widget: HomeWidget): void => {
     },
     `${widgetDisplayName(widget)} 已从首页移除`,
   );
-};
+}
 
-const removeSelectedWidget = (): void => {
+/**
+ * 移除当前选中的组件。
+ *
+ * @returns 无返回值；没有选中组件时不执行操作。
+ */
+function removeSelectedWidget(): void {
   if (selectedWidget.value) removeWidget(selectedWidget.value);
-};
+}
 
-const overlaps = (
-  widget: HomeWidget,
-  col: number,
-  row: number,
-  other: HomeWidget,
-): boolean =>
-  col < other.col + other.colSpan &&
-  col + widget.colSpan > other.col &&
-  row < other.row + other.rowSpan &&
-  row + widget.rowSpan > other.row;
-
-const isPositionFree = (
-  widget: HomeWidget,
-  col: number,
-  row: number,
-): boolean => {
-  if (col < 1 || col + widget.colSpan > HOME_GRID_COLUMNS + 1 || row < 1) {
-    return false;
-  }
-  return !editorConfig.value.widgets.some(
-    (other) =>
-      other.visible &&
-      other.id !== widget.id &&
-      overlaps(widget, col, row, other),
-  );
-};
-
-const findNearestPosition = (
-  widget: HomeWidget,
-  desiredCol: number,
-  desiredRow: number,
-): { col: number; row: number } => {
-  const maxCol = HOME_GRID_COLUMNS - widget.colSpan + 1;
-  const clampedCol = Math.min(maxCol, Math.max(1, desiredCol));
-  const clampedRow = Math.max(1, desiredRow);
-  if (isPositionFree(widget, clampedCol, clampedRow)) {
-    return { col: clampedCol, row: clampedRow };
-  }
-
-  for (let distance = 1; distance < 16; distance += 1) {
-    for (
-      let row = Math.max(1, clampedRow - distance);
-      row <= clampedRow + distance;
-      row += 1
-    ) {
-      for (
-        let col = Math.max(1, clampedCol - distance);
-        col <= clampedCol + distance;
-        col += 1
-      ) {
-        const candidateCol = Math.min(maxCol, col);
-        if (isPositionFree(widget, candidateCol, row)) {
-          return { col: candidateCol, row };
-        }
-      }
-    }
-  }
-  return { col: clampedCol, row: clampedRow };
-};
-
-const updateDragPosition = (event: PointerEvent): void => {
+/**
+ * 根据指针位置更新被拖拽组件的吸附网格位置。
+ *
+ * @param event - 当前指针移动事件。
+ * @returns 无返回值；指针尚未超过拖拽阈值时不改变布局。
+ */
+function updateDragPosition(event: PointerEvent): void {
   const id = draggingWidgetId.value;
   const grid = gridElement.value;
   const widget = editorConfig.value.widgets.find((item) => item.id === id);
@@ -360,12 +356,22 @@ const updateDragPosition = (event: PointerEvent): void => {
   const col =
     Math.floor(((event.clientX - rect.left) / rect.width) * columns) + 1;
   const row = Math.floor(((event.clientY - rect.top) / rect.height) * rows) + 1;
-  const position = findNearestPosition(widget, col, row);
+  const position = findNearestWidgetPosition(
+    editorConfig.value.widgets,
+    widget,
+    col,
+    row,
+  );
   widget.col = position.col;
   widget.row = position.row;
-};
+}
 
-const finishDrag = (): void => {
+/**
+ * 结束拖拽并在组件确实移动后提交布局变更。
+ *
+ * @returns 无返回值；未发生实际移动时不会产生配置事件。
+ */
+function finishDrag(): void {
   if (!draggingWidgetId.value) return;
   const wasMoved = dragMoved.value;
   draggingWidgetId.value = null;
@@ -385,9 +391,16 @@ const finishDrag = (): void => {
     suppressWidgetClickTimer = null;
   }, 450);
   emitConfigChange(editorConfig.value, "组件位置已吸附");
-};
+}
 
-const startDrag = (event: PointerEvent, widget: HomeWidget): void => {
+/**
+ * 开始记录组件拖拽，并注册全局指针跟踪事件。
+ *
+ * @param event - 指针按下事件。
+ * @param widget - 被拖拽的首页组件配置。
+ * @returns 无返回值；非编辑模式下忽略操作。
+ */
+function startDrag(event: PointerEvent, widget: HomeWidget): void {
   if (!isEditing.value) return;
   event.preventDefault();
   draggingWidgetId.value = widget.id;
@@ -397,12 +410,19 @@ const startDrag = (event: PointerEvent, widget: HomeWidget): void => {
   window.addEventListener("pointermove", updateDragPosition);
   window.addEventListener("pointerup", finishDrag);
   window.addEventListener("pointercancel", finishDrag);
-};
+}
 
-const handleWidgetSurfaceClick = (
+/**
+ * 处理组件表面点击，区分拖拽结束后的误触发。
+ *
+ * @param event - 组件表面点击事件。
+ * @param widget - 被点击的首页组件配置。
+ * @returns 无返回值；拖拽后的短暂窗口内会阻止误点击。
+ */
+function handleWidgetSurfaceClick(
   event: MouseEvent,
   widget: HomeWidget,
-): void => {
+): void {
   if (suppressWidgetClick.value) {
     event.preventDefault();
     event.stopPropagation();
@@ -414,24 +434,42 @@ const handleWidgetSurfaceClick = (
     return;
   }
   openWidgetEditor(widget);
-};
+}
 
-const widgetCatalogState = (type: HomeWidgetType): string => {
+/**
+ * 返回组件目录中某类组件的当前状态文案。
+ *
+ * @param type - 组件目录中的组件类型。
+ * @returns 添加、已启用或可启用等状态文案。
+ */
+function widgetCatalogState(type: HomeWidgetType): string {
   if (type === "link") return "新增";
   const current = editorConfig.value.widgets.find(
     (widget) => widget.type === type,
   );
   return current ? (current.visible ? "已启用" : "可启用") : "可添加";
-};
+}
 
-const isWidgetCatalogDisabled = (type: HomeWidgetType): boolean => {
+/**
+ * 判断组件目录中的添加按钮是否应被禁用。
+ *
+ * @param type - 组件目录中的组件类型。
+ * @returns 当前类型已经存在可见组件时返回 true。
+ */
+function isWidgetCatalogDisabled(type: HomeWidgetType): boolean {
   if (type === "link") return false;
   return editorConfig.value.widgets.some(
     (widget) => widget.type === type && widget.visible,
   );
-};
+}
 
-const addWidget = (type: HomeWidgetType): void => {
+/**
+ * 新增或重新启用一个首页组件，并为其寻找可用位置。
+ *
+ * @param type - 需要新增或重新启用的组件类型。
+ * @returns 无返回值；组件位置由公共网格工具统一计算。
+ */
+function addWidget(type: HomeWidgetType): void {
   const current = editorConfig.value.widgets.find(
     (widget) => widget.type === type,
   );
@@ -439,7 +477,12 @@ const addWidget = (type: HomeWidgetType): void => {
   let addedLabel = type === "link" ? "跳转按钮" : widgetCatalogState(type);
 
   if (current && type !== "link") {
-    const position = findNearestPosition(current, current.col, current.row);
+    const position = findNearestWidgetPosition(
+      editorConfig.value.widgets,
+      current,
+      current.col,
+      current.row,
+    );
     const nextWidget = {
       ...current,
       visible: true,
@@ -455,7 +498,12 @@ const addWidget = (type: HomeWidgetType): void => {
       type,
       type === "link" ? `link-${Date.now()}` : type,
     );
-    const position = findNearestPosition(widget, widget.col, widget.row);
+    const position = findNearestWidgetPosition(
+      editorConfig.value.widgets,
+      widget,
+      widget.col,
+      widget.row,
+    );
     nextWidgets.push({
       ...widget,
       visible: true,
@@ -470,9 +518,15 @@ const addWidget = (type: HomeWidgetType): void => {
     { ...editorConfig.value, widgets: nextWidgets },
     `${addedLabel} 已加入首页`,
   );
-};
+}
 
-const fetchGameAccount = async (uid: string): Promise<void> => {
+/**
+ * 为选中的游戏组件读取 UID 对应的公开账号摘要。
+ *
+ * @param uid - 游戏账号 UID。
+ * @returns 账号请求完成后结束；失败信息写入编辑器状态。
+ */
+async function fetchGameAccount(uid: string): Promise<void> {
   const widget = selectedWidget.value;
   if (!widget || widget.type !== "game" || !uid) return;
   gameBusy.value = true;
@@ -507,13 +561,19 @@ const fetchGameAccount = async (uid: string): Promise<void> => {
   } finally {
     gameBusy.value = false;
   }
-};
+}
 
-const handleKeydown = (event: KeyboardEvent): void => {
+/**
+ * 响应 Escape 键关闭当前首页组件编辑器。
+ *
+ * @param event - 浏览器键盘事件。
+ * @returns 无返回值；只处理 Escape 键。
+ */
+function handleKeydown(event: KeyboardEvent): void {
   if (event.key === "Escape" && selectedWidgetId.value) {
     selectedWidgetId.value = null;
   }
-};
+}
 
 watch(
   () => props.localConfig,

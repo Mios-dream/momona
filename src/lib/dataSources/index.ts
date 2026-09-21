@@ -1,267 +1,177 @@
-import { projectBangumiRaw, syncBangumi } from "./providers/bangumi";
-import { projectBilibiliRaw, syncBilibili } from "./providers/bilibili";
-import { projectSfacgRaw, syncSfacg } from "./providers/sfacg";
-import { projectSteamRaw, syncSteam } from "./providers/steam";
+import type { DataSourceId, LocalConfig } from "../../data/types";
 import {
-  musicUserId,
-  projectMusicCatalog,
-  projectMusicRaw,
-  syncMusic,
-} from "./providers/music";
-import {
-  projectGithubRaw,
-  sortGithubRepositories,
-  syncGithub,
-} from "./providers/github";
-import { sourceValue } from "./shared";
-import {
+  applyLocalConfigToSiteData,
   buildSiteDataFromResults,
   filterLibraryItemsForConfig,
   hasSelectedContent,
-  sourceLabel,
+  mapManualItem,
+  mergeSourceSiteData,
   selectedContentLabel,
+  sourceLabel as projectSourceLabel,
+  sourceLabels,
 } from "./siteData";
+import { getSourceAdapter } from "./registry";
 import {
   dataSourceIds,
   type DataSyncResult,
   type SourceSyncResult,
 } from "./types";
-import type { DataSourceId, LocalConfig } from "../../data/types";
 
-const sourceIdentity = (sourceId: DataSourceId, config: LocalConfig): string =>
-  sourceId === "bilibili"
-    ? sourceValue(config.sources.bilibili.userId, /\/(\d+)\/?$/)
-    : sourceId === "steam"
-      ? sourceValue(config.sources.steam.username, /\/(?:profiles|id)\/([^/]+)\/?$/)
-    : sourceId === "sfacg"
-      ? sourceValue(config.sources.sfacg.username, /\/p\/(\d+)(?:\/\d+)?\/?$/)
-    : sourceId === "netease" || sourceId === "qqmusic"
-      ? musicUserId(
-          config.sources[sourceId].username || config.sources[sourceId].userId,
-        )
-      : sourceValue(config.sources[sourceId].username, /\/([^/]+)\/?$/);
-
-const sourceError = (
+/**
+ * 生成来源同步失败结果；失败不会阻塞其他来源和静态页面生成。
+ *
+ * @param sourceId - 发生错误的来源标识。
+ * @param error - 来源同步过程捕获的未知错误。
+ * @returns 可继续参与页面合并的失败结果。
+ */
+function sourceError(
   sourceId: DataSourceId,
   error: unknown,
-): SourceSyncResult => ({
+): SourceSyncResult {
+  return {
   sourceId,
   status: {
     id: sourceId,
-    label: sourceLabel(sourceId),
+    label: projectSourceLabel(sourceId),
     status: "error",
     message: String(error instanceof Error ? error.message : error),
     count: 0,
   },
   rawData: null,
   libraryItems: [],
-  musicCatalog: undefined,
   repositories: [],
-});
+  };
+}
 
-const skippedSource = (
+/**
+ * 生成来源被配置跳过时的统一结果。
+ *
+ * @param sourceId - 被跳过的来源标识。
+ * @param message - 说明跳过原因的中文消息。
+ * @returns 可继续参与页面合并的跳过结果。
+ */
+function skippedSource(
   sourceId: DataSourceId,
   message: string,
-): SourceSyncResult => ({
+): SourceSyncResult {
+  return {
   sourceId,
   status: {
     id: sourceId,
-    label: sourceLabel(sourceId),
+    label: projectSourceLabel(sourceId),
     status: "skipped",
     message,
     count: 0,
   },
   rawData: null,
   libraryItems: [],
-  musicCatalog: undefined,
   repositories: [],
-});
+  };
+}
 
-/** 将本地原始快照重新投影为当前配置允许进入页面的数据。 */
-export const projectSourceRaw = (
+/**
+ * 返回各来源缺少账号标识时使用的中文提示。
+ *
+ * @param sourceId - 缺少身份信息的来源标识。
+ * @returns 面向设置页的缺少身份提示。
+ */
+function missingIdentityMessage(sourceId: DataSourceId): string {
+  if (sourceId === "bilibili") return "未配置 UID";
+  if (sourceId === "netease" || sourceId === "qqmusic") {
+    return "未配置用户 ID";
+  }
+  if (sourceId === "steam") return "未配置 Steam 个人页地址或 SteamID64";
+  if (sourceId === "sfacg") return "未配置 SFACG 开放书架地址";
+  return "未配置用户名";
+}
+
+/**
+ * 将来源原始响应按当前配置重新生成公开投影。
+ *
+ * @param config - 当前完整本地配置。
+ * @param sourceId - 需要重新投影的来源标识。
+ * @param rawData - 来源私有快照中的原始数据。
+ * @returns 当前配置允许公开的资料库、音乐和仓库投影。
+ */
+export function projectSourceRaw(
   config: LocalConfig,
   sourceId: DataSourceId,
   rawData: unknown,
-): Pick<SourceSyncResult, "libraryItems" | "musicCatalog" | "repositories"> => {
-  const sourceConfig = config.sources[sourceId];
-  const libraryItems =
-    sourceId === "bangumi"
-      ? projectBangumiRaw(rawData)
-      : sourceId === "bilibili"
-        ? projectBilibiliRaw(rawData, sourceConfig)
-      : sourceId === "netease" || sourceId === "qqmusic"
-          ? projectMusicRaw(rawData, sourceId, sourceConfig)
-          : sourceId === "steam"
-            ? projectSteamRaw(rawData, sourceConfig)
-            : sourceId === "sfacg"
-              ? projectSfacgRaw(rawData, sourceConfig)
-        : [];
-  const repositories =
-    sourceId === "github"
-      ? sortGithubRepositories(
-          projectGithubRaw(rawData),
-          sourceConfig.content.githubRepositorySort,
-        )
-      : [];
-  const musicCatalog =
-    sourceId === "netease" || sourceId === "qqmusic"
-      ? projectMusicCatalog(rawData, sourceId, sourceConfig)
-      : undefined;
+): Pick<SourceSyncResult, "libraryItems" | "musicCatalog" | "repositories"> {
+  const adapter = getSourceAdapter(sourceId);
+  const projection = adapter.project(rawData, config.sources[sourceId]);
   return {
-    libraryItems: filterLibraryItemsForConfig(libraryItems, config),
-    ...(musicCatalog ? { musicCatalog } : {}),
-    repositories,
+    libraryItems: filterLibraryItemsForConfig(projection.libraryItems, config),
+    ...(projection.musicCatalog ? { musicCatalog: projection.musicCatalog } : {}),
+    repositories: projection.repositories,
   };
-};
+}
 
-/** 独立抓取一个来源，调用方可以决定是否把结果写入快照。 */
-export const syncDataSource = async (
+/**
+ * 独立抓取一个来源；调用方可以决定是否把结果写入快照。
+ *
+ * @param config - 当前完整本地配置。
+ * @param sourceId - 需要同步的来源标识。
+ * @returns 该来源的同步状态、原始数据和统一投影。
+ */
+export async function syncDataSource(
   config: LocalConfig,
   sourceId: DataSourceId,
-): Promise<SourceSyncResult> => {
+): Promise<SourceSyncResult> {
   const sourceConfig = config.sources[sourceId];
   if (!sourceConfig.enabled) return skippedSource(sourceId, "未启用");
-  if (!hasSelectedContent(sourceId, config))
+  if (!hasSelectedContent(sourceId, config)) {
     return skippedSource(sourceId, "未选择同步内容");
+  }
 
-  if (!sourceIdentity(sourceId, config)) {
-    return sourceError(
-      sourceId,
-      sourceId === "bilibili"
-        ? "未配置 UID"
-        : sourceId === "netease" || sourceId === "qqmusic"
-        ? "未配置用户 ID"
-        : sourceId === "steam"
-          ? "未配置 Steam 个人页地址或 SteamID64"
-          : sourceId === "sfacg"
-            ? "未配置 SFACG 开放书架地址"
-        : "未配置用户名",
-    );
+  const adapter = getSourceAdapter(sourceId);
+  if (!adapter.resolveIdentity(sourceConfig)) {
+    return sourceError(sourceId, missingIdentityMessage(sourceId));
   }
 
   try {
-    if (sourceId === "bangumi") {
-      const result = await syncBangumi(sourceConfig);
-      const projection = projectSourceRaw(config, sourceId, result.rawData);
-      return {
-        sourceId,
-        status: {
-          id: sourceId,
-          label: sourceLabel(sourceId),
-          status: "success",
-          message: `已同步${selectedContentLabel(sourceId, config)}`,
-          count: projection.libraryItems.length,
-        },
-        rawData: result.rawData,
-        ...projection,
-      };
-    }
-
-    if (sourceId === "bilibili") {
-      const result = await syncBilibili(sourceConfig);
-      const projection = projectSourceRaw(config, sourceId, result.rawData);
-      return {
-        sourceId,
-        status: {
-          id: sourceId,
-          label: sourceLabel(sourceId),
-          status: "success",
-          message: `已同步${selectedContentLabel(sourceId, config)}`,
-          count: projection.libraryItems.length,
-        },
-        rawData: result.rawData,
-        ...projection,
-      };
-    }
-
-    if (sourceId === "netease" || sourceId === "qqmusic") {
-      const result = await syncMusic(sourceId, sourceConfig);
-      const projection = projectSourceRaw(config, sourceId, result.rawData);
-      return {
-        sourceId,
-        status: {
-          id: sourceId,
-          label: sourceLabel(sourceId),
-          status: "success",
-          message: `${result.message}：${selectedContentLabel(sourceId, config)}`,
-          count: projection.libraryItems.length,
-        },
-        rawData: result.rawData,
-        ...(result.musicCatalog ? { musicCatalog: result.musicCatalog } : {}),
-        ...projection,
-      };
-    }
-
-    if (sourceId === "steam") {
-      const result = await syncSteam(sourceConfig);
-      const projection = projectSourceRaw(config, sourceId, result.rawData);
-      return {
-        sourceId,
-        status: {
-          id: sourceId,
-          label: sourceLabel(sourceId),
-          status: "success",
-          message: result.message,
-          count: projection.libraryItems.length,
-        },
-        rawData: result.rawData,
-        ...projection,
-      };
-    }
-
-    if (sourceId === "sfacg") {
-      const result = await syncSfacg(sourceConfig);
-      const projection = projectSourceRaw(config, sourceId, result.rawData);
-      return {
-        sourceId,
-        status: {
-          id: sourceId,
-          label: sourceLabel(sourceId),
-          status: "success",
-          message: result.message,
-          count: projection.libraryItems.length,
-        },
-        rawData: result.rawData,
-        ...projection,
-      };
-    }
-
-    const github = await syncGithub(sourceConfig);
-    const projection = projectSourceRaw(config, sourceId, github.rawData);
+    const result = await adapter.sync(sourceConfig);
+    const projection = projectSourceRaw(config, sourceId, result.rawData);
     return {
       sourceId,
       status: {
         id: sourceId,
-        label: sourceLabel(sourceId),
+        label: projectSourceLabel(sourceId),
         status: "success",
-        message: github.message,
-        count: projection.repositories.length,
+        message: adapter.formatMessage(result, sourceConfig),
+        count: projection.libraryItems.length + projection.repositories.length,
       },
-      rawData: github.rawData,
+      rawData: result.rawData,
       ...projection,
     };
   } catch (error) {
     return sourceError(sourceId, error);
   }
-};
+}
 
-/** 按配置抓取并转换所有来源，任何单个来源失败都不会阻塞静态生成。 */
-export const collectSiteData = async (
+/**
+ * 并行抓取全部来源并组装成可写入站点快照的完整数据。
+ *
+ * @param config - 当前完整本地配置。
+ * @returns 包含页面快照和每个来源状态的同步结果。
+ */
+export async function collectSiteData(
   config: LocalConfig,
-): Promise<DataSyncResult> => {
+): Promise<DataSyncResult> {
   const results = await Promise.all(
     dataSourceIds.map((sourceId) => syncDataSource(config, sourceId)),
   );
   const siteData = buildSiteDataFromResults(config, results);
   return { siteData, statuses: siteData.providerStatus };
-};
+}
 
 export {
   applyLocalConfigToSiteData,
   hasSelectedContent,
   mapManualItem,
   mergeSourceSiteData,
+  selectedContentLabel,
   sourceLabels,
-} from "./siteData";
+};
 export { dataSourceIds, ProviderError } from "./types";
 export type { DataSyncResult, SourceSyncResult } from "./types";

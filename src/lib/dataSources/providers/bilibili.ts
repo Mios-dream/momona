@@ -3,7 +3,14 @@ import type { LibraryItem, LocalConfig } from "../../../data/types";
 import type { ProviderSyncData } from "../types";
 import { ProviderError } from "../types";
 
-const readBilibiliJson = async <T>(url: string): Promise<T> => {
+/**
+ * 请求 Bilibili JSON 接口并检查平台级错误码。
+ *
+ * @param url - Bilibili 接口地址。
+ * @returns 接口返回的指定类型数据。
+ * @throws 当接口返回平台错误码时抛出 ProviderError。
+ */
+async function readBilibiliJson<T>(url: string): Promise<T> {
   const payload = (await readJson(url, {
     headers: { Accept: "application/json" },
   })) as T & { code?: number; message?: string };
@@ -14,12 +21,25 @@ const readBilibiliJson = async <T>(url: string): Promise<T> => {
     );
   }
   return payload;
-};
+}
 
-const cleanBilibiliTitle = (value: unknown): string =>
-  typeof value === "string" ? value.replace(/<[^>]+>/g, "").trim() : "";
+/**
+ * 清理 Bilibili 标题中的 HTML 标签。
+ *
+ * @param value - Bilibili 返回的未知标题值。
+ * @returns 去除标签和首尾空白后的标题。
+ */
+function cleanBilibiliTitle(value: unknown): string {
+  return typeof value === "string" ? value.replace(/<[^>]+>/g, "").trim() : "";
+}
 
-const bilibiliImageUrl = (value: unknown): string => {
+/**
+ * 将 Bilibili 图片地址转换为可直接加载的 HTTPS 地址。
+ *
+ * @param value - Bilibili 返回的未知图片地址。
+ * @returns 可直接加载的图片地址；无效输入返回空字符串。
+ */
+function bilibiliImageUrl(value: unknown): string {
   const image = imageOr(value);
   if (!image) return "";
 
@@ -35,7 +55,7 @@ const bilibiliImageUrl = (value: unknown): string => {
   } catch {
     return image;
   }
-};
+}
 
 interface BilibiliGroupResult {
   rawData: unknown;
@@ -48,10 +68,23 @@ interface BilibiliRawData {
   bangumi?: unknown;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+/**
+ * 判断未知接口数据是否为普通对象。
+ *
+ * @param value - 待判断的未知接口数据。
+ * @returns 值是非数组对象时返回 true。
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
-export const projectBilibiliVideosRaw = (payload: unknown): LibraryItem[] => {
+/**
+ * 将投稿视频响应投影为统一资料库条目。
+ *
+ * @param payload - 投稿视频接口原始响应。
+ * @returns 统一视频资料库条目。
+ */
+export function projectBilibiliVideosRaw(payload: unknown): LibraryItem[] {
   const entries = isRecord(payload)
     ? ((isRecord(payload.data) &&
         isRecord(payload.data.list) &&
@@ -80,17 +113,30 @@ export const projectBilibiliVideosRaw = (payload: unknown): LibraryItem[] => {
       },
     ];
   });
-};
+}
 
-const favoriteResources = (value: unknown): unknown[] => {
+/**
+ * 从收藏夹组合响应中提取收藏夹资源列表。
+ *
+ * @param value - 收藏夹接口组合响应。
+ * @returns 收藏夹资源列表；响应结构不匹配时返回空数组。
+ */
+function favoriteResources(value: unknown): unknown[] {
   if (!isRecord(value) || !Array.isArray(value.resources)) return [];
   return value.resources;
-};
+}
 
-export const projectBilibiliFavoritesRaw = (
+/**
+ * 将 Bilibili 收藏夹响应去重后投影为统一条目。
+ *
+ * @param rawData - 收藏夹及资源的组合原始响应。
+ * @param limit - 需要保留的最大条目数。
+ * @returns 去重后的统一视频资料库条目。
+ */
+export function projectBilibiliFavoritesRaw(
   rawData: unknown,
   limit: number,
-): LibraryItem[] => {
+): LibraryItem[] {
   const libraryItems: LibraryItem[] = [];
   const seen = new Set<string>();
   for (const resource of favoriteResources(rawData)) {
@@ -125,9 +171,15 @@ export const projectBilibiliFavoritesRaw = (
     }
   }
   return libraryItems;
-};
+}
 
-export const projectBilibiliBangumiRaw = (payload: unknown): LibraryItem[] => {
+/**
+ * 将 Bilibili 追番/追剧响应投影为统一条目。
+ *
+ * @param payload - Bilibili 追番接口原始响应。
+ * @returns 统一动画资料库条目。
+ */
+export function projectBilibiliBangumiRaw(payload: unknown): LibraryItem[] {
   const entries =
     isRecord(payload) && isRecord(payload.data)
       ? Array.isArray(payload.data.list)
@@ -156,12 +208,19 @@ export const projectBilibiliBangumiRaw = (payload: unknown): LibraryItem[] => {
       },
     ];
   });
-};
+}
 
-export const projectBilibiliRaw = (
+/**
+ * 按当前内容配置组合 Bilibili 的多个原始响应投影。
+ *
+ * @param rawData - Bilibili 各内容接口的原始响应集合。
+ * @param config - Bilibili 来源配置。
+ * @returns 按内容开关筛选后的统一资料库条目。
+ */
+export function projectBilibiliRaw(
   rawData: unknown,
   config: LocalConfig["sources"]["bilibili"],
-): LibraryItem[] => {
+): LibraryItem[] {
   if (!isRecord(rawData)) return [];
   const snapshot = rawData as BilibiliRawData;
   const items: LibraryItem[] = [];
@@ -175,24 +234,40 @@ export const projectBilibiliRaw = (
     items.push(...projectBilibiliBangumiRaw(snapshot.bangumi));
   }
   return items;
-};
+}
 
-const mapBilibiliVideos = async (
+/**
+ * 请求 Bilibili 投稿视频。
+ *
+ * @param config - Bilibili 来源配置。
+ * @param base - Bilibili API 基础地址。
+ * @param userId - Bilibili 用户 UID。
+ * @returns 投稿视频的原始响应和统一条目。
+ */
+async function mapBilibiliVideos(
   config: LocalConfig["sources"]["bilibili"],
   base: string,
   userId: string,
-): Promise<BilibiliGroupResult> => {
+): Promise<BilibiliGroupResult> {
   const payload = await readBilibiliJson<unknown>(
     `${base}/x/space/arc/search?mid=${encodeURIComponent(userId)}&ps=${sourceLimit(config.limit)}&pn=1`,
   );
   return { rawData: payload, libraryItems: projectBilibiliVideosRaw(payload) };
-};
+}
 
-const mapBilibiliFavorites = async (
+/**
+ * 请求 Bilibili 收藏夹及其视频资源。
+ *
+ * @param config - Bilibili 来源配置。
+ * @param base - Bilibili API 基础地址。
+ * @param userId - Bilibili 用户 UID。
+ * @returns 收藏夹资源的原始响应和统一条目。
+ */
+async function mapBilibiliFavorites(
   config: LocalConfig["sources"]["bilibili"],
   base: string,
   userId: string,
-): Promise<BilibiliGroupResult> => {
+): Promise<BilibiliGroupResult> {
   const foldersPayload = await readBilibiliJson<unknown>(
     `${base}/x/v3/fav/folder/created/list-all?up_mid=${encodeURIComponent(userId)}`,
   );
@@ -220,22 +295,36 @@ const mapBilibiliFavorites = async (
     rawData,
     libraryItems: projectBilibiliFavoritesRaw(rawData, config.limit),
   };
-};
+}
 
-const mapBilibiliBangumi = async (
+/**
+ * 请求 Bilibili 追番/追剧列表。
+ *
+ * @param config - Bilibili 来源配置。
+ * @param base - Bilibili API 基础地址。
+ * @param userId - Bilibili 用户 UID。
+ * @returns 追番列表的原始响应和统一条目。
+ */
+async function mapBilibiliBangumi(
   config: LocalConfig["sources"]["bilibili"],
   base: string,
   userId: string,
-): Promise<BilibiliGroupResult> => {
+): Promise<BilibiliGroupResult> {
   const payload = await readBilibiliJson<unknown>(
     `${base}/x/space/bangumi/follow/list?vmid=${encodeURIComponent(userId)}&type=1&ps=${sourceLimit(config.limit)}&pn=1`,
   );
   return { rawData: payload, libraryItems: projectBilibiliBangumiRaw(payload) };
-};
+}
 
-const mapBilibili = async (
+/**
+ * 按配置并行请求 Bilibili 已选内容。
+ *
+ * @param config - Bilibili 来源配置。
+ * @returns 包含原始响应和统一资料条目的同步数据。
+ */
+async function mapBilibili(
   config: LocalConfig["sources"]["bilibili"],
-): Promise<ProviderSyncData> => {
+): Promise<ProviderSyncData> {
   const userId = sourceValue(config.userId, /\/(\d+)\/?$/);
   if (!config.enabled || !userId) {
     return {
@@ -284,6 +373,6 @@ const mapBilibili = async (
     repositories: [],
     message: `Bilibili 已同步 ${libraryItems.length} 项内容`,
   };
-};
+}
 
 export const syncBilibili = mapBilibili;

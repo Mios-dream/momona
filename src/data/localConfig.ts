@@ -5,8 +5,8 @@ import {
   widgetToneOptions,
 } from "./homeWidgets";
 import { normalizeFriendLink } from "./friends";
+import { dataSourceIds } from "./sourceCatalog";
 import type {
-  DataSourceId,
   HomeWidget,
   IconName,
   LibraryFilter,
@@ -19,49 +19,89 @@ import type {
   SourceContentConfig,
 } from "./types";
 
-const sourceIds: DataSourceId[] = [
-  "bangumi",
-  "bilibili",
-  "github",
-  "netease",
-  "qqmusic",
-  "steam",
-  "sfacg",
-];
+/**
+ * 判断未知输入是否为可读取属性的普通对象。
+ *
+ * @param value - 待判断的未知输入。
+ * @returns 输入是非数组对象时返回 true。
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+/**
+ * 读取配置中的文本字段，并统一去除首尾空白。
+ *
+ * @param value - 待读取的未知字段。
+ * @returns 类型为字符串时的去空白文本，否则返回空字符串。
+ */
+function text(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
 
-const text = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : "";
+/**
+ * 判断未知图标是否属于首页配置允许的图标集合。
+ *
+ * @param value - 待判断的未知图标值。
+ * @returns 值属于允许的图标集合时返回 true。
+ */
+function isIconName(value: unknown): value is IconName {
+  return typeof value === "string" && widgetIconOptions.includes(value as IconName);
+}
 
-const isIconName = (value: unknown): value is IconName =>
-  typeof value === "string" && widgetIconOptions.includes(value as IconName);
+/**
+ * 判断未知颜色是否属于社交链接允许的主题集合。
+ *
+ * @param value - 待判断的未知主题色。
+ * @returns 值属于允许的主题色集合时返回 true。
+ */
+function isSocialTone(value: unknown): value is SocialLink["tone"] {
+  return (
+    typeof value === "string" &&
+    (widgetToneOptions as readonly string[]).includes(value)
+  );
+}
 
-const isSocialTone = (value: unknown): value is SocialLink["tone"] =>
-  typeof value === "string" &&
-  (widgetToneOptions as readonly string[]).includes(value);
+/**
+ * 创建个人站点的默认身份信息。
+ *
+ * @returns 站点首次启动时使用的默认个人资料。
+ */
+function defaultProfile(): SiteProfile {
+  return {
+    name: "三三 sama",
+    latinName: "@miosdream",
+    motto: "「世界中のすべての素晴らしいために戦う！」",
+    avatar: "/assets/avatar.jpg",
+  };
+}
 
-const defaultProfile = (): SiteProfile => ({
-  name: "三三 sama",
-  latinName: "@miosdream",
-  motto: "「世界中のすべての素晴らしいために戦う！」",
-  avatar: "/assets/avatar.jpg",
-});
+/**
+ * 创建空的播放器配置。
+ *
+ * @returns 未选择曲目的默认播放器配置。
+ */
+function emptyMusic(): MusicSettings {
+  return {
+    enabled: false,
+    source: "manual",
+    playlistId: "",
+    id: "",
+    title: "",
+    artist: "",
+    album: "",
+    cover: "",
+    audioUrl: "",
+  };
+}
 
-const emptyMusic = (): MusicSettings => ({
-  enabled: false,
-  source: "manual",
-  playlistId: "",
-  id: "",
-  title: "",
-  artist: "",
-  album: "",
-  cover: "",
-  audioUrl: "",
-});
-
-const emptyContent = (): SourceContentConfig => ({
+/**
+ * 创建所有来源内容均关闭的配置。
+ *
+ * @returns 所有来源内容开关均关闭的默认对象。
+ */
+function emptyContent(): SourceContentConfig {
+  return {
   bangumiAnime: false,
   bangumiGames: false,
   bangumiBooks: false,
@@ -81,42 +121,73 @@ const emptyContent = (): SourceContentConfig => ({
   githubRepositories: false,
   githubRepositoryScope: "all",
   githubRepositorySort: "updated",
-});
+  };
+}
 
-const emptySource = (): SourceConfig => ({
-  enabled: false,
-  username: "",
-  userId: "",
-  token: "",
-  endpoint: "",
-  limit: 24,
-  content: emptyContent(),
-});
+/**
+ * 创建单个来源的默认配置。
+ *
+ * @returns 未启用且没有身份信息的来源配置。
+ */
+function emptySource(): SourceConfig {
+  return {
+    enabled: false,
+    username: "",
+    userId: "",
+    token: "",
+    endpoint: "",
+    limit: 24,
+    content: emptyContent(),
+  };
+}
 
-const emptyAutoRefresh = (): LocalConfig["autoRefresh"] => ({
-  enabled: false,
-  intervalHours: 24,
-});
+/**
+ * 创建默认的本地自动刷新配置。
+ *
+ * @returns 关闭自动刷新的默认配置。
+ */
+function emptyAutoRefresh(): LocalConfig["autoRefresh"] {
+  return {
+    enabled: false,
+    intervalHours: 24,
+  };
+}
 
-const defaultLinkWidget = (
+/**
+ * 创建首次启动时的默认链接组件。
+ *
+ * @param id - 组件实例标识。
+ * @param col - 组件在首页网格中的起始列。
+ * @param row - 组件在首页网格中的起始行。
+ * @param link - 链接组件的展示与跳转设置。
+ * @returns 配置好默认尺寸和位置的链接组件。
+ */
+function defaultLinkWidget(
   id: string,
   col: number,
   row: number,
   link: LinkWidgetSettings,
-): HomeWidget => ({
-  ...createHomeWidget("link", id),
-  visible: true,
-  col,
-  row,
-  colSpan: 1,
-  rowSpan: 1,
-  mobileColSpan: 1,
-  mobileRowSpan: 1,
-  settings: { link },
-});
+): HomeWidget {
+  return {
+    ...createHomeWidget("link", id),
+    visible: true,
+    col,
+    row,
+    colSpan: 1,
+    rowSpan: 1,
+    mobileColSpan: 1,
+    mobileRowSpan: 1,
+    settings: { link },
+  };
+}
 
-/** 首次启动时展示的首页布局；内容数据仍保持为空，方便用户继续编辑。 */
-const defaultHomeWidgets = (): HomeWidget[] => [
+/**
+ * 创建首次启动时的首页组件布局。
+ *
+ * @returns 带有基础社交链接和默认展示组件的首页布局。
+ */
+function defaultHomeWidgets(): HomeWidget[] {
+  return [
   createHomeWidget("greeting", "greeting"),
   defaultLinkWidget("social-qq", 3, 1, {
     title: "QQ",
@@ -167,10 +238,16 @@ const defaultHomeWidgets = (): HomeWidget[] => [
     col: 13,
     row: 3,
   },
-];
+  ];
+}
 
-/** 创建首次启动用的本地配置；数据来源和内容为空，身份与首页布局提供默认值。 */
-export const createEmptyLocalConfig = (): LocalConfig => ({
+/**
+ * 创建首次启动用的本地配置；数据来源和内容为空，身份与首页布局提供默认值。
+ *
+ * @returns 可直接用于设置页和同步流程的空本地配置。
+ */
+export function createEmptyLocalConfig(): LocalConfig {
+  return {
   version: 1,
   account: defaultProfile(),
   socialLinks: [],
@@ -188,9 +265,16 @@ export const createEmptyLocalConfig = (): LocalConfig => ({
   manualItems: [],
   music: emptyMusic(),
   widgets: defaultHomeWidgets(),
-});
+  };
+}
 
-const normalizeProfile = (value: unknown): SiteProfile => {
+/**
+ * 规范化个人资料字段，缺失字段保持为空。
+ *
+ * @param value - 文件或接口中的未知个人资料。
+ * @returns 具有稳定字段的个人资料对象。
+ */
+function normalizeProfile(value: unknown): SiteProfile {
   const record = isRecord(value) ? value : {};
   return {
     name: text(record.name),
@@ -198,9 +282,15 @@ const normalizeProfile = (value: unknown): SiteProfile => {
     motto: text(record.motto),
     avatar: text(record.avatar),
   };
-};
+}
 
-const normalizeSocialLinks = (value: unknown): SocialLink[] => {
+/**
+ * 过滤并规范化社交链接配置。
+ *
+ * @param value - 文件或接口中的未知社交链接列表。
+ * @returns 去除无效项并补齐默认字段后的链接列表。
+ */
+function normalizeSocialLinks(value: unknown): SocialLink[] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry, index) => {
     if (!isRecord(entry)) return [];
@@ -218,18 +308,31 @@ const normalizeSocialLinks = (value: unknown): SocialLink[] => {
       },
     ];
   });
-};
+}
 
-const normalizeSource = (value: unknown): SourceConfig => {
+/**
+ * 规范化一个来源的开关、账号和内容范围。
+ *
+ * @param value - 文件或接口中的未知来源配置。
+ * @returns 具有固定字段和合法范围的来源配置。
+ */
+function normalizeSource(value: unknown): SourceConfig {
   const record = isRecord(value) ? value : {};
   const rawContent = isRecord(record.content) ? record.content : {};
-  const boolean = (
+  /**
+   * 读取来源内容配置中的布尔开关。
+   *
+   * @param key - 需要读取的内容开关字段。
+   * @returns 字段确实为布尔值时返回其值，否则返回 false。
+   */
+  function boolean(
     key: Exclude<
       keyof SourceContentConfig,
       "githubRepositoryScope" | "githubRepositorySort"
     >,
-  ): boolean =>
-    typeof rawContent[key] === "boolean" ? rawContent[key] : false;
+  ): boolean {
+    return typeof rawContent[key] === "boolean" ? rawContent[key] : false;
+  }
   const parsedLimit = Number(record.limit);
 
   return {
@@ -269,9 +372,15 @@ const normalizeSource = (value: unknown): SourceConfig => {
           : "updated",
     },
   };
-};
+}
 
-const normalizeMusic = (value: unknown): MusicSettings => {
+/**
+ * 规范化播放器当前曲目设置。
+ *
+ * @param value - 文件或接口中的未知播放器设置。
+ * @returns 具有稳定字段和合法来源标识的播放器设置。
+ */
+function normalizeMusic(value: unknown): MusicSettings {
   const record = isRecord(value) ? value : {};
   return {
     enabled: record.enabled === true,
@@ -287,9 +396,15 @@ const normalizeMusic = (value: unknown): MusicSettings => {
     cover: text(record.cover),
     audioUrl: text(record.audioUrl),
   };
-};
+}
 
-const normalizeAutoRefresh = (value: unknown): LocalConfig["autoRefresh"] => {
+/**
+ * 规范化本地开发服务器的自动刷新设置。
+ *
+ * @param value - 文件或接口中的未知自动刷新设置。
+ * @returns 限定刷新间隔范围的自动刷新配置。
+ */
+function normalizeAutoRefresh(value: unknown): LocalConfig["autoRefresh"] {
   const record = isRecord(value) ? value : {};
   const interval = Number(record.intervalHours);
   return {
@@ -297,7 +412,7 @@ const normalizeAutoRefresh = (value: unknown): LocalConfig["autoRefresh"] => {
     intervalHours:
       interval === 6 || interval === 12 || interval === 24 ? interval : 24,
   };
-};
+}
 
 const libraryFilters: LibraryFilter[] = [
   "all",
@@ -308,7 +423,13 @@ const libraryFilters: LibraryFilter[] = [
   "book",
 ];
 
-const normalizeManualItems = (value: unknown): LocalConfig["manualItems"] => {
+/**
+ * 过滤并规范化用户手动维护的资料库条目。
+ *
+ * @param value - 文件或接口中的未知手动条目列表。
+ * @returns 仅包含合法类型和标题的手动条目列表。
+ */
+function normalizeManualItems(value: unknown): LocalConfig["manualItems"] {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry, index) => {
     if (!isRecord(entry)) return [];
@@ -326,13 +447,18 @@ const normalizeManualItems = (value: unknown): LocalConfig["manualItems"] => {
       },
     ];
   });
-};
+}
 
-/** 对本地配置文件或导入文件做结构校验；缺失内容保持为空。 */
-export const normalizeLocalConfig = (
+/**
+ * 对本地配置文件或导入文件做结构校验；缺失内容保持为空。
+ *
+ * @param input - 待规范化的部分本地配置。
+ * @returns 可供应用运行的完整本地配置。
+ */
+export function normalizeLocalConfig(
   input: Partial<LocalConfig> | null | undefined,
-): LocalConfig => {
-  const sources = sourceIds.reduce(
+): LocalConfig {
+  const sources = dataSourceIds.reduce(
     (result, sourceId) => {
       result[sourceId] = normalizeSource(input?.sources?.[sourceId]);
       return result;
@@ -357,7 +483,14 @@ export const normalizeLocalConfig = (
     music: normalizeMusic(input?.music),
     widgets: normalizeHomeWidgets(input?.widgets, []),
   };
-};
+}
 
-export const cloneLocalConfig = (config: LocalConfig): LocalConfig =>
-  JSON.parse(JSON.stringify(config)) as LocalConfig;
+/**
+ * 深拷贝本地配置，供编辑状态与原始状态隔离使用。
+ *
+ * @param config - 需要复制的完整本地配置。
+ * @returns 与原配置内容相同但引用完全隔离的配置副本。
+ */
+export function cloneLocalConfig(config: LocalConfig): LocalConfig {
+  return JSON.parse(JSON.stringify(config)) as LocalConfig;
+}

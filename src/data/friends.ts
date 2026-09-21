@@ -1,14 +1,29 @@
 import type { FriendLink } from './types';
 
-const isFriendTone = (value: unknown): value is FriendLink['tone'] =>
-  value === 'butter' ||
-  value === 'lilac' ||
-  value === 'mint' ||
-  value === 'peach' ||
-  value === 'rose' ||
-  value === 'sky';
+/**
+ * 判断未知值是否为友联卡片允许的主题色。
+ *
+ * @param value - 待判断的未知主题色。
+ * @returns 值属于友联主题色集合时返回 true。
+ */
+function isFriendTone(value: unknown): value is FriendLink['tone'] {
+  return (
+    value === 'butter' ||
+    value === 'lilac' ||
+    value === 'mint' ||
+    value === 'peach' ||
+    value === 'rose' ||
+    value === 'sky'
+  );
+}
 
-export const normalizeFriendUrl = (value: string): string => {
+/**
+ * 将用户输入的友联地址规范化为 HTTP 或 HTTPS URL。
+ *
+ * @param value - 用户输入的主页地址。
+ * @returns 规范化后的 HTTP 或 HTTPS 地址；输入无效时返回空字符串。
+ */
+export function normalizeFriendUrl(value: string): string {
   const raw = value.trim();
   if (!raw) return '';
   const candidate = /^[a-z][a-z\d+.-]*:\/\//i.test(raw)
@@ -23,10 +38,16 @@ export const normalizeFriendUrl = (value: string): string => {
   } catch {
     return '';
   }
-};
+}
 
-export const normalizeFriendTags = (value: string): string[] =>
-  Array.from(
+/**
+ * 将逗号分隔的标签清洗、去重并限制数量。
+ *
+ * @param value - 逗号分隔的原始标签文本。
+ * @returns 最多四个去重后的标签。
+ */
+export function normalizeFriendTags(value: string): string[] {
+  return Array.from(
     new Set(
       value
         .split(/[,，]/)
@@ -34,22 +55,44 @@ export const normalizeFriendTags = (value: string): string[] =>
         .filter(Boolean),
     ),
   ).slice(0, 4);
+}
 
-const makeFriendId = (nickname: string, index = 0): string => {
+/**
+ * 根据昵称和位置生成旧配置兼容的友联 ID。
+ *
+ * @param nickname - 友联昵称。
+ * @param index - 友联在配置中的位置。
+ * @returns 稳定的友联 ID。
+ */
+function makeFriendId(nickname: string, index = 0): string {
   const base = nickname
     .toLowerCase()
     .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
     .replace(/^-|-$/g, '') || 'friend';
   return `${base}-${index + 1}`;
-};
+}
 
-export const cloneFriendLinks = (items: FriendLink[]): FriendLink[] =>
-  items.map((friend) => ({ ...friend, tags: [...friend.tags] }));
+/**
+ * 深拷贝友联数组，避免编辑页修改原始标签数组。
+ *
+ * @param items - 原始友联数组。
+ * @returns 标签数组也被复制的新友联数组。
+ */
+export function cloneFriendLinks(items: FriendLink[]): FriendLink[] {
+  return items.map((friend) => ({ ...friend, tags: [...friend.tags] }));
+}
 
-export const normalizeFriendLink = (
+/**
+ * 校验并规范化一条外部友联配置；不完整数据返回空值。
+ *
+ * @param value - 文件或表单中的未知友联配置。
+ * @param index - 友联在列表中的索引，用于生成缺省 ID。
+ * @returns 规范化后的友联；必填字段缺失时返回 null。
+ */
+export function normalizeFriendLink(
   value: unknown,
   index = 0,
-): FriendLink | null => {
+): FriendLink | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Partial<FriendLink>;
   const nickname = typeof record.nickname === 'string' ? record.nickname.trim() : '';
@@ -74,4 +117,4 @@ export const normalizeFriendLink = (
     ...(feedUrl ? { feedUrl } : {}),
     tone: isFriendTone(record.tone) ? record.tone : 'lilac',
   };
-};
+}

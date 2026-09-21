@@ -58,54 +58,85 @@ const latestSource = computed(
 /**
  * 打开信息源详情面板。
  */
-const openSource = (source: BrewSource): void => {
+/**
+ * 打开指定 Brew 来源的详情面板。
+ *
+ * @param source - 需要查看的 Brew 来源。
+ * @returns 无返回值。
+ */
+function openSource(source: BrewSource): void {
   selectedSource.value = source;
   searchOpen.value = false;
   sortOpen.value = false;
   shortcutOpen.value = false;
-};
+}
 
 /**
  * 关闭信息源详情面板。
  */
-const closeSource = (): void => {
+/**
+ * 关闭 Brew 来源详情面板。
+ *
+ * @returns 无返回值。
+ */
+function closeSource(): void {
   selectedSource.value = null;
-};
+}
 
 /**
  * 切换底部搜索入口。
  */
-const toggleSearch = (): void => {
+/**
+ * 切换 Brew 搜索框的显示状态。
+ *
+ * @returns 无返回值。
+ */
+function toggleSearch(): void {
   searchOpen.value = !searchOpen.value;
   sortOpen.value = false;
   shortcutOpen.value = false;
-};
+}
 
 /**
  * 切换排序菜单。
  */
-const toggleSort = (): void => {
+/**
+ * 在最新和原始顺序之间切换 Brew 来源排序。
+ *
+ * @returns 无返回值。
+ */
+function toggleSort(): void {
   sortOpen.value = !sortOpen.value;
   searchOpen.value = false;
   shortcutOpen.value = false;
-};
+}
 
 /**
  * 切换快捷键提示。
  */
-const toggleShortcuts = (): void => {
+/**
+ * 切换键盘快捷键提示区域。
+ *
+ * @returns 无返回值。
+ */
+function toggleShortcuts(): void {
   shortcutOpen.value = !shortcutOpen.value;
   searchOpen.value = false;
   sortOpen.value = false;
-};
+}
 
 /**
  * 清除当前搜索条件。
  */
-const clearSearch = (): void => {
+/**
+ * 清空 Brew 搜索关键词并收起搜索框。
+ *
+ * @returns 无返回值。
+ */
+function clearSearch(): void {
   query.value = '';
   searchOpen.value = false;
-};
+}
 </script>
 
 <template>

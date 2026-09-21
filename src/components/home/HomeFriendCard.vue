@@ -11,6 +11,11 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
+  /**
+   * 为没有友联配置的首页组件提供空列表默认值。
+   *
+   * @returns 空友联数组。
+   */
   friends: () => [],
   interval: FRIEND_ROTATION_INTERVAL,
 });
@@ -22,20 +27,36 @@ let rotationTimer: number | null = null;
 
 const currentFriend = computed(() => friends.value[activeIndex.value] ?? null);
 
-const clearRotation = (): void => {
+/**
+ * 清理友联轮播定时器。
+ *
+ * @returns 无返回值；重复调用不会产生副作用。
+ */
+function clearRotation(): void {
   if (rotationTimer !== null) {
     window.clearInterval(rotationTimer);
     rotationTimer = null;
   }
-};
+}
 
-const advance = (offset = 1): void => {
+/**
+ * 按指定偏移量切换当前友联。
+ *
+ * @param offset - 要移动的友联索引步长。
+ * @returns 无返回值。
+ */
+function advance(offset = 1): void {
   if (friends.value.length < 2) return;
   activeIndex.value =
     (activeIndex.value + offset + friends.value.length) % friends.value.length;
-};
+}
 
-const startRotation = (): void => {
+/**
+ * 根据友联数量启动自动轮播。
+ *
+ * @returns 无返回值；不足两条友联时保持静态展示。
+ */
+function startRotation(): void {
   clearRotation();
   if (typeof window === "undefined" || friends.value.length < 2) return;
   const interval = Math.min(
@@ -45,7 +66,7 @@ const startRotation = (): void => {
   rotationTimer = window.setInterval(() => {
     if (!isPaused.value) advance();
   }, interval);
-};
+}
 
 watch(
   () => props.friends,

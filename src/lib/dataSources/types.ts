@@ -6,17 +6,10 @@ import type {
   RepositorySummary,
   SiteData,
 } from "../../data/types";
+import { dataSourceIds as sourceCatalogIds } from "../../data/sourceCatalog";
 
 /** 可供设置页单独同步的数据来源。 */
-export const dataSourceIds = [
-  "bangumi",
-  "bilibili",
-  "github",
-  "netease",
-  "qqmusic",
-  "steam",
-  "sfacg",
-] as const satisfies readonly DataSourceId[];
+export const dataSourceIds = sourceCatalogIds;
 
 export interface DataSyncResult {
   siteData: SiteData;
@@ -59,6 +52,13 @@ export interface ProviderSyncData {
 }
 
 export class ProviderError extends Error {
+  /**
+   * 创建带可选 HTTP 状态码的来源同步错误。
+   *
+   * @param message - 来源同步失败的可读错误信息。
+   * @param status - 上游 HTTP 状态码，没有状态码时留空。
+   * @returns 无返回值；错误对象会携带 ProviderError 类型标识。
+   */
   constructor(
     message: string,
     public readonly status?: number,

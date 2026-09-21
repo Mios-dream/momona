@@ -15,15 +15,21 @@ const appPageByPath: Record<string, AppPage> = {
   "/settings": "settings",
 };
 
-/** 根据浏览器路径解析当前应用页面。 */
-export const getAppPageFromPath = (
+/**
+ * 根据浏览器路径解析当前应用页面。
+ *
+ * @param pathname - 浏览器当前路径。
+ * @param fallback - 路径未知时使用的默认页面。
+ * @returns 与路径对应的应用页面标识。
+ */
+export function getAppPageFromPath(
   pathname: string,
   fallback: AppPage = "home",
-): AppPage => {
+): AppPage {
   const normalizedPath =
     pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
   return appPageByPath[normalizedPath] ?? fallback;
-};
+}
 
 /** 页面切换后同步浏览器标签页标题。 */
 export const appPageTitles: Record<AppPage, string> = {

@@ -47,7 +47,12 @@ const weatherIconBase = "/assets";
 let weatherRequest: Promise<WeatherData | null> | null = null;
 let locationRequest: Promise<WeatherLocation | null> | null = null;
 
-const readCache = (): WeatherData | null => {
+/**
+ * 从浏览器本地缓存读取未过期的天气数据。
+ *
+ * @returns 未过期的天气缓存；没有可用缓存时返回 null。
+ */
+function readCache(): WeatherData | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = window.localStorage.getItem(CACHE_KEY);
@@ -59,9 +64,15 @@ const readCache = (): WeatherData | null => {
   } catch {
     return null;
   }
-};
+}
 
-const writeCache = (data: WeatherData): void => {
+/**
+ * 将天气数据写入浏览器本地缓存，失败时保持静默。
+ *
+ * @param data - 需要缓存的天气数据。
+ * @returns 无返回值。
+ */
+function writeCache(data: WeatherData): void {
   if (typeof window === "undefined") return;
   try {
     window.localStorage.setItem(
@@ -69,11 +80,18 @@ const writeCache = (data: WeatherData): void => {
       JSON.stringify({ savedAt: Date.now(), data }),
     );
   } catch {
-    // Private browsing and storage quotas should not disable the weather card.
+    // 隐私浏览或存储配额异常不应阻止天气卡片继续尝试读取。
   }
-};
+}
 
-const fetchJson = async <T>(url: string): Promise<T> => {
+/**
+ * 发送带超时控制的天气服务请求。
+ *
+ * @param url - 天气服务请求地址。
+ * @returns 解析后的天气服务响应。
+ * @throws HTTP 请求失败时抛出错误。
+ */
+async function fetchJson<T>(url: string): Promise<T> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT);
   try {
@@ -83,10 +101,15 @@ const fetchJson = async <T>(url: string): Promise<T> => {
   } finally {
     window.clearTimeout(timer);
   }
-};
+}
 
-const browserLocation = (): Promise<WeatherLocation | null> =>
-  new Promise((resolve) => {
+/**
+ * 请求浏览器定位权限并返回当前位置。
+ *
+ * @returns 浏览器定位结果；浏览器不支持或用户拒绝时返回 null。
+ */
+function browserLocation(): Promise<WeatherLocation | null> {
+  return new Promise((resolve) => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
       resolve(null);
       return;
@@ -102,20 +125,31 @@ const browserLocation = (): Promise<WeatherLocation | null> =>
       { enableHighAccuracy: false, timeout: 8_000, maximumAge: 10 * 60 * 1000 },
     );
   });
+}
 
-const resolveLocation = async (): Promise<WeatherLocation | null> => {
+/**
+ * 复用同一轮定位请求，避免多个天气卡片重复触发权限询问。
+ *
+ * @returns 当前浏览器位置；定位不可用时返回 null。
+ */
+async function resolveLocation(): Promise<WeatherLocation | null> {
   if (locationRequest) return locationRequest;
   locationRequest = (async () => {
-    // Static pages have no server-side location fallback. A denied or unavailable
-    // browser permission intentionally results in the weather failure state.
+    // 静态页面没有服务端定位回退；用户拒绝或浏览器无法定位时，保持天气不可用状态。
     return browserLocation();
   })().finally(() => {
     locationRequest = null;
   });
   return locationRequest;
-};
+}
 
-const weatherText = (code: number): string => {
+/**
+ * 将 Open-Meteo 天气代码转换为中文天气描述。
+ *
+ * @param code - Open-Meteo 天气代码。
+ * @returns 中文天气描述。
+ */
+function weatherText(code: number): string {
   if (code === 0) return "晴";
   if (code === 1 || code === 2) return "多云";
   if (code === 3) return "阴";
@@ -127,9 +161,15 @@ const weatherText = (code: number): string => {
   if (code >= 85 && code <= 86) return "阵雪";
   if (code >= 95) return "雷雨";
   return "天气未知";
-};
+}
 
-const weatherIcon = (code: number): { asset: string; iconName: IconName } => {
+/**
+ * 将 Open-Meteo 天气代码转换为资源图片和语义图标。
+ *
+ * @param code - Open-Meteo 天气代码。
+ * @returns 天气图片地址和图标标识。
+ */
+function weatherIcon(code: number): { asset: string; iconName: IconName } {
   if (code === 0)
     return { asset: `${weatherIconBase}/weather-sunny.webp`, iconName: "sun" };
   if (code === 1 || code === 2)
@@ -156,9 +196,14 @@ const weatherIcon = (code: number): { asset: string; iconName: IconName } => {
     asset: `${weatherIconBase}/weather-partly-cloudy.webp`,
     iconName: "cloudRain",
   };
-};
+}
 
-const loadWeather = async (): Promise<WeatherData | null> => {
+/**
+ * 读取当前位置的天气和空气质量，并组合为页面模型。
+ *
+ * @returns 页面使用的天气数据；定位或接口不可用时返回 null。
+ */
+async function loadWeather(): Promise<WeatherData | null> {
   const location = await resolveLocation();
   if (!location) return null;
   const query = new URLSearchParams({
@@ -208,11 +253,17 @@ const loadWeather = async (): Promise<WeatherData | null> => {
       ? { aqi: Math.round(air.current.us_aqi) }
       : {}),
   };
-};
+}
 
-export const getWeatherInfo = async (
+/**
+ * 获取天气数据，默认优先使用短期缓存并合并并发请求。
+ *
+ * @param force - 是否忽略缓存并强制重新请求。
+ * @returns 页面使用的天气数据；不可用时返回 null。
+ */
+export async function getWeatherInfo(
   force = false,
-): Promise<WeatherData | null> => {
+): Promise<WeatherData | null> {
   if (!force) {
     const cached = readCache();
     if (cached) return cached;
@@ -228,12 +279,18 @@ export const getWeatherInfo = async (
       weatherRequest = null;
     });
   return weatherRequest;
-};
+}
 
-export const airQualityLabel = (aqi?: number): string => {
+/**
+ * 将 AQI 数值转换为简短的中文健康提示。
+ *
+ * @param aqi - 空气质量指数。
+ * @returns 面向用户的空气质量提示。
+ */
+export function airQualityLabel(aqi?: number): string {
   if (typeof aqi !== "number") return "空气未知";
   if (aqi <= 50) return "空气优";
   if (aqi <= 100) return "空气良";
   if (aqi <= 150) return "轻度污染";
   return "需要留意空气质量";
-};
+}

@@ -53,45 +53,49 @@ export const emptySiteData: SiteData = {
   generatedAt: '',
 };
 
-/** 合并公开页面快照；缺失字段保持为空，不生成替代站点内容。 */
-export const mergeSiteData = (overrides: Partial<SiteData> = {}): SiteData => ({
-  profile: { ...emptySiteData.profile, ...(overrides.profile ?? {}) },
-  socialLinks: overrides.socialLinks ?? [],
-  friends: overrides.friends ?? [],
-  feedCards: overrides.feedCards ?? [],
-  collections: overrides.collections ?? [],
-  activities: overrides.activities ?? [],
-  libraryTiles: overrides.libraryTiles ?? [],
-  brewSources: overrides.brewSources ?? [],
-  reportPlatforms: overrides.reportPlatforms ?? [],
-  repositories: overrides.repositories ?? [],
-  music: { ...emptySiteData.music, ...(overrides.music ?? {}) },
-  musicCatalog: overrides.musicCatalog ?? { playlists: [] },
-  homeMedia: {
-    bangumi: {
-      ...emptySiteData.homeMedia.bangumi,
-      ...(overrides.homeMedia?.bangumi ?? {}),
-      statusCounts: {
-        ...emptySiteData.homeMedia.bangumi.statusCounts,
-        ...(overrides.homeMedia?.bangumi?.statusCounts ?? {}),
+/**
+ * 合并公开页面快照；缺失字段保持为空，不生成替代站点内容。
+ *
+ * @param overrides - 需要覆盖空快照的部分页面数据。
+ * @returns 具有完整字段的页面数据快照。
+ */
+export function mergeSiteData(overrides: Partial<SiteData> = {}): SiteData {
+  return {
+    profile: { ...emptySiteData.profile, ...(overrides.profile ?? {}) },
+    socialLinks: overrides.socialLinks ?? [],
+    friends: overrides.friends ?? [],
+    feedCards: overrides.feedCards ?? [],
+    collections: overrides.collections ?? [],
+    activities: overrides.activities ?? [],
+    libraryTiles: overrides.libraryTiles ?? [],
+    brewSources: overrides.brewSources ?? [],
+    reportPlatforms: overrides.reportPlatforms ?? [],
+    repositories: overrides.repositories ?? [],
+    music: { ...emptySiteData.music, ...(overrides.music ?? {}) },
+    musicCatalog: overrides.musicCatalog ?? { playlists: [] },
+    homeMedia: {
+      bangumi: {
+        ...emptySiteData.homeMedia.bangumi,
+        ...(overrides.homeMedia?.bangumi ?? {}),
+        statusCounts: {
+          ...emptySiteData.homeMedia.bangumi.statusCounts,
+          ...(overrides.homeMedia?.bangumi?.statusCounts ?? {}),
+        },
+        typeCounts: overrides.homeMedia?.bangumi?.typeCounts ?? {},
+        items: overrides.homeMedia?.bangumi?.items ?? [],
       },
-      typeCounts: overrides.homeMedia?.bangumi?.typeCounts ?? {},
-      items: overrides.homeMedia?.bangumi?.items ?? [],
+      netease: {
+        ...emptySiteData.homeMedia.netease,
+        ...(overrides.homeMedia?.netease ?? {}),
+        moodKeywords: overrides.homeMedia?.netease?.moodKeywords ?? [],
+        items: overrides.homeMedia?.netease?.items ?? [],
+      },
     },
-    netease: {
-      ...emptySiteData.homeMedia.netease,
-      ...(overrides.homeMedia?.netease ?? {}),
-      moodKeywords: overrides.homeMedia?.netease?.moodKeywords ?? [],
-      items: overrides.homeMedia?.netease?.items ?? [],
-    },
-  },
-  homeWidgets: normalizeHomeWidgets(
-    overrides.homeWidgets,
-    [],
-  ),
-  providerStatus: overrides.providerStatus ?? [],
-  generatedAt: overrides.generatedAt ?? '',
-});
+    homeWidgets: normalizeHomeWidgets(overrides.homeWidgets, []),
+    providerStatus: overrides.providerStatus ?? [],
+    generatedAt: overrides.generatedAt ?? "",
+  };
+}
 
 /** 没有本地快照时的构建起点；真实快照由构建期数据中心按需读取。 */
 export const siteData = mergeSiteData();

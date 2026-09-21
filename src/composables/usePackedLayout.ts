@@ -31,17 +31,21 @@ export interface PackedLayout<T extends PackedSize> {
 interface PackedRect extends PackedSize, PackedPosition {}
 
 /**
- * 用固定尺寸做紧凑的矩形排布。
+ * 将带宽高的条目放入紧凑二维网格，并返回画布尺寸。
  *
  * 这类自由画布需要保留每张卡片自己的宽高，不能使用会把所有卡片
  * 拉伸到目标宽高比的 justified/packing grid。每次只尝试已占用矩形的
  * 左边和右边作为候选列，再把候选位置向下推到不相交为止，足以覆盖
  * 当前页面的小规模卡片墙，同时让筛选后的资料库重新排列而不留下空洞。
+ *
+ * @param items - 需要排布的固定尺寸条目。
+ * @param options - 画布宽度、间距、内边距和最小高度配置。
+ * @returns 包含每个条目位置以及最终画布高度的排布结果。
  */
-export const packItems = <T extends PackedSize>(
+export function packItems<T extends PackedSize>(
   items: readonly T[],
   options: PackedLayoutOptions,
-): PackedLayout<T> => {
+): PackedLayout<T> {
   const gap = Math.max(0, options.gap ?? 24);
   const padding = Math.max(0, options.padding ?? 24);
   const canvasWidth = Math.max(1, Math.round(options.canvasWidth));
@@ -125,4 +129,4 @@ export const packItems = <T extends PackedSize>(
     height: Math.max(options.minHeight ?? 0, contentBottom + padding),
     items: packed,
   };
-};
+}

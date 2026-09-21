@@ -29,7 +29,22 @@ export interface HomeWidgetDefinition {
   defaultVisible: boolean;
 }
 
-const definition = (
+/**
+ * 创建首页组件目录项，统一描述位置、尺寸和设置类型。
+ *
+ * @param type - 首页组件类型。
+ * @param label - 组件在设置页显示的名称。
+ * @param description - 组件功能说明。
+ * @param col - 组件默认起始列。
+ * @param row - 组件默认起始行。
+ * @param colSpan - 组件默认占用的桌面列数。
+ * @param rowSpan - 组件默认占用的桌面行数。
+ * @param mobileColSpan - 组件在移动端占用的列数。
+ * @param mobileRowSpan - 组件在移动端占用的行数。
+ * @param options - 组件设置类型、可调整性和默认可见性。
+ * @returns 一个完整的首页组件目录项。
+ */
+function definition(
   type: HomeWidgetType,
   label: string,
   description: string,
@@ -45,14 +60,16 @@ const definition = (
   > = {
     defaultVisible: true,
   },
-): HomeWidgetDefinition => ({
-  type,
-  label,
-  description,
-  defaultPosition: { col, row },
-  defaultSize: { colSpan, rowSpan, mobileColSpan, mobileRowSpan },
-  ...options,
-});
+): HomeWidgetDefinition {
+  return {
+    type,
+    label,
+    description,
+    defaultPosition: { col, row },
+    defaultSize: { colSpan, rowSpan, mobileColSpan, mobileRowSpan },
+    ...options,
+  };
+}
 
 /** 首页组件目录。新增组件只需要先在这里登记，再接入 HomePage 的组件映射。 */
 export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
@@ -135,9 +152,18 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
   ),
 ];
 
-export const widgetDefinition = (type: HomeWidgetType): HomeWidgetDefinition =>
-  homeWidgetDefinitions.find((item) => item.type === type) ??
-  homeWidgetDefinitions[0];
+/**
+ * 根据组件类型查找目录定义；未知类型回退到目录首项。
+ *
+ * @param type - 需要查找的首页组件类型。
+ * @returns 对应的组件目录项；找不到时返回默认目录项。
+ */
+export function widgetDefinition(type: HomeWidgetType): HomeWidgetDefinition {
+  return (
+    homeWidgetDefinitions.find((item) => item.type === type) ??
+    homeWidgetDefinitions[0]
+  );
+}
 
 export const widgetIconOptions: IconName[] = [
   "external",
@@ -184,12 +210,19 @@ export const linkPlatformOptions: LinkPlatform[] = [
   "telegram",
 ];
 
-/** 从旧版链接配置推断平台，保证已有首页卡片自动升级。 */
-export const inferLinkPlatform = (
+/**
+ * 从旧版链接配置推断平台，保证已有首页卡片自动升级。
+ *
+ * @param title - 链接标题。
+ * @param href - 链接地址。
+ * @param icon - 旧配置中的图标，可用于辅助判断 QQ 链接。
+ * @returns 推断出的链接平台标识。
+ */
+export function inferLinkPlatform(
   title: string,
   href: string,
   icon?: IconName,
-): LinkPlatform => {
+): LinkPlatform {
   const value = `${title} ${href}`.toLocaleLowerCase();
   if (value.includes("github")) return "github";
   if (value.includes("bilibili") || value.includes("哔哩")) return "bilibili";
@@ -210,7 +243,7 @@ export const inferLinkPlatform = (
   if (value.includes("blog") || value.includes("博客")) return "blog";
   if (value.includes("qq") || icon === "user") return "qq";
   return "generic";
-};
+}
 
 export const widgetToneOptions: LinkWidgetSettings["tone"][] = [
   "blue",
@@ -229,39 +262,71 @@ export const friendIntervalOptions = [
 
 export const FRIEND_ROTATION_INTERVAL = 6000;
 
-const emptyLinkSettings = (): LinkWidgetSettings => ({
-  title: "",
-  subtitle: "",
-  href: "",
-  platform: "generic",
-  icon: "link",
-  tone: "blue",
-  openInNewTab: true,
-});
+/**
+ * 创建链接组件的空设置。
+ *
+ * @returns 可直接用于链接组件的默认设置。
+ */
+function emptyLinkSettings(): LinkWidgetSettings {
+  return {
+    title: "",
+    subtitle: "",
+    href: "",
+    platform: "generic",
+    icon: "link",
+    tone: "blue",
+    openInNewTab: true,
+  };
+}
 
-const emptyGameSettings = (): NonNullable<HomeWidgetSettings["game"]> => ({
-  uid: "",
-  game: "hsr",
-  account: null,
-});
+/**
+ * 创建游戏组件的空设置。
+ *
+ * @returns 可直接用于游戏组件的默认设置。
+ */
+function emptyGameSettings(): NonNullable<HomeWidgetSettings["game"]> {
+  return {
+    uid: "",
+    game: "hsr",
+    account: null,
+  };
+}
 
-const emptyFriendSettings = (): NonNullable<HomeWidgetSettings["friend"]> => ({
-  interval: FRIEND_ROTATION_INTERVAL,
-});
+/**
+ * 创建友联轮播组件的空设置。
+ *
+ * @returns 可直接用于友联轮播组件的默认设置。
+ */
+function emptyFriendSettings(): NonNullable<HomeWidgetSettings["friend"]> {
+  return { interval: FRIEND_ROTATION_INTERVAL };
+}
 
-const createEmptySettings = (
+/**
+ * 根据组件类型创建对应的设置默认值。
+ *
+ * @param type - 需要初始化设置的首页组件类型。
+ * @returns 对应的设置对象；无需额外设置的组件返回 undefined。
+ */
+function createEmptySettings(
   type: HomeWidgetType,
-): HomeWidgetSettings | undefined => {
+): HomeWidgetSettings | undefined {
   if (type === "link") return { link: emptyLinkSettings() };
   if (type === "game") return { game: emptyGameSettings() };
   if (type === "friend") return { friend: emptyFriendSettings() };
   return undefined;
-};
+}
 
-export const createHomeWidget = (
+/**
+ * 根据目录定义创建一个可编辑的首页组件实例。
+ *
+ * @param type - 需要创建的首页组件类型。
+ * @param id - 组件实例标识；省略时使用组件类型。
+ * @returns 带有默认位置、尺寸和设置的首页组件。
+ */
+export function createHomeWidget(
   type: HomeWidgetType,
   id: string = type,
-): HomeWidget => {
+): HomeWidget {
   const item = widgetDefinition(type);
   return {
     id,
@@ -273,41 +338,97 @@ export const createHomeWidget = (
     ...item.defaultSize,
     settings: createEmptySettings(item.type),
   };
-};
+}
 
-const isIconName = (value: unknown): value is IconName =>
-  typeof value === "string" && widgetIconOptions.includes(value as IconName);
+/**
+ * 判断未知值是否为首页组件允许的图标名称。
+ *
+ * @param value - 待判断的未知值。
+ * @returns 值属于图标名称集合时返回 true。
+ */
+function isIconName(value: unknown): value is IconName {
+  return typeof value === "string" && widgetIconOptions.includes(value as IconName);
+}
 
-const isLinkPlatform = (value: unknown): value is LinkPlatform =>
-  typeof value === "string" &&
-  linkPlatformOptions.includes(value as LinkPlatform);
+/**
+ * 判断未知值是否为链接组件允许的平台标识。
+ *
+ * @param value - 待判断的未知值。
+ * @returns 值属于链接平台集合时返回 true。
+ */
+function isLinkPlatform(value: unknown): value is LinkPlatform {
+  return (
+    typeof value === "string" &&
+    linkPlatformOptions.includes(value as LinkPlatform)
+  );
+}
 
-const isTone = (value: unknown): value is LinkWidgetSettings["tone"] =>
-  typeof value === "string" &&
-  widgetToneOptions.includes(value as LinkWidgetSettings["tone"]);
+/**
+ * 判断未知值是否为链接组件允许的主题色。
+ *
+ * @param value - 待判断的未知值。
+ * @returns 值属于链接主题色集合时返回 true。
+ */
+function isTone(value: unknown): value is LinkWidgetSettings["tone"] {
+  return (
+    typeof value === "string" &&
+    widgetToneOptions.includes(value as LinkWidgetSettings["tone"])
+  );
+}
 
-const isHoyoGame = (value: unknown): value is HoyoGame =>
-  value === "genshin" || value === "hsr" || value === "zzz";
+/**
+ * 判断未知值是否为支持的 HoYoverse 游戏标识。
+ *
+ * @param value - 待判断的未知值。
+ * @returns 值属于支持的游戏标识时返回 true。
+ */
+function isHoyoGame(value: unknown): value is HoyoGame {
+  return value === "genshin" || value === "hsr" || value === "zzz";
+}
 
-const numberOr = (
+/**
+ * 将未知数字规范化到指定范围，并在失败时使用回退值。
+ *
+ * @param candidate - 待解析的未知数值。
+ * @param fallback - 解析失败时使用的回退值。
+ * @param min - 允许的最小值。
+ * @param max - 允许的最大值。
+ * @returns 四舍五入并限制在范围内的数字。
+ */
+function numberOr(
   candidate: unknown,
   fallback: number,
   min: number,
   max: number,
-): number => {
+): number {
   const parsed = Number(candidate);
   return Number.isFinite(parsed)
     ? Math.min(max, Math.max(min, Math.round(parsed)))
     : fallback;
-};
+}
 
-const stringOr = (candidate: unknown, fallback: string): string =>
-  typeof candidate === "string" ? candidate : fallback;
+/**
+ * 读取字符串配置字段并在类型不匹配时返回回退值。
+ *
+ * @param candidate - 待读取的未知值。
+ * @param fallback - 类型不匹配时使用的回退文本。
+ * @returns 规范化后的字符串。
+ */
+function stringOr(candidate: unknown, fallback: string): string {
+  return typeof candidate === "string" ? candidate : fallback;
+}
 
-const normalizeAccount = (
+/**
+ * 规范化游戏账号摘要，并尽量保留已有快照字段。
+ *
+ * @param value - 文件或接口中的未知账号数据。
+ * @param fallback - 当前已有的账号快照，用于补齐缺失字段。
+ * @returns 规范化后的账号摘要；无法识别且没有回退值时返回 undefined。
+ */
+function normalizeAccount(
   value: unknown,
   fallback?: StarRailAccountData,
-): StarRailAccountData | undefined => {
+): StarRailAccountData | undefined {
   if (!value || typeof value !== "object") return fallback;
   const record = value as Partial<StarRailAccountData>;
   const uid = stringOr(record.uid, fallback?.uid ?? "");
@@ -390,13 +511,21 @@ const normalizeAccount = (
     updatedAt:
       stringOr(record.updatedAt, fallback?.updatedAt ?? "") || undefined,
   };
-};
+}
 
-const normalizeSettings = (
+/**
+ * 按组件类型规范化链接、游戏和友联轮播设置。
+ *
+ * @param type - 设置所属的首页组件类型。
+ * @param value - 文件或接口中的未知设置值。
+ * @param fallback - 当前已有设置，用于保留未覆盖字段。
+ * @returns 规范化后的组件设置；无需设置的组件返回 undefined。
+ */
+function normalizeSettings(
   type: HomeWidgetType,
   value: unknown,
   fallback?: HomeWidgetSettings,
-): HomeWidgetSettings | undefined => {
+): HomeWidgetSettings | undefined {
   const record =
     value && typeof value === "object"
       ? (value as Record<string, unknown>)
@@ -460,14 +589,21 @@ const normalizeSettings = (
     };
   }
   return undefined;
-};
+}
 
-/** 将文件中的首页组件配置补成当前版本的结构。 */
-export const normalizeHomeWidget = (
+/**
+ * 将单个首页组件配置补齐为当前版本的稳定结构。
+ *
+ * @param value - 文件中的未知组件配置。
+ * @param index - 组件在原始数组中的索引，用于生成缺省标识。
+ * @param fallbackWidgets - 当前版本的已有组件，用于兼容旧配置字段。
+ * @returns 规范化后的组件；无法识别组件类型时返回 null。
+ */
+export function normalizeHomeWidget(
   value: unknown,
   index: number,
   fallbackWidgets: HomeWidget[] = [],
-): HomeWidget | null => {
+): HomeWidget | null {
   const record =
     value && typeof value === "object" ? (value as Partial<HomeWidget>) : {};
   const fallback =
@@ -536,15 +672,22 @@ export const normalizeHomeWidget = (
     mobileRowSpan,
     settings: normalizeSettings(type, record.settings, fallbackWidget.settings),
   };
-};
+}
 
-export const normalizeHomeWidgets = (
+/**
+ * 批量规范化首页组件配置并丢弃无法识别的项。
+ *
+ * @param input - 文件中的首页组件数组或未知输入。
+ * @param fallbackWidgets - 输入不是数组时使用的默认组件列表。
+ * @returns 可供首页直接渲染的规范化组件列表。
+ */
+export function normalizeHomeWidgets(
   input: unknown,
   fallbackWidgets: HomeWidget[] = [],
-): HomeWidget[] => {
+): HomeWidget[] {
   const values = Array.isArray(input) ? input : fallbackWidgets;
   return values.flatMap((value, index) => {
     const widget = normalizeHomeWidget(value, index, fallbackWidgets);
     return widget ? [widget] : [];
   });
-};
+}

@@ -46,13 +46,20 @@ const hasStats = computed(
     ),
 );
 
-const hash = (value: string, seed: number): number => {
+/**
+ * 根据文本和种子生成稳定的伪随机浮点数。
+ *
+ * @param value - 参与计算的文本。
+ * @param seed - 控制结果变化的数字种子。
+ * @returns 范围为 0 到 1 的稳定数值。
+ */
+function hash(value: string, seed: number): number {
   let result = seed;
   for (const character of value) {
     result = Math.imul(result ^ character.charCodeAt(0), 2654435761);
   }
   return ((result ^ (result >>> 16)) >>> 0) / 4294967296;
-};
+}
 
 const moodBubbleSlots = [
   { left: 72, top: 22, jitterX: 6, jitterY: 6 },
@@ -88,18 +95,34 @@ const moodBubbles = computed<MoodBubble[]>(() => {
   return bubbles;
 });
 
-const formatNumber = (value: number): string => {
+/**
+ * 将首页统计数字转换为紧凑显示文本。
+ *
+ * @param value - 需要展示的统计数量。
+ * @returns 适合媒体卡片宽度的数字文本。
+ */
+function formatNumber(value: number): string {
   if (value >= 10000) return `${(value / 10000).toFixed(1)}万`;
   if (value >= 1000) return `${(value / 1000).toFixed(1)}k`;
   return String(value);
-};
+}
 
-const clearRotation = (): void => {
+/**
+ * 清理媒体摘要轮播定时器。
+ *
+ * @returns 无返回值；重复调用不会产生副作用。
+ */
+function clearRotation(): void {
   if (rotationTimer !== undefined) window.clearTimeout(rotationTimer);
   rotationTimer = undefined;
-};
+}
 
-const scheduleRotation = (): void => {
+/**
+ * 安排下一次媒体摘要轮换。
+ *
+ * @returns 无返回值；没有足够摘要或页面隐藏时不创建定时器。
+ */
+function scheduleRotation(): void {
   clearRotation();
   if (itemsWithCover.value.length < 2) return;
   rotationTimer = window.setTimeout(() => {
@@ -113,12 +136,17 @@ const scheduleRotation = (): void => {
     }
     scheduleRotation();
   }, showStats.value ? 8000 : 5000);
-};
+}
 
-const handleVisibility = (): void => {
+/**
+ * 根据页面可见性暂停或恢复媒体摘要轮换。
+ *
+ * @returns 无返回值；页面重新可见时从当前摘要继续轮播。
+ */
+function handleVisibility(): void {
   if (document.hidden) clearRotation();
   else scheduleRotation();
-};
+}
 
 watch(
   () => props.stats.items,

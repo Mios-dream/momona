@@ -2,18 +2,30 @@ import { imageOr, readJson, slug, sourceLimit, sourceValue } from "../shared";
 import type { LibraryFilter, LibraryItem, LocalConfig } from "../../../data/types";
 import type { ProviderSyncData } from "../types";
 
-const mapBangumiType = (
+/**
+ * 将 Bangumi 类型编号映射为统一资料库类别。
+ *
+ * @param value - Bangumi 返回的类型编号。
+ * @returns 统一资料库类别；不支持的类型返回 null。
+ */
+function mapBangumiType(
   value: unknown,
-): Exclude<LibraryFilter, "all"> | null => {
+): Exclude<LibraryFilter, "all"> | null {
   const type = Number(value);
   if (type === 1 || type === 8) return "book";
   if (type === 2) return "anime";
   if (type === 4) return "game";
   if (type === 3) return "music";
   return null;
-};
+}
 
-const collectionStatus = (value: unknown): string => {
+/**
+ * 将 Bangumi 收藏状态编号转换为中文状态。
+ *
+ * @param value - Bangumi 返回的收藏状态编号。
+ * @returns 面向用户的收藏状态文本。
+ */
+function collectionStatus(value: unknown): string {
   const status = Number(value);
   return (
     (
@@ -23,17 +35,29 @@ const collectionStatus = (value: unknown): string => {
       >
     )[status] ?? "收藏"
   );
-};
+}
 
-const bangumiEntries = (payload: unknown): unknown[] => {
+/**
+ * 从 Bangumi 响应中提取收藏条目数组。
+ *
+ * @param payload - Bangumi 接口返回的未知响应。
+ * @returns 响应中的收藏条目数组。
+ */
+function bangumiEntries(payload: unknown): unknown[] {
   if (Array.isArray(payload)) return payload;
   if (!payload || typeof payload !== "object") return [];
   const record = payload as { data?: unknown[]; collections?: unknown[] };
   return record.data ?? record.collections ?? [];
-};
+}
 
-export const projectBangumiRaw = (payload: unknown): LibraryItem[] =>
-  bangumiEntries(payload).flatMap((entry): LibraryItem[] => {
+/**
+ * 将 Bangumi 原始收藏响应投影为统一资料库条目。
+ *
+ * @param payload - Bangumi 接口返回的原始响应。
+ * @returns 统一资料库条目列表。
+ */
+export function projectBangumiRaw(payload: unknown): LibraryItem[] {
+  return bangumiEntries(payload).flatMap((entry): LibraryItem[] => {
     if (!entry || typeof entry !== "object") return [];
     const record = entry as Record<string, unknown>;
     const subject = (
@@ -80,10 +104,17 @@ export const projectBangumiRaw = (payload: unknown): LibraryItem[] =>
       },
     ];
   });
+}
 
-const mapBangumi = async (
+/**
+ * 请求 Bangumi 收藏数据并保留来源原始响应。
+ *
+ * @param config - Bangumi 来源配置。
+ * @returns 包含原始响应和统一条目的同步数据。
+ */
+async function mapBangumi(
   config: LocalConfig["sources"]["bangumi"],
-): Promise<ProviderSyncData> => {
+): Promise<ProviderSyncData> {
   const username = sourceValue(config.username, /\/user\/([^/]+)/);
   if (!config.enabled || !username) {
     return {
@@ -109,6 +140,6 @@ const mapBangumi = async (
     repositories: [],
     message: `Bangumi 已同步 ${libraryItems.length} 项内容`,
   };
-};
+}
 
 export const syncBangumi = mapBangumi;

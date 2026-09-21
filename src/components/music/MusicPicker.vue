@@ -49,17 +49,40 @@ const searchQuery = ref("");
 
 const isOpen = computed(() => props.open ?? localOpen.value);
 
-const setOpen = (value: boolean): void => {
+/**
+ * 设置歌单选择面板的展开状态。
+ *
+ * @param value - 是否展开面板。
+ * @returns 无返回值；受控模式通过事件通知父组件，非受控模式更新本地状态。
+ */
+function setOpen(value: boolean): void {
   if (props.open !== undefined) emit("update:open", value);
   else localOpen.value = value;
   if (!value) searchQuery.value = "";
-};
+}
 
-const isMusicSource = (value: string | undefined): value is "netease" | "qq" =>
-  value === "netease" || value === "qq";
+/**
+ * 判断来源值是否为播放器支持的音乐平台。
+ *
+ * @param value - 未经校验的来源字符串。
+ * @returns 来源属于网易云音乐或 QQ 音乐时返回 true。
+ */
+function isMusicSource(
+  value: string | undefined,
+): value is "netease" | "qq" {
+  return value === "netease" || value === "qq";
+}
 
-const playlistKey = (source: "netease" | "qq", playlistId: string): string =>
-  `${source}:${playlistId}`;
+/**
+ * 组合平台和歌单 ID，生成选择器内部使用的稳定键。
+ *
+ * @param source - 音乐平台标识。
+ * @param playlistId - 歌单 ID。
+ * @returns 用于下拉选择和状态匹配的稳定字符串键。
+ */
+function playlistKey(source: "netease" | "qq", playlistId: string): string {
+  return `${source}:${playlistId}`;
+}
 
 const playlists = computed(() => props.catalog.playlists);
 const activePlaylist = computed(() => {
@@ -123,12 +146,27 @@ const currentArtist = computed(
   () => state.value.currentSong?.artist || props.track?.artist || "选择一首曲目开始播放",
 );
 
-const isCurrentTrack = (track: MusicTrack): boolean =>
-  currentId.value === track.id &&
-  state.value.currentSong?.source === track.source &&
-  state.value.currentSong?.playlistId === track.playlistId;
+/**
+ * 判断指定曲目是否为播放器当前曲目。
+ *
+ * @param track - 需要比较的歌单曲目。
+ * @returns 曲目 ID、平台和歌单都匹配时返回 true。
+ */
+function isCurrentTrack(track: MusicTrack): boolean {
+  return (
+    currentId.value === track.id &&
+    state.value.currentSong?.source === track.source &&
+    state.value.currentSong?.playlistId === track.playlistId
+  );
+}
 
-const handleState = (event: Event): void => {
+/**
+ * 接收播放器状态并同步当前歌单选择。
+ *
+ * @param event - 携带播放器状态的自定义事件。
+ * @returns 无返回值；无效状态事件会被忽略。
+ */
+function handleState(event: Event): void {
   const next = (event as CustomEvent<State>).detail;
   if (!next || typeof next !== "object") return;
   state.value = next;
@@ -137,19 +175,34 @@ const handleState = (event: Event): void => {
   } else {
     selectedPlaylistKey.value = "";
   }
-};
+}
 
-const requestState = (): void => {
+/**
+ * 请求播放器宿主立即发布当前状态。
+ *
+ * @returns 无返回值；服务端渲染阶段不会访问 window。
+ */
+function requestState(): void {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("music-player-request-state"));
   }
-};
+}
 
-const toggle = (): void => {
+/**
+ * 发布播放器展开或播放切换事件。
+ *
+ * @returns 无返回值。
+ */
+function toggle(): void {
   window.dispatchEvent(new CustomEvent("music-player-toggle"));
-};
+}
 
-const choosePlaylist = (): void => {
+/**
+ * 选择当前歌单并请求播放器加载歌单曲目。
+ *
+ * @returns 无返回值；没有可选歌单时不派发事件。
+ */
+function choosePlaylist(): void {
   const playlist = activePlaylist.value;
   if (!playlist) return;
   selectedPlaylistKey.value = playlistKey(playlist.source, playlist.id);
@@ -163,14 +216,20 @@ const choosePlaylist = (): void => {
       },
     }),
   );
-};
+}
 
-const chooseTrack = (track: MusicTrack): void => {
+/**
+ * 选择曲目并通知播放器切换当前曲目。
+ *
+ * @param track - 用户选择的歌单曲目。
+ * @returns 无返回值；嵌入播放器模式保持面板打开。
+ */
+function chooseTrack(track: MusicTrack): void {
   window.dispatchEvent(
     new CustomEvent("music-player-select-track", { detail: track }),
   );
   if (!props.embedded) setOpen(false);
-};
+}
 
 onMounted(() => {
   window.addEventListener("music-player-state-change", handleState);

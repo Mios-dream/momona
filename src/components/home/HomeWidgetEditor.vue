@@ -59,11 +59,24 @@ const widgetDisplayName = computed(
   () => linkSettings.value?.title?.trim() || props.widget.label,
 );
 
-const updateWidget = (patch: Partial<HomeWidget>): void => {
+/**
+ * 将局部组件配置合并后通知首页编辑器。
+ *
+ * @param patch - 需要覆盖到当前组件配置的字段。
+ * @returns 无返回值；合并结果通过 update 事件交给父组件。
+ */
+function updateWidget(patch: Partial<HomeWidget>): void {
   emit("update:widget", { ...props.widget, ...patch });
-};
+}
 
-const updateLink = (key: keyof LinkWidgetSettings, value: unknown): void => {
+/**
+ * 更新链接组件的单个设置字段。
+ *
+ * @param key - 链接设置中的字段名。
+ * @param value - 字段的新值。
+ * @returns 无返回值；非链接组件会被忽略。
+ */
+function updateLink(key: keyof LinkWidgetSettings, value: unknown): void {
   if (!linkSettings.value) return;
   emit("update:widget", {
     ...props.widget,
@@ -72,9 +85,15 @@ const updateLink = (key: keyof LinkWidgetSettings, value: unknown): void => {
       link: { ...linkSettings.value, [key]: value },
     },
   });
-};
+}
 
-const updateGameUid = (value: string): void => {
+/**
+ * 更新游戏组件 UID，并清理旧账号摘要。
+ *
+ * @param value - 用户输入的游戏 UID。
+ * @returns 无返回值；清空 UID 时同步清除已有账号摘要。
+ */
+function updateGameUid(value: string): void {
   if (!gameSettings.value) return;
   emit("update:widget", {
     ...props.widget,
@@ -83,9 +102,15 @@ const updateGameUid = (value: string): void => {
       game: { ...gameSettings.value, uid: value, account: null },
     },
   });
-};
+}
 
-const updateGame = (value: HoyoGame): void => {
+/**
+ * 更新游戏组件使用的游戏类型。
+ *
+ * @param value - 新的游戏类型。
+ * @returns 无返回值；非游戏组件会被忽略。
+ */
+function updateGame(value: HoyoGame): void {
   if (!gameSettings.value) return;
   emit("update:widget", {
     ...props.widget,
@@ -94,9 +119,15 @@ const updateGame = (value: HoyoGame): void => {
       game: { ...gameSettings.value, game: value, account: null },
     },
   });
-};
+}
 
-const updateFriendInterval = (value: number): void => {
+/**
+ * 更新友联组件轮播间隔。
+ *
+ * @param value - 输入框中的轮播秒数文本。
+ * @returns 无返回值；结果会被限制在允许范围内。
+ */
+function updateFriendInterval(value: number): void {
   if (!friendSettings.value) return;
   emit("update:widget", {
     ...props.widget,
@@ -105,10 +136,16 @@ const updateFriendInterval = (value: number): void => {
       friend: { ...friendSettings.value, interval: value },
     },
   });
-};
+}
 
-const iconLabel = (icon: IconName): string =>
-  ({
+/**
+ * 将图标标识转换为组件目录显示名称。
+ *
+ * @param icon - 首页组件使用的图标标识。
+ * @returns 对应的中文图标名称。
+ */
+function iconLabel(icon: IconName): string {
+  return ({
     external: "外部链接",
     link: "链接",
     github: "GitHub",
@@ -141,9 +178,16 @@ const iconLabel = (icon: IconName): string =>
     disc3: "唱片",
     droplets: "水滴",
   })[icon] ?? icon;
+}
 
-const platformLabel = (platform: LinkPlatform): string =>
-  ({
+/**
+ * 将链接平台标识转换为中文名称。
+ *
+ * @param platform - 链接平台标识。
+ * @returns 页面展示用的平台名称。
+ */
+function platformLabel(platform: LinkPlatform): string {
+  return ({
     generic: "通用链接",
     qq: "QQ",
     github: "GitHub",
@@ -158,14 +202,27 @@ const platformLabel = (platform: LinkPlatform): string =>
     discord: "Discord",
     telegram: "Telegram",
   })[platform];
+}
 
-const toneLabel = (tone: LinkWidgetSettings["tone"]): string =>
-  ({ blue: "晴蓝", indigo: "靛青", ink: "墨色", violet: "紫罗兰" })[tone];
+/**
+ * 将链接组件色调标识转换为中文名称。
+ *
+ * @param tone - 链接组件的色调标识。
+ * @returns 页面展示用的色调名称。
+ */
+function toneLabel(tone: LinkWidgetSettings["tone"]): string {
+  return ({ blue: "晴蓝", indigo: "靛青", ink: "墨色", violet: "紫罗兰" })[tone];
+}
 
-const requestGame = (): void => {
+/**
+ * 将当前游戏 UID 请求交给父组件读取公开账号摘要。
+ *
+ * @returns 无返回值；父组件通过 emit 负责实际网络请求。
+ */
+function requestGame(): void {
   const uid = gameSettings.value?.uid.trim();
   if (uid) emit("fetch-game", uid);
-};
+}
 </script>
 
 <template>

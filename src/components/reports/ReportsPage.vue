@@ -27,9 +27,11 @@ const cardViewport = ref<HTMLElement | null>(null);
 let cardViewportResetTimer: number | null = null;
 let cardScrollFrame: number | null = null;
 
+/** 读取当前横向报告卡片。 */
 const activeCard = computed(
   () => props.platforms[activeIndex.value] ?? props.platforms[0],
 );
+/** 返回当前报告卡片的平台展示名称。 */
 const activeLabel = computed(
   () =>
     activeCard.value?.platformLabel ||
@@ -50,6 +52,7 @@ const stageHeroNames: Record<string, string> = {
   xbox: "Xbox",
   youtube: "YouTube",
 };
+/** 返回当前报告卡片的摘要文本。 */
 const activeSummary = computed(
   () =>
     activeCard.value?.summary ||
@@ -57,23 +60,33 @@ const activeSummary = computed(
       ? `${activeCard.value.title} · ${activeCard.value.subtitle}`
       : "保存数据快照后，这里会显示报告内容。"),
 );
+/** 根据平台类型选择舞台模式的主视觉名称。 */
 const activeStageHero = computed(() => {
   if (!stageOpen.value) return "Stage";
   const platformId = activeCard.value?.platformId?.toLowerCase() || "";
   return stageHeroNames[platformId] || activeLabel.value;
 });
+/** 汇总当前报告卡片的同步状态。 */
 const activeStatusSummary = computed(() =>
   stageOpen.value ? "舞台模式播放中" : activeSummary.value,
 );
+/** 生成报告状态区域标题。 */
 const statusTitle = computed(() =>
   stageOpen.value ? `${activeLabel.value} · 舞台模式播放中` : "平台报告舞台",
 );
+/** 生成报告状态操作按钮文案。 */
 const statusActionLabel = computed(() => {
   if (!stageOpen.value) return "播放所有平台报告";
   return stagePaused.value ? "继续播放" : "暂停";
 });
 
-const scrollCardIntoView = async (index: number): Promise<void> => {
+/**
+ * 将指定报告卡片平滑滚动到视口中央。
+ *
+ * @param index - 需要居中的报告卡片索引。
+ * @returns 滚动动画安排完成后的 Promise。
+ */
+async function scrollCardIntoView(index: number): Promise<void> {
   await nextTick();
   const viewport = cardViewport.value;
   if (!viewport) return;
@@ -105,49 +118,83 @@ const scrollCardIntoView = async (index: number): Promise<void> => {
 
   const duration = 860;
   const startedAt = performance.now();
-  const animate = (now: number): void => {
+  /**
+   * 推进报告卡片横向滚动动画。
+   *
+   * @param now - requestAnimationFrame 提供的时间戳。
+   * @returns 无返回值；动画未完成时继续请求下一帧。
+   */
+  function animate(now: number): void {
     const progress = Math.min(1, (now - startedAt) / duration);
     const eased = 1 - Math.pow(1 - progress, 3);
-    viewport.scrollLeft = start + distance * eased;
+    if (viewport) viewport.scrollLeft = start + distance * eased;
     if (progress < 1) {
       cardScrollFrame = window.requestAnimationFrame(animate);
     } else {
       cardScrollFrame = null;
     }
-  };
+  }
   cardScrollFrame = window.requestAnimationFrame(animate);
-};
+}
 
-const resetCardViewport = (): void => {
+/**
+ * 将报告卡片滚动容器恢复到起始位置。
+ *
+ * @returns 无返回值；会先取消尚未完成的横向滚动动画。
+ */
+function resetCardViewport(): void {
   if (cardScrollFrame !== null) {
     window.cancelAnimationFrame(cardScrollFrame);
     cardScrollFrame = null;
   }
   if (cardViewport.value) cardViewport.value.scrollLeft = 0;
-};
+}
 
-const openStage = (index: number, playAll = false): void => {
+/**
+ * 打开报告舞台模式，并决定是否连续播放全部卡片。
+ *
+ * @param index - 首次打开时选中的报告索引。
+ * @param playAll - 是否在当前卡片完成后继续播放下一张。
+ * @returns 无返回值；没有报告数据时不打开舞台。
+ */
+function openStage(index: number, playAll = false): void {
   if (!props.platforms.length) return;
   activeIndex.value = Math.max(0, Math.min(index, props.platforms.length - 1));
   stagePlayAll.value = playAll;
   stagePaused.value = false;
   stageOpen.value = true;
   void scrollCardIntoView(activeIndex.value);
-};
+}
 
-const selectCard = (index: number): void => {
+/**
+ * 选择报告卡片并同步滚动位置。
+ *
+ * @param index - 用户选择的报告索引。
+ * @returns 无返回值；重复点击当前舞台卡片会关闭舞台。
+ */
+function selectCard(index: number): void {
   if (stageOpen.value && index === activeIndex.value) {
     closeStage();
     return;
   }
   openStage(index);
-};
+}
 
-const startPlayAll = (): void => {
+/**
+ * 从第一张报告卡开始连续播放。
+ *
+ * @returns 无返回值。
+ */
+function startPlayAll(): void {
   openStage(0, true);
-};
+}
 
-const closeStage = (): void => {
+/**
+ * 关闭报告舞台模式并恢复普通浏览状态。
+ *
+ * @returns 无返回值；首页卡片会在首卡场景恢复到滚动起点。
+ */
+function closeStage(): void {
   stageOpen.value = false;
   stagePlayAll.value = false;
   stagePaused.value = false;
@@ -164,9 +211,14 @@ const closeStage = (): void => {
       }, 420);
     });
   }
-};
+}
 
-const handleStageComplete = (): void => {
+/**
+ * 处理舞台模式完成事件，决定进入下一张或退出。
+ *
+ * @returns 无返回值；播放结束或没有下一张时关闭舞台。
+ */
+function handleStageComplete(): void {
   if (!stagePlayAll.value || activeIndex.value >= props.platforms.length - 1) {
     closeStage();
     return;
@@ -174,15 +226,20 @@ const handleStageComplete = (): void => {
   activeIndex.value += 1;
   stagePaused.value = false;
   void scrollCardIntoView(activeIndex.value);
-};
+}
 
-const handleStatusAction = (): void => {
+/**
+ * 处理状态区域的主操作，复用已有舞台或滚动交互。
+ *
+ * @returns 无返回值；舞台未打开时开始连续播放，否则切换暂停状态。
+ */
+function handleStatusAction(): void {
   if (!stageOpen.value) {
     startPlayAll();
     return;
   }
   stagePaused.value = !stagePaused.value;
-};
+}
 
 onMounted(() => {
   isClientReady.value = true;

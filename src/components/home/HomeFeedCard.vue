@@ -23,8 +23,15 @@ const currentRepository = computed(() =>
     : repositories.value[activeRepositoryIndex.value],
 );
 
-const safeNumber = (value: number): number =>
-  Number.isFinite(value) && value >= 0 ? Math.round(value) : 0;
+/**
+ * 将仓库统计数值转换为有限的非负整数。
+ *
+ * @param value - 来源数据中的未知统计值。
+ * @returns 可用于展示和计算的非负整数。
+ */
+function safeNumber(value: number): number {
+  return Number.isFinite(value) && value >= 0 ? Math.round(value) : 0;
+}
 
 const totalStars = computed(() =>
   props.repositories.reduce(
@@ -33,7 +40,13 @@ const totalStars = computed(() =>
   ),
 );
 
-const formatCount = (value: number): string => {
+/**
+ * 将仓库统计数量转换为简短的 K/M 显示文本。
+ *
+ * @param value - 需要格式化的仓库统计数量。
+ * @returns 适合卡片宽度的紧凑显示文本。
+ */
+function formatCount(value: number): string {
   const count = safeNumber(value);
   if (count >= 1_000_000) {
     return (count / 1_000_000).toFixed(1).replace(/\.0$/, "") + "m";
@@ -42,7 +55,7 @@ const formatCount = (value: number): string => {
     return (count / 1_000).toFixed(1).replace(/\.0$/, "") + "k";
   }
   return String(count);
-};
+}
 
 const languageColors: Record<string, string> = {
   TypeScript: "#3178c6",
@@ -129,12 +142,22 @@ const heatmapCells = computed(() => {
   });
 });
 
-const clearRotation = (): void => {
+/**
+ * 清理 GitHub 仓库轮播定时器。
+ *
+ * @returns 无返回值；重复调用不会产生副作用。
+ */
+function clearRotation(): void {
   if (rotationTimer !== undefined) window.clearInterval(rotationTimer);
   rotationTimer = undefined;
-};
+}
 
-const showRandomRepository = (): void => {
+/**
+ * 从当前仓库列表中随机选择一项展示。
+ *
+ * @returns 无返回值；没有仓库时回到概览状态。
+ */
+function showRandomRepository(): void {
   const count = repositories.value.length;
   if (!count) {
     activeRepositoryIndex.value = null;
@@ -149,40 +172,66 @@ const showRandomRepository = (): void => {
   }
   lastRepositoryIndex.value = nextIndex;
   activeRepositoryIndex.value = nextIndex;
-};
+}
 
-const advanceRotation = (): void => {
+/**
+ * 推进一次仓库轮播或从概览进入仓库详情。
+ *
+ * @returns 无返回值；展示状态由当前卡片内容决定。
+ */
+function advanceRotation(): void {
   if (activeRepositoryIndex.value === null) {
     showRandomRepository();
     return;
   }
   activeRepositoryIndex.value = null;
-};
+}
 
-const startRotation = (): void => {
+/**
+ * 启动仓库轮播定时器。
+ *
+ * @returns 无返回值；已有定时器会先被清理。
+ */
+function startRotation(): void {
   clearRotation();
   if (isPaused.value || !hasRepositories.value) return;
   rotationTimer = window.setInterval(() => {
     advanceRotation();
   }, 5600);
-};
+}
 
-const pauseRotation = (): void => {
+/**
+ * 暂停仓库轮播。
+ *
+ * @returns 无返回值。
+ */
+function pauseRotation(): void {
   isPaused.value = true;
   clearRotation();
-};
+}
 
-const resumeRotation = (): void => {
+/**
+ * 恢复仓库轮播。
+ *
+ * @returns 无返回值；页面隐藏时保持暂停。
+ */
+function resumeRotation(): void {
   isPaused.value = false;
   startRotation();
-};
+}
 
-const handleFocusout = (event: FocusEvent): void => {
+/**
+ * 焦点离开仓库卡片区域时恢复轮播。
+ *
+ * @param event - 焦点离开事件。
+ * @returns 无返回值；焦点仍在卡片内部时不恢复。
+ */
+function handleFocusout(event: FocusEvent): void {
   const root = event.currentTarget as HTMLElement | null;
   const nextTarget = event.relatedTarget;
   if (root && nextTarget instanceof Node && root.contains(nextTarget)) return;
   resumeRotation();
-};
+}
 
 watch(
   () => props.repositories.map((repository) => repository.id).join("|"),

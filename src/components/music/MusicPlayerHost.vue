@@ -59,45 +59,74 @@ const repeatMode = ref<RepeatMode>("off");
 const volume = ref(1);
 let playlistLoadToken = 0;
 
-const getPlaybackMode = (): MusicPlaybackMode => {
+/**
+ * 根据随机和重复开关计算播放器对外暴露的播放模式。
+ *
+ * @returns 当前播放器使用的播放模式。
+ */
+function getPlaybackMode(): MusicPlaybackMode {
   if (isShuffle.value) return "shuffle";
   if (repeatMode.value === "one") return "one";
   return "sequential";
-};
+}
 
 interface LoadedPlaylist {
   title: string;
   tracks: MusicTrack[];
 }
 
-const toSong = (track: MusicSettings): PlayerSong => ({
-  id: track.id,
-  name: track.title,
-  artist: track.artist,
-  album: track.album,
-  cover: track.cover,
-  url: track.audioUrl,
-  source: track.source,
-  playlistId: track.playlistId,
-});
+/**
+ * 将页面配置中的音乐设置转换为播放器事件使用的曲目对象。
+ *
+ * @param track - 当前音乐设置。
+ * @returns 对外发布的播放器曲目快照。
+ */
+function toSong(track: MusicSettings): PlayerSong {
+  return {
+    id: track.id,
+    name: track.title,
+    artist: track.artist,
+    album: track.album,
+    cover: track.cover,
+    url: track.audioUrl,
+    source: track.source,
+    playlistId: track.playlistId,
+  };
+}
 
-const dispatchConfigChange = (): void => {
+/**
+ * 在本地可编辑模式下通知设置页保存当前曲目配置。
+ *
+ * @returns 无返回值；生产模式或服务端渲染阶段不会派发事件。
+ */
+function dispatchConfigChange(): void {
   if (typeof window === "undefined" || !props.editable) return;
   window.dispatchEvent(
     new CustomEvent("music-player-config-change", {
       detail: { ...currentTrack.value },
     }),
   );
-};
+}
 
-const currentPlaylist = () =>
-  props.catalog.playlists.find(
+/**
+ * 从公开音乐目录中查找当前曲目所属歌单。
+ *
+ * @returns 与当前来源和歌单 ID 匹配的歌单，找不到时返回 undefined。
+ */
+function currentPlaylist(): MusicCatalog["playlists"][number] | undefined {
+  return props.catalog.playlists.find(
     (playlist) =>
       playlist.id === currentTrack.value.playlistId &&
       playlist.source === currentTrack.value.source,
   );
+}
 
-const publishState = (): void => {
+/**
+ * 组装并发布播放器状态，供音乐控件和首页卡片共享。
+ *
+ * @returns 无返回值；状态同时写入 window 缓存并派发自定义事件。
+ */
+function publishState(): void {
   if (typeof window === "undefined") return;
   const playlist = currentPlaylist();
   const detail: PlayerDetail = {
@@ -125,9 +154,14 @@ const publishState = (): void => {
   (window as Window & { __musicPlayerState?: PlayerDetail }).__musicPlayerState =
     detail;
   window.dispatchEvent(new CustomEvent("music-player-state-change", { detail }));
-};
+}
 
-const syncAudio = (): void => {
+/**
+ * 将当前曲目、音量和静音状态同步到原生 audio 元素。
+ *
+ * @returns 无返回值；没有挂载 audio 元素时直接结束。
+ */
+function syncAudio(): void {
   const audio = audioRef.value;
   if (!audio) return;
   currentTime.value = 0;
@@ -136,13 +170,21 @@ const syncAudio = (): void => {
   audio.muted = isMuted.value;
   audio.src = currentTrack.value.audioUrl || "";
   audio.load();
-};
+}
 
-const setTrack = (
+/**
+ * 切换当前曲目，并按需自动播放和保存配置。
+ *
+ * @param track - 需要切换到的目录曲目。
+ * @param autoPlay - 是否在同步 audio 后立即播放。
+ * @param persist - 是否向本地设置页派发保存事件。
+ * @returns 无返回值；所有播放器控件通过 publishState 获取最新状态。
+ */
+function setTrack(
   track: MusicTrack,
   autoPlay = false,
   persist = false,
-): void => {
+): void {
   currentTrack.value = {
     ...currentTrack.value,
     enabled: true,
@@ -165,22 +207,37 @@ const setTrack = (
   publishState();
   if (persist) dispatchConfigChange();
   if (autoPlay) void togglePlaying();
-};
+}
 
-const findPlaylistTracks = (
+/**
+ * 从构建时音乐目录中查找指定歌单的曲目。
+ *
+ * @param source - 音乐平台标识。
+ * @param playlistId - 歌单 ID。
+ * @returns 目录中已有的曲目列表；不存在时返回空数组。
+ */
+function findPlaylistTracks(
   source: "netease" | "qq",
   playlistId: string,
-): MusicTrack[] => {
+): MusicTrack[] {
   const playlist = props.catalog.playlists.find(
     (item) => item.source === source && item.id === playlistId,
   );
   return playlist?.tracks ?? [];
-};
+}
 
-const loadPlaylistFromDevServer = async (
+/**
+ * 在本地开发模式下从代理接口加载完整歌单。
+ *
+ * @param source - 音乐平台标识。
+ * @param playlistId - 歌单 ID。
+ * @returns 规范化后的歌单标题和曲目列表。
+ * @throws 当接口响应失败或没有可播放曲目时抛出异常。
+ */
+async function loadPlaylistFromDevServer(
   source: "netease" | "qq",
   playlistId: string,
-): Promise<LoadedPlaylist> => {
+): Promise<LoadedPlaylist> {
   if (!props.editable) return { title: "", tracks: [] };
   const response = await fetch(
     `/__momona/music-playlist?source=${encodeURIComponent(source)}&id=${encodeURIComponent(playlistId)}`,
@@ -190,13 +247,19 @@ const loadPlaylistFromDevServer = async (
   const result = normalizeMusicPlaylist(payload, source, playlistId);
   if (!result) throw new Error("歌单中没有可播放的曲目");
   return { title: result.playlistTitle, tracks: result.tracks };
-};
+}
 
-const loadPlaylist = async (detail: {
+/**
+ * 加载歌单曲目，优先使用公开快照，缺失时回退到本地开发接口。
+ *
+ * @param detail - 歌单来源、ID和可选自动播放标志。
+ * @returns 无返回值；过期请求不会覆盖较新的歌单结果。
+ */
+async function loadPlaylist(detail: {
   source: "netease" | "qq";
   playlistId: string;
   autoPlay?: boolean;
-}): Promise<void> => {
+}): Promise<void> {
   const requestToken = ++playlistLoadToken;
   let tracks = findPlaylistTracks(detail.source, detail.playlistId);
   let playlistTitle =
@@ -221,9 +284,14 @@ const loadPlaylist = async (detail: {
   currentPlaylistTracks.value = tracks;
   currentPlaylistTitle.value = playlistTitle;
   if (tracks[0]) setTrack(tracks[0], detail.autoPlay === true, true);
-};
+}
 
-const togglePlaying = async (): Promise<void> => {
+/**
+ * 切换当前曲目的播放和暂停状态。
+ *
+ * @returns 播放器操作完成后结束；浏览器拒绝播放时会恢复暂停状态。
+ */
+async function togglePlaying(): Promise<void> {
   const audio = audioRef.value;
   if (!currentTrack.value.title) return;
   if (!audio || !currentTrack.value.audioUrl) {
@@ -241,9 +309,15 @@ const togglePlaying = async (): Promise<void> => {
     isPlaying.value = false;
     publishState();
   }
-};
+}
 
-const handleSelectTrack = (event: Event): void => {
+/**
+ * 处理外部曲目选择事件并切换播放器当前曲目。
+ *
+ * @param event - 携带 MusicTrack 的自定义事件。
+ * @returns 无返回值；无效曲目事件会被忽略。
+ */
+function handleSelectTrack(event: Event): void {
   const track = (event as CustomEvent<MusicTrack>).detail;
   if (!track || typeof track !== "object" || !track.id) return;
   playlistLoadToken += 1;
@@ -255,9 +329,15 @@ const handleSelectTrack = (event: Event): void => {
     if (catalogTracks.length) currentPlaylistTracks.value = catalogTracks;
   }
   setTrack(track, false, true);
-};
+}
 
-const handleLoadPlaylist = (event: Event): void => {
+/**
+ * 处理外部歌单加载事件，并启动带过期保护的异步加载。
+ *
+ * @param event - 携带平台、歌单 ID和自动播放标志的自定义事件。
+ * @returns 无返回值；异步结果由 loadPlaylist 负责更新。
+ */
+function handleLoadPlaylist(event: Event): void {
   const detail = (event as CustomEvent<{
     source?: "netease" | "qq";
     playlistId?: string;
@@ -269,21 +349,38 @@ const handleLoadPlaylist = (event: Event): void => {
     playlistId: detail.playlistId,
     autoPlay: detail.autoPlay,
   });
-};
+}
 
-const handleToggle = (): void => {
+/**
+ * 将播放器切换事件转交给播放状态方法。
+ *
+ * @returns 无返回值。
+ */
+function handleToggle(): void {
   void togglePlaying();
-};
+}
 
-const currentTrackIndex = (): number =>
-  currentPlaylistTracks.value.findIndex(
+/**
+ * 查找当前曲目在已加载歌单中的索引。
+ *
+ * @returns 当前曲目索引；找不到时返回 -1。
+ */
+function currentTrackIndex(): number {
+  return currentPlaylistTracks.value.findIndex(
     (track) =>
       track.source === currentTrack.value.source &&
       track.playlistId === currentTrack.value.playlistId &&
       track.id === currentTrack.value.id,
   );
+}
 
-const chooseRelativeTrack = (direction: -1 | 1): void => {
+/**
+ * 按相对方向切换歌单曲目，并处理随机和循环规则。
+ *
+ * @param direction - -1 表示上一首，1 表示下一首。
+ * @returns 无返回值；没有可切换曲目时保持当前状态。
+ */
+function chooseRelativeTrack(direction: -1 | 1): void {
   const tracks = currentPlaylistTracks.value;
   if (!tracks.length) return;
   const index = currentTrackIndex();
@@ -302,9 +399,14 @@ const chooseRelativeTrack = (direction: -1 | 1): void => {
   }
   const next = tracks[nextIndex];
   if (next) setTrack(next, isPlaying.value, true);
-};
+}
 
-const handlePrevious = (): void => {
+/**
+ * 处理上一首操作；播放超过三秒时先回到当前曲目开头。
+ *
+ * @returns 无返回值。
+ */
+function handlePrevious(): void {
   const audio = audioRef.value;
   if (audio && currentTime.value > 3) {
     audio.currentTime = 0;
@@ -313,13 +415,23 @@ const handlePrevious = (): void => {
     return;
   }
   chooseRelativeTrack(-1);
-};
+}
 
-const handleNext = (): void => {
+/**
+ * 处理下一首操作。
+ *
+ * @returns 无返回值。
+ */
+function handleNext(): void {
   chooseRelativeTrack(1);
-};
+}
 
-const handleRepeat = (): void => {
+/**
+ * 循环切换关闭、列表循环和单曲循环模式。
+ *
+ * @returns 无返回值；切换循环时会关闭随机播放。
+ */
+function handleRepeat(): void {
   isShuffle.value = false;
   repeatMode.value =
     repeatMode.value === "off"
@@ -328,15 +440,26 @@ const handleRepeat = (): void => {
         ? "one"
         : "off";
   publishState();
-};
+}
 
-const handleShuffle = (): void => {
+/**
+ * 切换随机播放模式。
+ *
+ * @returns 无返回值；开启随机播放时会关闭循环模式。
+ */
+function handleShuffle(): void {
   isShuffle.value = !isShuffle.value;
   if (isShuffle.value) repeatMode.value = "off";
   publishState();
-};
+}
 
-const handlePlaybackMode = (event: Event): void => {
+/**
+ * 将播放器外部模式事件转换为内部随机/循环状态。
+ *
+ * @param event - 携带播放模式的自定义事件。
+ * @returns 无返回值；不支持的模式不会改变当前状态。
+ */
+function handlePlaybackMode(event: Event): void {
   const mode = (event as CustomEvent<MusicPlaybackMode>).detail;
   if (mode === "shuffle") {
     isShuffle.value = true;
@@ -351,16 +474,27 @@ const handlePlaybackMode = (event: Event): void => {
     return;
   }
   publishState();
-};
+}
 
-const handleMute = (): void => {
+/**
+ * 切换静音状态并同步原生 audio 元素。
+ *
+ * @returns 无返回值。
+ */
+function handleMute(): void {
   isMuted.value = !isMuted.value;
   const audio = audioRef.value;
   if (audio) audio.muted = isMuted.value;
   publishState();
-};
+}
 
-const handleSeek = (event: Event): void => {
+/**
+ * 将播放器进度移动到外部控件指定的时间点。
+ *
+ * @param event - 携带目标秒数的自定义事件。
+ * @returns 无返回值；非法时间或未加载音频时直接忽略。
+ */
+function handleSeek(event: Event): void {
   const nextTime = Number((event as CustomEvent<number>).detail);
   if (!Number.isFinite(nextTime)) return;
   const audio = audioRef.value;
@@ -368,35 +502,67 @@ const handleSeek = (event: Event): void => {
   audio.currentTime = Math.min(audio.duration, Math.max(0, nextTime));
   currentTime.value = audio.currentTime;
   publishState();
-};
+}
 
-const handleRequestState = (): void => publishState();
+/**
+ * 响应其他音乐控件的状态请求。
+ *
+ * @returns 无返回值；通过 publishState 重新广播当前状态。
+ */
+function handleRequestState(): void {
+  publishState();
+}
 
-const handleAudioPlay = (): void => {
+/**
+ * 处理原生 audio 的播放事件。
+ *
+ * @returns 无返回值。
+ */
+function handleAudioPlay(): void {
   isPlaying.value = true;
   publishState();
-};
+}
 
-const handleAudioPause = (): void => {
+/**
+ * 处理原生 audio 的暂停事件。
+ *
+ * @returns 无返回值。
+ */
+function handleAudioPause(): void {
   isPlaying.value = false;
   publishState();
-};
+}
 
-const handleAudioLoadedMetadata = (): void => {
+/**
+ * 处理原生 audio 元数据加载完成事件并记录总时长。
+ *
+ * @returns 无返回值。
+ */
+function handleAudioLoadedMetadata(): void {
   const audio = audioRef.value;
   duration.value = audio && Number.isFinite(audio.duration) ? audio.duration : 0;
   publishState();
-};
+}
 
-const handleAudioTimeUpdate = (): void => {
+/**
+ * 处理原生 audio 播放进度变化并广播当前时间。
+ *
+ * @returns 无返回值；无法读取有效时间时直接忽略。
+ */
+function handleAudioTimeUpdate(): void {
   const audio = audioRef.value;
   if (!audio || !Number.isFinite(audio.currentTime)) return;
   currentTime.value = audio.currentTime;
   if (Number.isFinite(audio.duration)) duration.value = audio.duration;
   publishState();
-};
+}
 
-const handleAudioEnded = (): void => {
+/**
+ * 处理原生 audio 播放结束事件，并按当前模式决定重播、下一首或停止。
+ *
+ * @returns 无返回值；播放列表为空时只广播停止状态。
+ */
+function handleAudioEnded(): void {
   isPlaying.value = false;
   if (repeatMode.value === "one") {
     const current = currentPlaylistTracks.value[currentTrackIndex()];
@@ -424,7 +590,7 @@ const handleAudioEnded = (): void => {
   const next = tracks[nextIndex];
   if (next) setTrack(next, true, true);
   else publishState();
-};
+}
 
 watch(
   () => props.track,

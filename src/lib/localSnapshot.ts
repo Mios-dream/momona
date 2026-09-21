@@ -1,6 +1,10 @@
-import { dirname, resolve } from "node:path";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import type { SiteData } from "../data/types";
+import {
+  isRecord,
+  readJsonFile,
+  writeJsonFileAtomically,
+} from "./persistence/jsonFile";
 
 /** 本机缓存的公开页面快照；它不包含 LocalConfig 或 token。 */
 export const siteSnapshotPath = resolve(
@@ -9,39 +13,52 @@ export const siteSnapshotPath = resolve(
   "generated.json",
 );
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+/**
+ * 读取公开页面快照；缺失或损坏的快照按空快照处理。
+ *
+ * @returns 公开页面快照片段；文件不可用时返回空对象。
+ */
+export async function readSiteSnapshot(): Promise<Partial<SiteData>> {
+  const parsed = await readJsonFile(siteSnapshotPath);
+  return isRecord(parsed) ? (parsed as Partial<SiteData>) : {};
+}
 
-export const readSiteSnapshot = async (): Promise<Partial<SiteData>> => {
-  try {
-    const raw = await readFile(siteSnapshotPath, "utf8");
-    const parsed: unknown = JSON.parse(raw);
-    return isRecord(parsed) ? (parsed as Partial<SiteData>) : {};
-  } catch {
-    return {};
-  }
-};
+/**
+ * 原子写入公开页面快照。
+ *
+ * @param siteData - 需要写入的完整页面数据。
+ * @returns 文件写入完成后结束的异步任务。
+ */
+export async function writeSiteSnapshot(siteData: SiteData): Promise<void> {
+  await writeJsonFileAtomically(siteSnapshotPath, siteData);
+}
 
-export const writeSiteSnapshot = async (siteData: SiteData): Promise<void> => {
-  await mkdir(dirname(siteSnapshotPath), { recursive: true });
-  const temporaryPath = `${siteSnapshotPath}.${process.pid}.tmp`;
-  await writeFile(
-    temporaryPath,
-    `${JSON.stringify(siteData, null, 2)}\n`,
-    "utf8",
-  );
-  await rename(temporaryPath, siteSnapshotPath);
-};
-
-/** 串行化设置页的写入，避免两个请求互相覆盖快照。 */
-export const createSiteSnapshotStore = () => {
-  let writeQueue: Promise<void> = Promise.resolve();
-
-  const update = async (
+/**
+ * 串行化设置页的写入，避免两个请求互相覆盖快照。
+ *
+ * @returns 提供读取和串行更新能力的快照存储对象。
+ */
+export function createSiteSnapshotStore(): {
+  read: typeof readSiteSnapshot;
+  update: (
     updater: (
       current: Partial<SiteData>,
     ) => SiteData | Promise<SiteData>,
-  ): Promise<SiteData> => {
+  ) => Promise<SiteData>;
+} {
+  let writeQueue: Promise<void> = Promise.resolve();
+
+  /**
+   * 在前一个写操作完成后读取最新快照并提交下一份快照。
+   *
+   * @param updater - 基于最新快照生成下一份页面数据的函数。
+   * @returns 已经写入磁盘的页面数据。
+   */
+  async function update(
+    updater: (
+      current: Partial<SiteData>,
+    ) => SiteData | Promise<SiteData>,
+  ): Promise<SiteData> {
     let release!: () => void;
     const previous = writeQueue;
     writeQueue = new Promise<void>((resolve) => {
@@ -56,7 +73,7 @@ export const createSiteSnapshotStore = () => {
     } finally {
       release();
     }
-  };
+  }
 
   return { read: readSiteSnapshot, update };
 };

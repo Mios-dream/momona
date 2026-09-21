@@ -3,18 +3,23 @@ import { computed, onMounted, ref } from "vue";
 import type {
   DataSourceId,
   HoyoGame,
-  IconName,
-  LibraryFilter,
   LocalConfig,
   ManualLibraryItem,
   ProviderStatus,
   RepositorySummary,
   SiteData,
   SourceSnapshotInfo,
-  SourceContentConfig,
 } from "../../data/types";
+import {
+  createManualItem,
+  emptySourceSnapshotStatuses,
+  sourceCards,
+  settingsTabs,
+  typeOptions,
+  type SettingsTab,
+} from "../../data/settings";
 import { cloneLocalConfig, normalizeLocalConfig } from "../../data/localConfig";
-import { sourceLabels } from "../../lib/dataSources/index";
+import { sourceLabels } from "../../data/sourceCatalog";
 import {
   musicResultToSettings,
   normalizeMusicPlaylist,
@@ -37,26 +42,6 @@ const emit = defineEmits<{
   "config-change": [config: LocalConfig, persist?: boolean];
 }>();
 
-interface SourceCard {
-  id: DataSourceId;
-  title: string;
-  description: string;
-  hint: string;
-  accountLabel: string;
-  accountKey: "username" | "userId";
-  placeholder: string;
-  token: boolean;
-  icon: IconName;
-  contentHint: string;
-  contentOptions: Array<{
-    key: keyof SourceContentConfig;
-    label: string;
-    description: string;
-  }>;
-}
-
-type SettingsTab = "profile" | "sources" | "components" | "content" | "status";
-
 interface SourcePreview {
   sourceId: DataSourceId;
   status: SourceSnapshotInfo;
@@ -70,200 +55,6 @@ interface SourcePreview {
   }>;
   repositories: RepositorySummary[];
 }
-
-const sourceCards: SourceCard[] = [
-  {
-    id: "bangumi",
-    title: "Bangumi",
-    description: "追番、游戏、书籍、音乐",
-    hint: "只同步勾选的作品类型；未勾选内容不会写入页面。",
-    accountLabel: "用户名或用户页 URL",
-    accountKey: "username",
-    placeholder: "例如：miosdream 或 https://bgm.tv/user/…",
-    token: false,
-    icon: "bookMarked",
-    contentHint: "未勾选类型不会写入页面快照。",
-    contentOptions: [
-      {
-        key: "bangumiAnime",
-        label: "追番",
-        description: "动画与番剧收藏",
-      },
-      { key: "bangumiGames", label: "游戏", description: "游戏收藏" },
-      { key: "bangumiBooks", label: "书籍", description: "书籍与小说收藏" },
-      { key: "bangumiMusic", label: "音乐", description: "音乐收藏" },
-    ],
-  },
-  {
-    id: "bilibili",
-    title: "Bilibili",
-    description: "投稿、收藏、追番",
-    hint: "未勾选的类别不会请求对应 API，也不会写入页面快照。",
-    accountLabel: "UID 或空间 URL",
-    accountKey: "userId",
-    placeholder: "例如：205296924 或 https://space.bilibili.com/…",
-    token: false,
-    icon: "video",
-    contentHint: "未勾选类别不会请求对应 API，也不会写入页面快照。",
-    contentOptions: [
-      {
-        key: "bilibiliVideos",
-        label: "投稿视频",
-        description: "你发布的公开视频",
-      },
-      {
-        key: "bilibiliFavorites",
-        label: "收藏夹内容",
-        description: "公开收藏夹中的视频",
-      },
-      {
-        key: "bilibiliBangumi",
-        label: "追番 / 追剧",
-        description: "公开追番与追剧列表",
-      },
-    ],
-  },
-  {
-    id: "github",
-    title: "GitHub",
-    description: "仓库与统计",
-    hint: "读取公开仓库；同步失败时保留上一次公开快照。",
-    accountLabel: "用户名或个人页 URL",
-    accountKey: "username",
-    placeholder: "例如：Mios-dream 或 https://github.com/…",
-    token: true,
-    icon: "github",
-    contentHint: "关闭后不会请求或展示仓库；范围可在下方选择。",
-    contentOptions: [
-      {
-        key: "githubRepositories",
-        label: "公开仓库",
-        description: "个人主页中的公开仓库",
-      },
-    ],
-  },
-  {
-    id: "steam",
-    title: "Steam",
-    description: "最近游玩、游戏库",
-    hint: "公开个人页可以读取最近游戏和近两周时长；完整游戏库需要 Steam Web API Key。",
-    accountLabel: "个人页 URL 或 SteamID64",
-    accountKey: "username",
-    placeholder: "例如：76561198863810095 或 Steam 个人页链接",
-    token: true,
-    icon: "game",
-    contentHint: "无 Key 时使用公开个人页的最近游戏；填写 Key 后可同步完整游戏库。",
-    contentOptions: [
-      {
-        key: "steamRecentGames",
-        label: "最近游玩",
-        description: "最近游戏、近两周时长和最后游玩日期",
-      },
-      {
-        key: "steamLibrary",
-        label: "游戏库",
-        description: "Steam 账号拥有的游戏及累计游玩时长",
-      },
-    ],
-  },
-  {
-    id: "sfacg",
-    title: "SFACG",
-    description: "菠萝包轻小说开放书架",
-    hint: "只读取公开书架页面，不需要登录；请输入 p.sfacg.com 的书架地址。",
-    accountLabel: "开放书架地址",
-    accountKey: "username",
-    placeholder: "例如：https://p.sfacg.com/p/8933368/",
-    token: false,
-    icon: "bookMarked",
-    contentHint: "公开书架中的小说会作为书籍写入资料库。",
-    contentOptions: [
-      {
-        key: "sfacgBooks",
-        label: "开放书架作品",
-        description: "书架中的小说标题、作者和封面",
-      },
-    ],
-  },
-  {
-    id: "netease",
-    title: "网易云音乐",
-    description: "喜欢、创建、收藏歌单",
-    hint: "只读取公开歌单列表；未勾选的分类不会写入资料库。",
-    accountLabel: "用户 ID 或个人页 URL",
-    accountKey: "username",
-    placeholder: "例如：32953014 或网易云用户页链接",
-    token: false,
-    icon: "music",
-    contentHint: "公开歌单可按分类选择展示。",
-    contentOptions: [
-      {
-        key: "neteaseLiked",
-        label: "喜欢的音乐",
-        description: "我喜欢的音乐歌单",
-      },
-      {
-        key: "neteaseCreated",
-        label: "创建的歌单",
-        description: "自己创建的公开歌单",
-      },
-      {
-        key: "neteaseCollected",
-        label: "收藏的歌单",
-        description: "收藏的公开歌单",
-      },
-    ],
-  },
-  {
-    id: "qqmusic",
-    title: "QQ 音乐",
-    description: "喜欢、创建、收藏歌单",
-    hint: "只读取公开歌单列表；平台未公开的收藏不会被写入页面。",
-    accountLabel: "QQ 音乐用户 ID",
-    accountKey: "username",
-    placeholder: "例如：10000 或 QQ 音乐个人页链接",
-    token: false,
-    icon: "radio",
-    contentHint: "公开歌单可按分类选择展示。",
-    contentOptions: [
-      {
-        key: "qqmusicLiked",
-        label: "喜欢的音乐",
-        description: "平台公开的喜欢歌单",
-      },
-      {
-        key: "qqmusicCreated",
-        label: "创建的歌单",
-        description: "自己创建的公开歌单",
-      },
-      {
-        key: "qqmusicCollected",
-        label: "收藏的歌单",
-        description: "收藏的公开歌单",
-      },
-    ],
-  },
-];
-
-const settingsTabs: Array<{ id: SettingsTab; label: string; icon: IconName }> =
-  [
-    { id: "profile", label: "个人资料", icon: "user" },
-    { id: "sources", label: "数据来源", icon: "globe" },
-    { id: "components", label: "组件设置", icon: "sliders" },
-    { id: "content", label: "内容管理", icon: "library" },
-    { id: "status", label: "同步状态", icon: "activity" },
-  ];
-
-const typeOptions: Array<{
-  value: Exclude<LibraryFilter, "all">;
-  label: string;
-}> = [
-  { value: "anime", label: "追番" },
-  { value: "game", label: "游戏" },
-  { value: "book", label: "书籍" },
-  { value: "video", label: "视频" },
-  { value: "music", label: "音乐" },
-];
 
 const config = ref<LocalConfig>(cloneLocalConfig(props.localConfig));
 const previewData = ref<SiteData | null>(props.siteData);
@@ -295,77 +86,52 @@ const sourceActionBusy = ref<"process" | "clear" | null>(null);
 const musicBusy = ref(false);
 const musicError = ref("");
 
-function createManualItem(): ManualLibraryItem {
-  return { id: "", title: "", type: "anime", subtitle: "", cover: "", url: "" };
-}
-
-function emptySourceSnapshotInfo(sourceId: DataSourceId): SourceSnapshotInfo {
-  return {
-    sourceId,
-    state: "never",
-    message: "尚未同步",
-    rawExists: false,
-    rawBytes: 0,
-    rawUpdatedAt: null,
-    derivedExists: false,
-    derivedBytes: 0,
-    derivedUpdatedAt: null,
-    itemCount: 0,
-    fetchedAt: null,
-    processedAt: null,
-  };
-}
-
-function emptySourceSnapshotStatuses(): Record<
-  DataSourceId,
-  SourceSnapshotInfo
-> {
-  return {
-    bangumi: emptySourceSnapshotInfo("bangumi"),
-    bilibili: emptySourceSnapshotInfo("bilibili"),
-    github: emptySourceSnapshotInfo("github"),
-    netease: emptySourceSnapshotInfo("netease"),
-    qqmusic: emptySourceSnapshotInfo("qqmusic"),
-    steam: emptySourceSnapshotInfo("steam"),
-    sfacg: emptySourceSnapshotInfo("sfacg"),
-  };
-}
-
+/** 读取当前预览快照中的来源同步状态。 */
 const providerStatuses = computed(
   () => previewData.value?.providerStatus ?? [],
 );
+/** 判断是否有来源正在同步。 */
 const anySourceBusy = computed(() =>
   Object.values(sourceBusy.value).some(Boolean),
 );
+/** 汇总保存、同步和快照操作的忙碌状态。 */
 const anyBusy = computed(
   () =>
     anySourceBusy.value || saveBusy.value || sourceActionBusy.value !== null,
 );
+/** 判断当前是否处于手动内容编辑状态。 */
 const editingManual = computed(() => editingManualId.value !== null);
+/** 读取配置中的首页游戏组件。 */
 const gameWidget = computed(() =>
   config.value.widgets.find((widget) => widget.type === "game"),
 );
+/** 读取首页游戏组件设置。 */
 const gameSettings = computed(() => gameWidget.value?.settings?.game);
+/** 将游戏标识转换为设置页提示名称。 */
 const gameName = computed(
   () =>
     ({ genshin: "原神", hsr: "崩坏：星穹铁道", zzz: "绝区零" })[
       gameSettings.value?.game ?? "hsr"
     ],
 );
+/** 根据当前编辑状态生成手动条目按钮文案。 */
 const manualActionLabel = computed(() =>
   editingManual.value ? "更新条目" : "添加条目",
 );
+/** 读取来源管理面板当前选中的来源描述。 */
 const selectedSource = computed(() =>
   selectedSourceId.value
     ? sourceCards.find((source) => source.id === selectedSourceId.value)
     : undefined,
 );
+/** 读取来源管理面板当前选中的快照状态。 */
 const selectedSourceStatus = computed(() =>
   selectedSourceId.value
     ? sourceSnapshotStatuses.value[selectedSourceId.value]
     : undefined,
 );
 
+/** 组合来源和手动内容的同步状态表格行。 */
 const statusRows = computed(() =>
   [
     ...sourceCards.map((source) => ({
@@ -376,6 +142,7 @@ const statusRows = computed(() =>
   ].map((row) => ({ ...row, status: statusFor(row.id) })),
 );
 
+/** 将公开快照生成时间转换为设置页显示文本。 */
 const snapshotTime = computed(() => {
   const value = previewData.value?.generatedAt;
   if (!value) return "尚未写入页面快照";
@@ -385,7 +152,12 @@ const snapshotTime = computed(() => {
     : date.toLocaleString("zh-CN", { hour12: false });
 });
 
-const refreshSourceStatus = async (): Promise<void> => {
+/**
+ * 从本地开发接口刷新各来源的快照状态。
+ *
+ * @returns 请求完成后结束；静态构建环境没有接口时保留空状态。
+ */
+async function refreshSourceStatus(): Promise<void> {
   try {
     const payload = await requestJson<{ sources?: SourceSnapshotInfo[] }>(
       "/__momona/source-status",
@@ -398,7 +170,13 @@ const refreshSourceStatus = async (): Promise<void> => {
   }
 };
 
-const loadSourcePreview = async (sourceId: DataSourceId): Promise<void> => {
+/**
+ * 读取单个来源的快照样例，供来源管理面板预览。
+ *
+ * @param sourceId - 需要预览的数据来源。
+ * @returns 请求完成后结束；失败时清空预览内容。
+ */
+async function loadSourcePreview(sourceId: DataSourceId): Promise<void> {
   sourcePreviewLoading.value = true;
   try {
     sourcePreview.value = await requestJson<SourcePreview>(
@@ -409,40 +187,81 @@ const loadSourcePreview = async (sourceId: DataSourceId): Promise<void> => {
   } finally {
     sourcePreviewLoading.value = false;
   }
-};
+}
 
-const openSourceManager = async (sourceId: DataSourceId): Promise<void> => {
+/**
+ * 打开来源管理面板并加载对应的快照预览。
+ *
+ * @param sourceId - 用户选择的数据来源。
+ * @returns 预览请求完成后结束。
+ */
+async function openSourceManager(sourceId: DataSourceId): Promise<void> {
   selectedSourceId.value = sourceId;
   await loadSourcePreview(sourceId);
 };
 
-const syncSelectedSource = (): void => {
+/**
+ * 触发来源管理面板中当前来源的同步。
+ *
+ * @returns 无返回值；具体异步流程由 syncSource 处理。
+ */
+function syncSelectedSource(): void {
   if (selectedSourceId.value) void syncSource(selectedSourceId.value);
 };
 
-const closeSourceManager = (): void => {
+/**
+ * 关闭来源管理面板并清除预览状态。
+ *
+ * @returns 无返回值。
+ */
+function closeSourceManager(): void {
   selectedSourceId.value = null;
   sourcePreview.value = null;
 };
 
-const sourceSnapshotText = (status: SourceSnapshotInfo): string => {
+/**
+ * 将来源快照状态转换为中文状态文本。
+ *
+ * @param status - 来源快照状态。
+ * @returns 设置页使用的中文状态文案。
+ */
+function sourceSnapshotText(status: SourceSnapshotInfo): string {
   if (status.state === "success") return "已就绪";
   if (status.state === "error") return "同步失败";
   if (status.state === "cleared") return "已清理派生数据";
   return "暂无快照";
 };
 
-const sourceSnapshotClass = (status: SourceSnapshotInfo): string =>
-  `is-${status.state}`;
+/**
+ * 将来源快照状态转换为 CSS 状态类名。
+ *
+ * @param status - 来源快照状态。
+ * @returns 由状态值组成的 CSS 类名。
+ */
+function sourceSnapshotClass(status: SourceSnapshotInfo): string {
+  return `is-${status.state}`;
+}
 
-const formatBytes = (bytes: number): string => {
+/**
+ * 将字节数转换为适合设置页显示的单位文本。
+ *
+ * @param bytes - 快照文件大小，单位为字节。
+ * @returns 带单位的可读文件大小文本。
+ */
+function formatBytes(bytes: number): string {
   if (!bytes) return "未生成";
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-const formatSnapshotDate = (value: string | null): string => {
+/**
+ * 将快照时间转换为本地化日期文本。
+ *
+ * @param value - ISO 时间文本或空值。
+ * @returns 本地化日期文本；无法解析时返回原文本。
+ */
+function formatSnapshotDate(value: string | null): string {
   if (!value) return "暂无";
   const date = new Date(value);
   return Number.isNaN(date.getTime())
@@ -450,7 +269,12 @@ const formatSnapshotDate = (value: string | null): string => {
     : date.toLocaleString("zh-CN", { hour12: false });
 };
 
-onMounted(async () => {
+/**
+ * 从本地开发接口加载配置、页面快照和来源状态。
+ *
+ * @returns 初始数据加载流程完成后结束。
+ */
+async function loadInitialState(): Promise<void> {
   try {
     const payload = await requestJson<{ config?: LocalConfig }>(
       "/__momona/config",
@@ -470,24 +294,54 @@ onMounted(async () => {
   }
 
   await refreshSourceStatus();
+}
+
+onMounted(() => {
+  void loadInitialState();
 });
 
-const closeSyncError = (): void => {
+/**
+ * 关闭同步错误提示。
+ *
+ * @returns 无返回值。
+ */
+function closeSyncError(): void {
   syncError.value = null;
-};
+}
 
-const showSyncError = (title: string, error: unknown): void => {
+/**
+ * 将未知异常转换为设置页可展示的同步错误。
+ *
+ * @param title - 错误区域标题。
+ * @param error - 捕获到的未知异常。
+ * @returns 无返回值；错误会写入同步错误状态。
+ */
+function showSyncError(title: string, error: unknown): void {
   syncError.value = {
     title,
     message: String(error instanceof Error ? error.message : error),
   };
-};
+}
 
-const cachePreview = (siteData: SiteData): SiteData => {
+/**
+ * 更新页面预览并返回同一份快照，方便保存流程继续使用。
+ *
+ * @param siteData - 最新公开页面快照。
+ * @returns 原样返回传入的页面快照。
+ */
+function cachePreview(siteData: SiteData): SiteData {
   previewData.value = siteData;
   return siteData;
-};
+}
 
+/**
+ * 请求本地设置接口，并将非成功响应转换为统一异常。
+ *
+ * @param path - 本地设置接口路径。
+ * @param body - 可选的 POST 请求载荷。
+ * @returns 解析后的接口响应，类型由调用方指定。
+ * @throws 当接口返回非 2xx 状态时抛出接口错误。
+ */
 async function requestJson<T>(path: string, body?: unknown): Promise<T> {
   const response = await fetch(path, {
     method: body === undefined ? "GET" : "POST",
@@ -502,7 +356,12 @@ async function requestJson<T>(path: string, body?: unknown): Promise<T> {
   return payload as T;
 }
 
-const loadMusicPlaylist = async (): Promise<void> => {
+/**
+ * 读取音乐歌单并把第一首曲目写入播放器设置。
+ *
+ * @returns 歌单读取流程完成后结束；重复操作会被忽略。
+ */
+async function loadMusicPlaylist(): Promise<void> {
   if (musicBusy.value) return;
   const parsed = parseMusicPlaylistReference(
     config.value.music.source,
@@ -534,15 +393,21 @@ const loadMusicPlaylist = async (): Promise<void> => {
   } finally {
     musicBusy.value = false;
   }
-};
+}
 
-const updateGameWidget = (patch: {
+/**
+ * 将游戏账号查询结果合并到首页游戏组件设置中。
+ *
+ * @param patch - 需要合并到首页游戏设置的部分字段。
+ * @returns 无返回值；不存在游戏组件时直接结束。
+ */
+function updateGameWidget(patch: {
   uid?: string;
   game?: HoyoGame;
   account?: NonNullable<
     NonNullable<LocalConfig["widgets"][number]["settings"]>["game"]
   >["account"];
-}): void => {
+}): void {
   const widget = gameWidget.value;
   if (!widget) return;
   const current = widget.settings?.game;
@@ -558,9 +423,14 @@ const updateGameWidget = (patch: {
         }
       : item,
   );
-};
+}
 
-const syncGameAccount = async (): Promise<void> => {
+/**
+ * 请求当前配置的游戏账号公开摘要。
+ *
+ * @returns 账号请求完成后结束；结果会写回首页游戏组件设置。
+ */
+async function syncGameAccount(): Promise<void> {
   const current = gameSettings.value;
   if (!current?.uid.trim() || gameBusy.value) return;
   gameBusy.value = true;
@@ -585,16 +455,26 @@ const syncGameAccount = async (): Promise<void> => {
   } finally {
     gameBusy.value = false;
   }
-};
+}
 
-const saveSiteSnapshot = async (): Promise<SiteData> => {
+/**
+ * 请求本地服务根据当前配置保存并生成页面快照。
+ *
+ * @returns 保存后的公开页面快照。
+ */
+async function saveSiteSnapshot(): Promise<SiteData> {
   const result = await requestJson<{ siteData: SiteData }>("/__momona/save", {
     config: config.value,
   });
   return cachePreview(result.siteData);
-};
+}
 
-const saveSettings = async (): Promise<void> => {
+/**
+ * 保存设置、刷新预览并通知应用壳层同步运行时配置。
+ *
+ * @returns 保存流程完成后结束；错误会显示在设置页状态区域。
+ */
+async function saveSettings(): Promise<void> {
   saveBusy.value = true;
   closeSyncError();
   messageTone.value = "neutral";
@@ -611,9 +491,15 @@ const saveSettings = async (): Promise<void> => {
   } finally {
     saveBusy.value = false;
   }
-};
+}
 
-const syncSource = async (sourceId: DataSourceId): Promise<void> => {
+/**
+ * 同步指定来源，并在完成后刷新来源状态和预览。
+ *
+ * @param sourceId - 需要同步的数据来源。
+ * @returns 同步流程完成后结束；成功或失败都会刷新来源状态。
+ */
+async function syncSource(sourceId: DataSourceId): Promise<void> {
   if (sourceBusy.value[sourceId]) return;
   sourceBusy.value[sourceId] = true;
   closeSyncError();
@@ -648,9 +534,14 @@ const syncSource = async (sourceId: DataSourceId): Promise<void> => {
     await refreshSourceStatus();
     if (selectedSourceId.value === sourceId) await loadSourcePreview(sourceId);
   }
-};
+}
 
-const processSelectedSource = async (): Promise<void> => {
+/**
+ * 使用选中来源的原始快照重新生成公开派生数据。
+ *
+ * @returns 处理流程完成后结束；没有原始快照时显示错误。
+ */
+async function processSelectedSource(): Promise<void> {
   const sourceId = selectedSourceId.value;
   if (!sourceId || sourceActionBusy.value) return;
   sourceActionBusy.value = "process";
@@ -675,9 +566,14 @@ const processSelectedSource = async (): Promise<void> => {
     await refreshSourceStatus();
     await loadSourcePreview(sourceId);
   }
-};
+}
 
-const clearSelectedSourceCache = async (): Promise<void> => {
+/**
+ * 清理选中来源的派生缓存，但保留原始抓取快照。
+ *
+ * @returns 清理流程完成后结束；完成后重新读取来源状态和预览。
+ */
+async function clearSelectedSourceCache(): Promise<void> {
   const sourceId = selectedSourceId.value;
   if (!sourceId || sourceActionBusy.value) return;
   sourceActionBusy.value = "clear";
@@ -702,9 +598,16 @@ const clearSelectedSourceCache = async (): Promise<void> => {
     await refreshSourceStatus();
     await loadSourcePreview(sourceId);
   }
-};
+}
 
-const downloadJson = (filename: string, value: unknown): void => {
+/**
+ * 将对象序列化为 JSON 并触发浏览器下载。
+ *
+ * @param filename - 浏览器下载使用的文件名。
+ * @param value - 需要序列化的配置或快照对象。
+ * @returns 无返回值。
+ */
+function downloadJson(filename: string, value: unknown): void {
   const blob = new Blob([JSON.stringify(value, null, 2)], {
     type: "application/json",
   });
@@ -714,9 +617,14 @@ const downloadJson = (filename: string, value: unknown): void => {
   anchor.download = filename;
   anchor.click();
   URL.revokeObjectURL(url);
-};
+}
 
-const exportConfig = (): void => {
+/**
+ * 导出脱敏后的配置和当前公开页面快照。
+ *
+ * @returns 无返回值；所有来源 token 会在下载前清空。
+ */
+function exportConfig(): void {
   const exportedConfig = cloneLocalConfig(config.value);
   for (const source of Object.values(exportedConfig.sources)) source.token = "";
   downloadJson("momona.config.json", {
@@ -725,9 +633,14 @@ const exportConfig = (): void => {
   });
   messageTone.value = "success";
   message.value = "配置文件已导出";
-};
+}
 
-const addOrUpdateManualItem = (): void => {
+/**
+ * 校验并新增或更新一条手动资料库内容。
+ *
+ * @returns 无返回值；未填写标题时只更新提示，不修改配置。
+ */
+function addOrUpdateManualItem(): void {
   if (!manualDraft.value.title.trim()) {
     messageTone.value = "error";
     message.value = "请先填写手动条目标题";
@@ -758,20 +671,37 @@ const addOrUpdateManualItem = (): void => {
   editingManualId.value = null;
   manualDraft.value = createManualItem();
   messageTone.value = "success";
-};
+}
 
-const editManualItem = (item: ManualLibraryItem): void => {
+/**
+ * 将指定手动条目装载到编辑表单。
+ *
+ * @param item - 需要编辑的手动资料库条目。
+ * @returns 无返回值。
+ */
+function editManualItem(item: ManualLibraryItem): void {
   editingManualId.value = item.id;
   manualDraft.value = { ...item };
   activeTab.value = "content";
 };
 
-const cancelManualEdit = (): void => {
+/**
+ * 取消手动条目编辑并恢复空表单。
+ *
+ * @returns 无返回值。
+ */
+function cancelManualEdit(): void {
   editingManualId.value = null;
   manualDraft.value = createManualItem();
 };
 
-const removeManualItem = (id: string): void => {
+/**
+ * 删除指定手动条目，并在编辑中的条目被删除时退出编辑状态。
+ *
+ * @param id - 需要删除的手动条目 ID。
+ * @returns 无返回值。
+ */
+function removeManualItem(id: string): void {
   config.value.manualItems = config.value.manualItems.filter(
     (item) => item.id !== id,
   );
@@ -780,10 +710,23 @@ const removeManualItem = (id: string): void => {
   message.value = "手动条目已删除";
 };
 
-const statusFor = (id: DataSourceId | "manual"): ProviderStatus | undefined =>
-  providerStatuses.value.find((status) => status.id === id);
+/**
+ * 从当前页面快照中读取指定来源的同步状态。
+ *
+ * @param id - 数据来源或手动内容标识。
+ * @returns 匹配的同步状态；尚未同步时返回 undefined。
+ */
+function statusFor(id: DataSourceId | "manual"): ProviderStatus | undefined {
+  return providerStatuses.value.find((status) => status.id === id);
+}
 
-const statusText = (status?: ProviderStatus): string => {
+/**
+ * 将来源同步状态转换为设置页文案。
+ *
+ * @param status - 可选的来源同步状态。
+ * @returns 设置页使用的中文状态文案。
+ */
+function statusText(status?: ProviderStatus): string {
   if (!status) return "尚未同步";
   return {
     success: "已同步",
@@ -792,8 +735,15 @@ const statusText = (status?: ProviderStatus): string => {
   }[status.status];
 };
 
-const statusClass = (status?: ProviderStatus): string =>
-  `is-${status?.status ?? "unknown"}`;
+/**
+ * 将来源同步状态转换为 CSS 类名。
+ *
+ * @param status - 可选的来源同步状态。
+ * @returns 由状态值组成的 CSS 类名。
+ */
+function statusClass(status?: ProviderStatus): string {
+  return `is-${status?.status ?? "unknown"}`;
+}
 </script>
 
 <template>

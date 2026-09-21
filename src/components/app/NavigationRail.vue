@@ -33,7 +33,15 @@ const filterItems: FilterItem[] = [
   { id: 'book', label: '显示书籍', icon: 'book' },
 ];
 
-const isSubmenuPage = (page: AppPage): boolean => page === 'library' || page === 'brew';
+/**
+ * 判断页面是否拥有二级导航。
+ *
+ * @param page - 当前应用页面。
+ * @returns 页面属于资料库或 Brew 时返回 true。
+ */
+function isSubmenuPage(page: AppPage): boolean {
+  return page === 'library' || page === 'brew';
+}
 const isSubmenuOpen = ref(isSubmenuPage(props.page));
 
 const navigationMode = computed<'app' | 'library' | 'brew'>(() => {
@@ -59,9 +67,23 @@ const railStyle = computed(() =>
   railHeight.value === null ? undefined : { height: `${railHeight.value}px` },
 );
 
-const getRailBoxExtraHeight = (element: HTMLElement): number => {
+/**
+ * 计算导航容器内边距和边框占用的额外高度。
+ *
+ * @param element - 需要读取样式的导航元素。
+ * @returns 内边距和边框高度之和。
+ */
+function getRailBoxExtraHeight(element: HTMLElement): number {
   const styles = window.getComputedStyle(element);
-  const parseSize = (value: string): number => Number.parseFloat(value) || 0;
+  /**
+   * 将 CSS 尺寸文本转换为非负数。
+   *
+   * @param value - 浏览器计算样式中的尺寸文本。
+   * @returns 可参与高度计算的非负像素值。
+   */
+  function parseSize(value: string): number {
+    return Number.parseFloat(value) || 0;
+  }
 
   return (
     parseSize(styles.paddingTop) +
@@ -69,9 +91,15 @@ const getRailBoxExtraHeight = (element: HTMLElement): number => {
     parseSize(styles.borderTopWidth) +
     parseSize(styles.borderBottomWidth)
   );
-};
+}
 
-const getTargetRailBoxExtraHeight = (element: HTMLElement): number => {
+/**
+ * 使用隐藏探针读取导航切换后的盒模型额外高度。
+ *
+ * @param element - 当前导航元素。
+ * @returns 隐藏探针的内边距和边框高度之和。
+ */
+function getTargetRailBoxExtraHeight(element: HTMLElement): number {
   const probe = element.cloneNode(false) as HTMLElement;
   probe.style.position = 'absolute';
   probe.style.visibility = 'hidden';
@@ -82,18 +110,28 @@ const getTargetRailBoxExtraHeight = (element: HTMLElement): number => {
   const extraHeight = getRailBoxExtraHeight(probe);
   probe.remove();
   return extraHeight;
-};
+}
 
-const releaseRailHeight = (): void => {
+/**
+ * 释放导航高度锁定，恢复由内容自然决定的高度。
+ *
+ * @returns 无返回值。
+ */
+function releaseRailHeight(): void {
   railHeight.value = null;
   isRailHeightAnimating.value = false;
   if (heightResetTimer !== null) {
     window.clearTimeout(heightResetTimer);
     heightResetTimer = null;
   }
-};
+}
 
-const lockRailHeight = (): void => {
+/**
+ * 在导航内容切换前锁定当前高度，供过渡动画使用。
+ *
+ * @returns 无返回值；没有挂载导航元素时直接结束。
+ */
+function lockRailHeight(): void {
   const rail = railElement.value;
   if (!rail) return;
 
@@ -108,7 +146,7 @@ const lockRailHeight = (): void => {
 
   isRailHeightAnimating.value = true;
   railHeight.value = Math.ceil(rail.getBoundingClientRect().height);
-};
+}
 
 watch(() => props.page, (page, previousPage) => {
   if (page !== previousPage) isSubmenuOpen.value = isSubmenuPage(page);
@@ -118,8 +156,13 @@ watch(navigationMode, () => {
   lockRailHeight();
 }, { flush: 'sync' });
 
-/** 用进入中的按钮组测量目标高度，并让常驻边框平滑过渡到新高度。 */
-const animateRailHeight = (enteringElement: Element): void => {
+/**
+ * 用进入中的按钮组测量目标高度，并让常驻边框平滑过渡到新高度。
+ *
+ * @param enteringElement - 正在进入导航的按钮组元素。
+ * @returns 无返回值。
+ */
+function animateRailHeight(enteringElement: Element): void {
   const rail = railElement.value;
   if (!(enteringElement instanceof HTMLElement) || !rail) return;
 
@@ -151,32 +194,52 @@ const animateRailHeight = (enteringElement: Element): void => {
   });
 
   heightResetTimer = window.setTimeout(releaseRailHeight, 620);
-};
+}
 
-const handleRailTransitionEnd = (event: TransitionEvent): void => {
+/**
+ * 在导航高度过渡结束后清理临时高度。
+ *
+ * @param event - CSS 过渡结束事件。
+ * @returns 无返回值。
+ */
+function handleRailTransitionEnd(event: TransitionEvent): void {
   if (event.target !== event.currentTarget || event.propertyName !== 'height') return;
   releaseRailHeight();
-};
+}
 
 onBeforeUnmount(() => {
   if (heightAnimationFrame !== null) window.cancelAnimationFrame(heightAnimationFrame);
   if (heightResetTimer !== null) window.clearTimeout(heightResetTimer);
 });
 
-/** 切换资料库的静态分类筛选。 */
-const selectLibraryFilter = (filter: LibraryFilter): void => {
+/**
+ * 切换资料库的静态分类筛选。
+ *
+ * @param filter - 需要切换到的资料库分类。
+ * @returns 无返回值；分类由父组件统一维护。
+ */
+function selectLibraryFilter(filter: LibraryFilter): void {
   emit('update:libraryFilter', filter);
-};
+}
 
-/** 返回当前页面的一级导航，同时保留页面地址和主体内容。 */
-const showPrimaryNavigation = (): void => {
+/**
+ * 返回当前页面的一级导航，同时保留页面地址和主体内容。
+ *
+ * @returns 无返回值；只关闭二级导航视图。
+ */
+function showPrimaryNavigation(): void {
   isSubmenuOpen.value = false;
-};
+}
 
-/** 从一级导航重新打开资料库或 Brew 的二级菜单。 */
-const openSubmenuFor = (page: AppPage): void => {
+/**
+ * 从一级导航重新打开资料库或 Brew 的二级菜单。
+ *
+ * @param page - 需要打开二级导航的目标页面。
+ * @returns 无返回值；非二级导航页面会被忽略。
+ */
+function openSubmenuFor(page: AppPage): void {
   if (isSubmenuPage(page)) isSubmenuOpen.value = true;
-};
+}
 </script>
 
 <template>

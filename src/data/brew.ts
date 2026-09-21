@@ -8,18 +8,38 @@ const tones: BrewSource['tone'][] = [
   'pink',
 ];
 
-const getHost = (href: string): string => {
+/**
+ * 从友联主页地址提取用于展示的主机名。
+ *
+ * @param href - 友联主页地址。
+ * @returns 去除 www 前缀的主机名；地址无效时返回原文本。
+ */
+function getHost(href: string): string {
   try {
     return new URL(href).hostname.replace(/^www\./, '');
   } catch {
     return href;
   }
-};
+}
 
-const feedTypeFromUrl = (feedUrl: string): BrewSource['type'] =>
-  /atom/i.test(feedUrl) ? 'Atom' : 'RSS';
+/**
+ * 根据订阅地址的文本特征推断 RSS 或 Atom 类型。
+ *
+ * @param feedUrl - 订阅地址。
+ * @returns 订阅协议类型。
+ */
+function feedTypeFromUrl(feedUrl: string): BrewSource['type'] {
+  return /atom/i.test(feedUrl) ? 'Atom' : 'RSS';
+}
 
-const sourceFromFriend = (friend: FriendLink, index: number): BrewSource => {
+/**
+ * 将友联配置转换为待运行时验证的 Brew 来源。
+ *
+ * @param friend - 友联配置。
+ * @param index - 友联在配置数组中的索引，用于循环分配主题色。
+ * @returns 尚未读取文章的 Brew 来源。
+ */
+function sourceFromFriend(friend: FriendLink, index: number): BrewSource {
   const feedUrl = friend.feedUrl?.trim() || undefined;
 
   return {
@@ -40,8 +60,14 @@ const sourceFromFriend = (friend: FriendLink, index: number): BrewSource => {
     tags: [...friend.tags],
     articles: [],
   };
-};
+}
 
-/** 根据当前友联配置创建 Brew 来源；文章必须由运行时验证订阅源后填充。 */
-export const createBrewSources = (friends: FriendLink[]): BrewSource[] =>
-  friends.map(sourceFromFriend);
+/**
+ * 根据当前友联配置创建 Brew 来源；文章必须由运行时验证订阅源后填充。
+ *
+ * @param friends - 当前友联配置列表。
+ * @returns 与友联一一对应的 Brew 来源列表。
+ */
+export function createBrewSources(friends: FriendLink[]): BrewSource[] {
+  return friends.map(sourceFromFriend);
+}

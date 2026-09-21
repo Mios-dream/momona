@@ -11,13 +11,27 @@ const maxBodySize = 1024 * 1024;
 const maxFeedSize = 2 * 1024 * 1024;
 const maxMusicResponseSize = 8 * 1024 * 1024;
 
-const requestError = (message, statusCode = 400) => {
+/**
+ * 创建一个带 HTTP 状态码的本地设置请求错误。
+ *
+ * @param {string} message - 面向设置页显示的错误信息。
+ * @param {number} statusCode - 需要返回的 HTTP 状态码。
+ * @returns {Error & {statusCode: number}} 带状态码的错误对象。
+ */
+function requestError(message, statusCode = 400) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
-};
+}
 
-const readJsonBody = async (request) => {
+/**
+ * 读取并限制本地设置接口的 JSON 请求体大小。
+ *
+ * @param {import('node:http').IncomingMessage} request - 当前 HTTP 请求。
+ * @returns {Promise<unknown>} 解析后的 JSON 请求载荷。
+ * @throws 当请求体过大、为空或不是有效 JSON 时抛出请求错误。
+ */
+async function readJsonBody(request) {
   const chunks = [];
   let size = 0;
   for await (const chunk of request) {
@@ -32,22 +46,51 @@ const readJsonBody = async (request) => {
   } catch {
     throw requestError("请求体不是有效 JSON");
   }
-};
+}
 
-const respondJson = (response, statusCode, payload) => {
+/**
+ * 将接口结果统一序列化为不缓存的 JSON 响应。
+ *
+ * @param {import('node:http').ServerResponse} response - 当前 HTTP 响应。
+ * @param {number} statusCode - HTTP 状态码。
+ * @param {unknown} payload - 需要序列化的响应载荷。
+ * @returns {void} 无返回值。
+ */
+function respondJson(response, statusCode, payload) {
   response.statusCode = statusCode;
   response.setHeader("Cache-Control", "no-store");
   response.setHeader("Content-Type", "application/json; charset=utf-8");
   response.end(JSON.stringify(payload));
-};
+}
 
-const errorStatus = (error) =>
-  Number.isInteger(error?.statusCode) ? error.statusCode : 500;
+/**
+ * 从未知异常中读取可用 HTTP 状态码。
+ *
+ * @param {unknown} error - 捕获到的未知异常。
+ * @returns {number} 可用于响应的 HTTP 状态码。
+ */
+function errorStatus(error) {
+  return Number.isInteger(error?.statusCode) ? error.statusCode : 500;
+}
 
-const errorMessage = (error) =>
-  error instanceof Error ? error.message : String(error);
+/**
+ * 将未知异常转换为用户可读的错误文本。
+ *
+ * @param {unknown} error - 捕获到的未知异常。
+ * @returns {string} 适合返回给设置页的错误文本。
+ */
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
 
-const readFriendFeed = async (request) => {
+/**
+ * 请求外部 RSS/Atom 地址，供本地友联预览使用。
+ *
+ * @param {import('node:http').IncomingMessage} request - 携带订阅源地址的请求。
+ * @returns {Promise<{feedUrl: string, xml: string}>} 规范化地址和 XML 文本。
+ * @throws 当地址、协议、响应状态或响应体不符合要求时抛出请求错误。
+ */
+async function readFriendFeed(request) {
   const requestUrl = new URL(
     request.url,
     `http://${request.headers.host || "localhost"}`,
@@ -87,9 +130,18 @@ const readFriendFeed = async (request) => {
   } finally {
     clearTimeout(timer);
   }
-};
+}
 
-const fetchRemoteJson = async (url, options = {}, label = "远程服务") => {
+/**
+ * 请求外部 JSON 接口，并统一处理超时、大小和格式错误。
+ *
+ * @param {string | URL} url - 外部 JSON 接口地址。
+ * @param {RequestInit} options - 需要传给 fetch 的请求选项。
+ * @param {string} label - 错误信息中使用的服务名称。
+ * @returns {Promise<unknown>} 解析后的 JSON 响应。
+ * @throws 当请求超时、状态异常、响应过大或不是有效 JSON 时抛出请求错误。
+ */
+async function fetchRemoteJson(url, options = {}, label = "远程服务") {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
   try {
@@ -110,9 +162,16 @@ const fetchRemoteJson = async (url, options = {}, label = "远程服务") => {
   } finally {
     clearTimeout(timer);
   }
-};
+}
 
-const readMusicPlaylist = async (request) => {
+/**
+ * 读取指定音乐平台的公开歌单原始响应。
+ *
+ * @param {import('node:http').IncomingMessage} request - 携带平台和歌单 ID 的请求。
+ * @returns {Promise<unknown>} 音乐平台返回的原始 JSON。
+ * @throws 当平台、ID或上游响应不符合要求时抛出请求错误。
+ */
+async function readMusicPlaylist(request) {
   const requestUrl = new URL(
     request.url,
     `http://${request.headers.host || "localhost"}`,
@@ -134,7 +193,7 @@ const readMusicPlaylist = async (request) => {
       "User-Agent": "Momona Music/1.0",
     },
   }, `${source === "qq" ? "QQ 音乐" : "网易云音乐"}歌单服务`);
-};
+}
 
 /**
  * 本地设置页集成。
@@ -145,7 +204,14 @@ const readMusicPlaylist = async (request) => {
 export const localSettingsServerPlugin = {
   name: "momona-local-settings",
   hooks: {
-    "astro:config:setup"({ command, injectRoute, updateConfig }) {
+    /**
+     * 只在开发服务器中挂载设置页入口，并忽略本地快照文件变动。
+     *
+     * @param context - Astro 配置钩子上下文。
+     * @returns {void} 无返回值。
+     */
+    "astro:config:setup"(context) {
+      const { command, injectRoute, updateConfig } = context;
       if (command !== "dev") return;
       injectRoute({
         pattern: "/settings",
@@ -162,13 +228,28 @@ export const localSettingsServerPlugin = {
       });
     },
 
-    async "astro:server:setup"({ server }) {
+    /**
+     * 注册本地设置接口和开发环境的定时刷新任务。
+     *
+     * @param context - Astro 开发服务器钩子上下文。
+     * @returns {Promise<void>} 接口注册完成后结束。
+     */
+    async "astro:server:setup"(context) {
+      const { server } = context;
       const { createLocalSettingsApi } = await server.ssrLoadModule(
         "/src/lib/localSettingsApi.ts",
       );
       const api = createLocalSettingsApi();
 
-      const register = (path, method, handler) => {
+      /**
+       * 注册一个带方法判断和统一异常处理的开发服务器中间件。
+       *
+       * @param {string} path - 需要挂载的本地接口路径。
+       * @param {string} method - 允许通过的 HTTP 方法。
+       * @param {(payload: unknown, request: import('node:http').IncomingMessage) => Promise<unknown> | unknown} handler - 业务处理函数。
+       * @returns {void} 无返回值；中间件会被挂载到开发服务器。
+       */
+      function register(path, method, handler) {
         server.middlewares.use(path, async (request, response, next) => {
           if (request.method !== method) {
             next();
@@ -184,7 +265,7 @@ export const localSettingsServerPlugin = {
             });
           }
         });
-      };
+      }
 
       register("/__momona/snapshot", "GET", () => api.readSnapshot());
       register("/__momona/config", "GET", () => api.readConfig());
@@ -219,7 +300,12 @@ export const localSettingsServerPlugin = {
       );
 
       let autoRefreshRunning = false;
-      const runAutoRefresh = async () => {
+      /**
+       * 防止自动刷新重入，并将异常限制在后台任务内部。
+       *
+       * @returns {Promise<void>} 本轮自动刷新完成后结束。
+       */
+      async function runAutoRefresh() {
         if (autoRefreshRunning) return;
         autoRefreshRunning = true;
         try {
@@ -229,7 +315,7 @@ export const localSettingsServerPlugin = {
         } finally {
           autoRefreshRunning = false;
         }
-      };
+      }
       const autoRefreshTimer = setInterval(runAutoRefresh, 15 * 60 * 1000);
       autoRefreshTimer.unref?.();
     },

@@ -77,7 +77,13 @@ const activeCharacterImage = computed(() =>
   resolveGameAsset(activeCharacter.value?.art || activeCharacter.value?.icon),
 );
 
-const resolveGameAsset = (value?: string): string => {
+/**
+ * 将游戏资源名转换为可直接加载的图片地址。
+ *
+ * @param value - 游戏资源文件名或已经是 URL 的地址。
+ * @returns 可供 img 元素使用的资源地址。
+ */
+function resolveGameAsset(value?: string): string {
   const source = value?.trim();
   if (!source) return "";
   if (source.startsWith("//")) return `https:${source}`;
@@ -85,19 +91,42 @@ const resolveGameAsset = (value?: string): string => {
   if (game.value === "hsr")
     return `https://api.mihomo.me/${source.replace(/^\/+/, "")}`;
   return source;
-};
+}
 
-const characterThumbnail = (character: GameShowcaseItem): string =>
-  resolveGameAsset(character.icon || character.art);
-const rarityRing = (rarity?: number): string => {
+/**
+ * 读取角色缩略图地址，并在缺少图标时使用立绘。
+ *
+ * @param character - 游戏账号中的角色信息。
+ * @returns 角色缩略图或立绘资源地址。
+ */
+function characterThumbnail(character: GameShowcaseItem): string {
+  return resolveGameAsset(character.icon || character.art);
+}
+
+/**
+ * 根据角色稀有度返回角色环颜色。
+ *
+ * @param rarity - 角色稀有度。
+ * @returns 与稀有度对应的 CSS 颜色值。
+ */
+function rarityRing(rarity?: number): string {
   if (rarity === 5) return "#e8b33b";
   if (rarity === 4) return "#a47ce0";
   return gameMeta.value.border;
-};
-const characterRing = (character: Character, index: number): string =>
-  index === activeCharacterIndex.value
+}
+
+/**
+ * 根据角色是否选中和稀有度返回角色环颜色。
+ *
+ * @param character - 需要渲染的角色。
+ * @param index - 角色在当前列表中的索引。
+ * @returns 选中态或普通态的 CSS 颜色值。
+ */
+function characterRing(character: Character, index: number): string {
+  return index === activeCharacterIndex.value
     ? gameMeta.value.accent
     : rarityRing(character.rarity);
+}
 watch([game, characters], () => {
   activeCharacterIndex.value = 0;
 });
@@ -146,21 +175,38 @@ const canOpenProfile = computed(() =>
   Boolean(props.interactive && account.value && profileUrl.value),
 );
 
-const openProfile = (): void => {
+/**
+ * 在新窗口打开当前游戏账号的公开资料页。
+ *
+ * @returns 无返回值；缺少账号地址时不会打开窗口。
+ */
+function openProfile(): void {
   if (!canOpenProfile.value) return;
   window.open(profileUrl.value, "_blank", "noopener,noreferrer");
-};
+}
 
-const handleCardKeydown = (event: KeyboardEvent): void => {
+/**
+ * 处理游戏卡片的键盘打开操作。
+ *
+ * @param event - 游戏卡片收到的键盘事件。
+ * @returns 无返回值；仅处理 Enter 和空格键。
+ */
+function handleCardKeydown(event: KeyboardEvent): void {
   if (event.key !== "Enter" && event.key !== " ") return;
   event.preventDefault();
   openProfile();
-};
+}
 
 /** 选择游戏角色。 */
-const selectCharacter = (index: number): void => {
+/**
+ * 选择要展示详情的角色索引。
+ *
+ * @param index - 角色在可展示角色列表中的索引。
+ * @returns 无返回值；非法索引会被忽略。
+ */
+function selectCharacter(index: number): void {
   activeCharacterIndex.value = index;
-};
+}
 </script>
 
 <template>

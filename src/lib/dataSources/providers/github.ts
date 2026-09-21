@@ -1,16 +1,22 @@
 import { readJson, sourceLimit, sourceValue } from "../shared";
 import { ProviderError } from "../types";
 import type {
-  GitHubRepositorySort,
   LocalConfig,
   RepositorySummary,
 } from "../../../data/types";
 import type { ProviderSyncData } from "../types";
 
-const repositoryFromGithubRecord = (
+/**
+ * 将 GitHub API 仓库对象转换为统一仓库摘要。
+ *
+ * @param record - GitHub API 返回的仓库对象。
+ * @param index - 仓库在响应数组中的索引。
+ * @returns 统一仓库摘要；缺少名称时返回 null。
+ */
+function repositoryFromGithubRecord(
   record: Record<string, unknown>,
   index: number,
-): RepositorySummary | null => {
+): RepositorySummary | null {
   const name = typeof record.name === "string" ? record.name.trim() : "";
   if (!name) return null;
   const primaryLanguage =
@@ -32,9 +38,15 @@ const repositoryFromGithubRecord = (
     updatedAt: String(record.updated_at ?? record.updatedAt ?? ""),
     ...(typeof image === "string" && image.trim() ? { image: image.trim() } : {}),
   };
-};
+}
 
-export const projectGithubRaw = (rawData: unknown): RepositorySummary[] => {
+/**
+ * 兼容 REST 数组和 GraphQL Pinned 响应并投影仓库摘要。
+ *
+ * @param rawData - GitHub REST 或 GraphQL 原始响应。
+ * @returns 统一仓库摘要列表。
+ */
+export function projectGithubRaw(rawData: unknown): RepositorySummary[] {
   if (Array.isArray(rawData)) {
     return rawData.flatMap((item, index) =>
       item && typeof item === "object"
@@ -66,56 +78,46 @@ export const projectGithubRaw = (rawData: unknown): RepositorySummary[] => {
           : [],
       )
     : [];
-};
+}
 
-export const sortGithubRepositories = (
-  repositories: RepositorySummary[],
-  sort: GitHubRepositorySort = "updated",
-): RepositorySummary[] => {
-  const result = repositories.slice();
-  result.sort((left, right) => {
-    if (sort === "stars") {
-      return right.stars - left.stars || right.forks - left.forks;
-    }
-    if (sort === "forks") {
-      return right.forks - left.forks || right.stars - left.stars;
-    }
-    if (sort === "name") {
-      return left.name.localeCompare(right.name, "zh-CN", {
-        sensitivity: "base",
-      });
-    }
-    const rightTime = Date.parse(right.updatedAt);
-    const leftTime = Date.parse(left.updatedAt);
-    return (
-      (Number.isFinite(rightTime) ? rightTime : 0) -
-        (Number.isFinite(leftTime) ? leftTime : 0) ||
-      right.stars - left.stars
-    );
-  });
-  return result;
-};
-
-const mapGithubAll = async (
+/**
+ * 请求 GitHub 用户的公开仓库列表。
+ *
+ * @param base - GitHub API 基础地址。
+ * @param username - GitHub 用户名。
+ * @param limit - 最大读取数量。
+ * @param headers - 请求头。
+ * @returns 原始响应及统一仓库摘要。
+ */
+async function mapGithubAll(
   base: string,
   username: string,
   limit: number,
   headers: HeadersInit,
-): Promise<{ repositories: RepositorySummary[]; rawData: unknown }> => {
+): Promise<{ repositories: RepositorySummary[]; rawData: unknown }> {
   const payload = await readJson(
     `${base}/users/${encodeURIComponent(username)}/repos?sort=updated&per_page=${sourceLimit(limit)}`,
     { headers },
   );
   if (!Array.isArray(payload)) throw new ProviderError("GitHub 返回格式不正确");
   return { rawData: payload, repositories: projectGithubRaw(payload) };
-};
+}
 
-const mapGithubPinned = async (
+/**
+ * 请求 GitHub 用户的 Pinned 仓库列表。
+ *
+ * @param base - GitHub API 基础地址。
+ * @param username - GitHub 用户名。
+ * @param limit - 最大读取数量。
+ * @param headers - 请求头，必须包含授权信息。
+ * @returns 原始响应及统一仓库摘要。
+ */
+async function mapGithubPinned(
   base: string,
   username: string,
   limit: number,
   headers: HeadersInit,
-): Promise<{ repositories: RepositorySummary[]; rawData: unknown }> => {
+): Promise<{ repositories: RepositorySummary[]; rawData: unknown }> {
   if (!("Authorization" in headers)) {
     throw new ProviderError("读取 GitHub Pinned 仓库需要填写 Token");
   }
@@ -162,11 +164,17 @@ const mapGithubPinned = async (
   if (!Array.isArray(nodes))
     throw new ProviderError("GitHub Pinned 返回格式不正确");
   return { rawData: payload, repositories: projectGithubRaw(payload) };
-};
+}
 
-const mapGithub = async (
+/**
+ * 根据仓库范围配置选择 REST 或 GraphQL 同步方式。
+ *
+ * @param config - GitHub 来源配置。
+ * @returns 包含原始响应和统一仓库摘要的同步数据。
+ */
+async function mapGithub(
   config: LocalConfig["sources"]["github"],
-): Promise<ProviderSyncData> => {
+): Promise<ProviderSyncData> {
   const username = sourceValue(config.username, /\/([^/]+)\/?$/);
   if (!config.enabled || !username)
     return {
@@ -191,6 +199,6 @@ const mapGithub = async (
     repositories: result.repositories,
     message: isPinned ? "GitHub Pinned 仓库已同步" : "GitHub 已同步",
   };
-};
+}
 
 export const syncGithub = mapGithub;

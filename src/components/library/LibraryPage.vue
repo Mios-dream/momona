@@ -62,29 +62,41 @@ const spatialIndex = shallowRef<LibraryCanvasSpatialIndex>({
 });
 const visibleTiles = shallowRef<LibraryTile[]>([]);
 const paintCache = createCanvasCardPaintCache();
-// SSR 与客户端先共享桌面初始值，挂载后再切换移动端缩放，避免 hydration mismatch。
+// SSR 与客户端先共享桌面初始值，挂载后再切换移动端缩放，避免水合不一致。
 const defaultScale = CANVAS_DEFAULT_SCALE_DESKTOP;
 let paintFrame: number | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let resizeHandler: (() => void) | null = null;
 let pageMounted = false;
 
-/** 让同一批数据每次刷新都保持稳定，同时避免退化为原始顺序。 */
-const stableHash = (value: string): number => {
+/**
+ * 让同一批数据每次刷新都保持稳定，同时避免退化为原始顺序。
+ *
+ * @param value - 参与排序的字符串值。
+ * @returns 稳定的无符号哈希数值。
+ */
+function stableHash(value: string): number {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
     hash ^= value.charCodeAt(index);
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
-};
+}
 
-const shuffleForCanvas = (tiles: readonly LibraryTile[]): LibraryTile[] =>
-  [...tiles].sort((left, right) => {
+/**
+ * 按稳定哈希为画布条目排序，避免每次渲染随机跳动。
+ *
+ * @param tiles - 待排序的资料库条目。
+ * @returns 按稳定顺序复制后的条目列表。
+ */
+function shuffleForCanvas(tiles: readonly LibraryTile[]): LibraryTile[] {
+  return [...tiles].sort((left, right) => {
     const leftHash = stableHash(`library-canvas:${left.id}`);
     const rightHash = stableHash(`library-canvas:${right.id}`);
     return leftHash - rightHash || left.id.localeCompare(right.id);
   });
+}
 
 const filteredTiles = computed(() => {
   if (props.activeFilter === "all") return shuffleForCanvas(props.tiles);
@@ -94,7 +106,13 @@ const filteredTiles = computed(() => {
   );
 });
 
-const getGridSize = (tile: LibraryTile): { w: number; h: number } => {
+/**
+ * 根据资料类型和图片比例决定画布卡片占用的网格尺寸。
+ *
+ * @param tile - 需要计算布局的资料库条目。
+ * @returns 画布卡片使用的网格宽高。
+ */
+function getGridSize(tile: LibraryTile): { w: number; h: number } {
   const type = tile.tag.trim().toLowerCase();
   if (filterTags.video.includes(type)) return { w: 2, h: 1 };
   if (filterTags.music.includes(type)) return { w: 1, h: 1 };
@@ -108,12 +126,19 @@ const getGridSize = (tile: LibraryTile): { w: number; h: number } => {
     return ratio >= 1.15 ? { w: 2, h: 1 } : { w: 1, h: 2 };
   }
   return { w: 1, h: 1 };
-};
+}
 
-const buildSpatialIndex = (
+/**
+ * 为可见画布条目建立空间分箱索引，降低视口查询成本。
+ *
+ * @param items - 已完成布局的资料库条目。
+ * @param nextLayouts - 条目 ID 到世界坐标布局的映射。
+ * @returns 按固定分箱尺寸建立的空间索引。
+ */
+function buildSpatialIndex(
   items: readonly LibraryTile[],
   nextLayouts: ReadonlyMap<string, LibraryCanvasLayout>,
-): LibraryCanvasSpatialIndex => {
+): LibraryCanvasSpatialIndex {
   const bins = new Map<string, LibraryTile[]>();
   const order = new Map<string, number>();
 
@@ -142,9 +167,15 @@ const buildSpatialIndex = (
   });
 
   return { bins, order };
-};
+}
 
-const getSourceLabel = (tile: LibraryTile): string => {
+/**
+ * 将资料条目的来源标识和兼容字段转换为展示名称。
+ *
+ * @param tile - 需要显示来源名称的资料库条目。
+ * @returns 页面使用的中文或平台来源名称。
+ */
+function getSourceLabel(tile: LibraryTile): string {
   const sourceLabels: Partial<Record<NonNullable<LibraryTile["sourceId"]>, string>> = {
     bangumi: "Bangumi",
     bilibili: "Bilibili",
@@ -178,13 +209,19 @@ const getSourceLabel = (tile: LibraryTile): string => {
   return tile.tag.toLowerCase().includes("video") || tile.tag.includes("视频")
     ? "Bilibili"
     : "Momona";
-};
+}
 
-const updateVisibleTiles = (transform: {
+/**
+ * 根据当前画布变换刷新视口内的可见条目。
+ *
+ * @param transform - 当前画布平移和缩放变换。
+ * @returns 无返回值；结果写入可见条目状态。
+ */
+function updateVisibleTiles(transform: {
   x: number;
   y: number;
   scale: number;
-}): void => {
+}): void {
   const nextVisible = queryCanvasVisibleItems(
     transform,
     viewportSize.value,
@@ -195,13 +232,19 @@ const updateVisibleTiles = (transform: {
   if (!sameLibraryTileIds(visibleTiles.value, nextVisible)) {
     visibleTiles.value = nextVisible;
   }
-};
+}
 
-const paintCanvasTransform = (transform: {
+/**
+ * 将画布变换写入 DOM，并同步卡片可见性和焦点绘制。
+ *
+ * @param transform - 需要绘制的画布变换。
+ * @returns 无返回值；DOM 和 Canvas 状态会在同一轮更新。
+ */
+function paintCanvasTransform(transform: {
   x: number;
   y: number;
   scale: number;
-}): void => {
+}): void {
   const viewport = viewportRef.value;
   const world = worldRef.value;
   if (world) {
@@ -220,7 +263,7 @@ const paintCanvasTransform = (transform: {
     }
     paintCanvasCardFocus(paintCache.nodes, transform, viewportSize.value);
   }
-};
+}
 
 const canvasControls = useLibraryCanvasControls({
   active: true,
@@ -229,6 +272,13 @@ const canvasControls = useLibraryCanvasControls({
   minScale: CANVAS_MIN_SCALE,
   surfaceRef: viewportRef,
   onPaint: paintCanvasTransform,
+  /**
+   * 仅在视口跨越空间分箱时提交响应式可见项，减少连续拖拽中的状态更新。
+   *
+   * @param next - 当前实时画布变换。
+   * @param committed - 上一次已提交的画布变换。
+   * @returns 两次变换对应的视口分箱不同则返回 true。
+   */
   shouldCommit: (next, committed) =>
     getLibraryCanvasViewportBinKey(
       next,
@@ -242,16 +292,26 @@ const canvasControls = useLibraryCanvasControls({
     ),
 });
 
-const schedulePaint = (): void => {
+/**
+ * 合并同一帧内的画布重绘请求。
+ *
+ * @returns 无返回值；重复请求会在下一帧统一绘制。
+ */
+function schedulePaint(): void {
   if (typeof window === "undefined") return;
   if (paintFrame !== null) return;
   paintFrame = window.requestAnimationFrame(() => {
     paintFrame = null;
     paintCanvasTransform(canvasControls.transformRef.current);
   });
-};
+}
 
-const rebuildLayout = (): void => {
+/**
+ * 根据筛选结果重建画布布局和空间索引。
+ *
+ * @returns 无返回值；布局变化后会重新测量视口中的可见条目。
+ */
+function rebuildLayout(): void {
   const items = filteredTiles.value;
   const nextLayouts = buildCenterOutCanvasLayout(items, getGridSize);
   layouts.value = nextLayouts;
@@ -263,7 +323,7 @@ const rebuildLayout = (): void => {
   });
 
   if (pageMounted) canvasControls.reset();
-};
+}
 
 watch(filteredTiles, rebuildLayout, { immediate: true });
 
@@ -285,7 +345,12 @@ onMounted(() => {
     canvasControls.setDefaultScale(responsiveScale);
   }
 
-  const measureViewport = (): void => {
+  /**
+   * 读取资料库视口尺寸并同步默认缩放。
+   *
+   * @returns 无返回值；未挂载视口时直接结束。
+   */
+  function measureViewport(): void {
     const element = viewportRef.value;
     if (!element) return;
     const nextSize = {
@@ -301,7 +366,7 @@ onMounted(() => {
     viewportSize.value = nextSize;
     updateVisibleTiles(canvasControls.transformRef.current);
     schedulePaint();
-  };
+  }
 
   measureViewport();
   resizeObserver = new ResizeObserver(measureViewport);

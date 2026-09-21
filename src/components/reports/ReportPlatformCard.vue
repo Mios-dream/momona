@@ -61,14 +61,26 @@ const cardStyle = computed(() => ({
   "--report-card-index": String(props.index),
 }));
 
-const hideBrokenImage = (image: HTMLImageElement): void => {
+/**
+ * 隐藏已经确认加载失败的平台主图。
+ *
+ * @param image - 加载失败的图片元素。
+ * @returns 无返回值；移除图片并让父节点显示回退内容。
+ */
+function hideBrokenImage(image: HTMLImageElement): void {
   image.parentElement?.classList.add("has-broken-image");
   image.remove();
-};
+}
 
-const markBrokenImage = (event: Event): void => {
+/**
+ * 处理平台主图加载错误并切换到文字或图标回退。
+ *
+ * @param event - 图片元素的 error 事件。
+ * @returns 无返回值。
+ */
+function markBrokenImage(event: Event): void {
   hideBrokenImage(event.currentTarget as HTMLImageElement);
-};
+}
 
 onMounted(() => {
   cardRoot.value?.querySelectorAll<HTMLImageElement>("img").forEach((image) => {

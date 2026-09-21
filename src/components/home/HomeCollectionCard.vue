@@ -64,12 +64,22 @@ const typeSegments = computed<TypeSegment[]>(() => {
 
 const coverWall = computed(() => itemsWithCover.value.slice(0, 5));
 
-const clearRotation = (): void => {
+/**
+ * 清理 Bangumi 收藏卡片轮播定时器。
+ *
+ * @returns 无返回值；重复调用不会产生副作用。
+ */
+function clearRotation(): void {
   if (rotationTimer !== undefined) window.clearTimeout(rotationTimer);
   rotationTimer = undefined;
-};
+}
 
-const scheduleRotation = (): void => {
+/**
+ * 在页面可见时安排下一次收藏卡片切换。
+ *
+ * @returns 无返回值；少于两条内容时不会创建定时器。
+ */
+function scheduleRotation(): void {
   clearRotation();
   if (itemsWithCover.value.length < 2) return;
   rotationTimer = window.setTimeout(() => {
@@ -83,12 +93,17 @@ const scheduleRotation = (): void => {
     }
     scheduleRotation();
   }, showStats.value ? 8000 : 5000);
-};
+}
 
-const handleVisibility = (): void => {
+/**
+ * 根据文档可见性暂停或恢复收藏卡片轮播。
+ *
+ * @returns 无返回值；页面隐藏时释放定时器，重新可见时恢复轮播。
+ */
+function handleVisibility(): void {
   if (document.hidden) clearRotation();
   else scheduleRotation();
-};
+}
 
 watch(
   () => props.stats.items,

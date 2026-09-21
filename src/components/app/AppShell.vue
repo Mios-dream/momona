@@ -74,7 +74,12 @@ let pointerOffsetX = 0;
 let pointerOffsetY = 0;
 let scrollOffset = 0;
 
-const updateParallax = (): void => {
+/**
+ * 根据最近一次指针和滚动位置更新背景视差值。
+ *
+ * @returns 无返回值；更新结果写入响应式背景状态。
+ */
+function updateParallax(): void {
   animationFrame = null;
   parallaxX.value = pointerOffsetX * 10;
   parallaxY.value = pointerOffsetY * 8 - Math.min(scrollOffset, 720) * 0.025;
@@ -83,34 +88,60 @@ const updateParallax = (): void => {
     0,
     Math.min(1, (0.5 - pointerOffsetY) * 0.9),
   );
-};
+}
 
-const requestParallaxUpdate = (): void => {
+/**
+ * 请求下一帧执行背景视差更新，避免高频事件重复排队。
+ *
+ * @returns 无返回值。
+ */
+function requestParallaxUpdate(): void {
   if (animationFrame !== null) return;
   animationFrame = window.requestAnimationFrame(updateParallax);
-};
+}
 
-/** 通过鼠标位置和页面滚动量轻微移动壁纸，避免内容层跟着晃动。 */
-const handlePointerMove = (event: PointerEvent): void => {
+/**
+ * 通过鼠标位置和页面滚动量轻微移动壁纸，避免内容层跟着晃动。
+ *
+ * @param event - 鼠标或指针移动事件。
+ * @returns 无返回值；触摸指针会被直接忽略。
+ */
+function handlePointerMove(event: PointerEvent): void {
   if (event.pointerType === "touch") return;
   pointerOffsetX = event.clientX / window.innerWidth - 0.5;
   pointerOffsetY = event.clientY / window.innerHeight - 0.5;
   requestParallaxUpdate();
-};
+}
 
-const handlePointerLeave = (): void => {
+/**
+ * 指针离开窗口时恢复背景中心位置。
+ *
+ * @returns 无返回值。
+ */
+function handlePointerLeave(): void {
   pointerOffsetX = 0;
   pointerOffsetY = 0;
   requestParallaxUpdate();
-};
+}
 
-const handleScroll = (): void => {
+/**
+ * 记录页面滚动量并请求背景视差更新。
+ *
+ * @returns 无返回值。
+ */
+function handleScroll(): void {
   scrollOffset = window.scrollY;
   requestParallaxUpdate();
-};
+}
 
-/** 更新主体、活动 Tab 和地址栏，而不触发浏览器文档导航。 */
-const navigateWithinApp = (url: URL, replace = false): void => {
+/**
+ * 更新主体、活动 Tab 和地址栏，而不触发浏览器文档导航。
+ *
+ * @param url - 目标应用内地址。
+ * @param replace - 是否使用 replaceState 替换当前历史记录。
+ * @returns 无返回值。
+ */
+function navigateWithinApp(url: URL, replace = false): void {
   const nextPage = getAppPageFromPath(url.pathname, currentPage.value);
   const nextAddress = `${url.pathname}${url.search}${url.hash}`;
   const currentAddress = `${window.location.pathname}${window.location.search}${window.location.hash}`;
@@ -123,10 +154,15 @@ const navigateWithinApp = (url: URL, replace = false): void => {
   currentPage.value = nextPage;
   document.title = appPageTitles[nextPage];
   window.scrollTo({ top: 0, behavior: "auto" });
-};
+}
 
-/** 捕获应用内链接，外部链接、修饰键和新窗口行为保持浏览器默认逻辑。 */
-const handleAppClick = (event: MouseEvent): void => {
+/**
+ * 捕获应用内链接，外部链接、修饰键和新窗口行为保持浏览器默认逻辑。
+ *
+ * @param event - 页面点击事件。
+ * @returns 无返回值。
+ */
+function handleAppClick(event: MouseEvent): void {
   if (
     event.defaultPrevented ||
     event.button !== 0 ||
@@ -156,23 +192,39 @@ const handleAppClick = (event: MouseEvent): void => {
 
   event.preventDefault();
   navigateWithinApp(url);
-};
+}
 
-const handlePopState = (): void => {
+/**
+ * 根据浏览器历史记录变化刷新当前页面和文档标题。
+ *
+ * @returns 无返回值。
+ */
+function handlePopState(): void {
   currentPage.value = getAppPageFromPath(
     window.location.pathname,
     currentPage.value,
   );
   document.title = appPageTitles[currentPage.value];
   window.scrollTo({ top: 0, behavior: "auto" });
-};
+}
 
-/** 在常驻导航外壳和资料库画布之间同步筛选分类。 */
-const updateLibraryFilter = (filter: LibraryFilter): void => {
+/**
+ * 在常驻导航外壳和资料库画布之间同步筛选分类。
+ *
+ * @param filter - 当前资料库筛选类型。
+ * @returns 无返回值。
+ */
+function updateLibraryFilter(filter: LibraryFilter): void {
   activeLibraryFilter.value = filter;
-};
+}
 
-const scheduleConfigSave = (config: LocalConfig): void => {
+/**
+ * 延迟保存编辑后的本地配置，合并短时间内连续变更。
+ *
+ * @param config - 需要保存的规范化本地配置。
+ * @returns 无返回值；保存任务在定时器中异步执行。
+ */
+function scheduleConfigSave(config: LocalConfig): void {
   if (!props.editable) return;
   pendingConfig = cloneLocalConfig(config);
   if (configSaveTimer !== null) window.clearTimeout(configSaveTimer);
@@ -197,12 +249,19 @@ const scheduleConfigSave = (config: LocalConfig): void => {
       console.error("Momona 本地配置保存失败", error);
     }
   }, 240);
-};
+}
 
-const handleHomeConfigChange = (
+/**
+ * 接收首页编辑器的配置变更，并刷新应用壳层运行时数据。
+ *
+ * @param nextConfig - 首页编辑器返回的本地配置。
+ * @param persist - 是否将配置延迟写入本地开发接口。
+ * @returns 无返回值；非编辑模式下忽略变更。
+ */
+function handleHomeConfigChange(
   nextConfig: LocalConfig,
   persist = true,
-): void => {
+): void {
   if (!props.editable) return;
   const config = normalizeLocalConfig(cloneLocalConfig(nextConfig));
   runtimeConfig.value = config;
@@ -211,9 +270,15 @@ const handleHomeConfigChange = (
     config,
   );
   if (persist) scheduleConfigSave(config);
-};
+}
 
-const handleFriendsChange = (friends: SiteData["friends"]): void => {
+/**
+ * 将友联编辑结果合并到运行时配置和页面快照。
+ *
+ * @param friends - 最新友联列表。
+ * @returns 无返回值。
+ */
+function handleFriendsChange(friends: SiteData["friends"]): void {
   const config = normalizeLocalConfig({
     ...runtimeConfig.value,
     friends,
@@ -223,9 +288,15 @@ const handleFriendsChange = (friends: SiteData["friends"]): void => {
     runtimeSiteData.value,
     config,
   );
-};
+}
 
-const handleMusicConfigChange = (event: Event): void => {
+/**
+ * 接收播放器选曲后的配置变更，并刷新运行时音乐投影。
+ *
+ * @param event - 携带音乐设置的自定义事件。
+ * @returns 无返回值；无效事件会被忽略。
+ */
+function handleMusicConfigChange(event: Event): void {
   if (!props.editable) return;
   const music = (event as CustomEvent<MusicSettings>).detail;
   if (!music || typeof music !== "object") return;
@@ -240,7 +311,7 @@ const handleMusicConfigChange = (event: Event): void => {
   runtimeConfig.value = config;
   runtimeSiteData.value = applyLocalConfigToSiteData(runtimeSiteData.value, config);
   scheduleConfigSave(config);
-};
+}
 
 onMounted(() => {
   currentPage.value = getAppPageFromPath(window.location.pathname, props.page);

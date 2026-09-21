@@ -30,14 +30,34 @@ interface SfacgShelfReference {
   baseUrl: string;
 }
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+/**
+ * 判断未知值是否为可安全读取的对象。
+ *
+ * @param value - 待判断的未知值。
+ * @returns 值是非数组对象时返回 true。
+ */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
-const text = (value: unknown): string =>
-  typeof value === "string" ? value.trim() : "";
+/**
+ * 将未知值转换为去除首尾空白的文本。
+ *
+ * @param value - 待转换的未知值。
+ * @returns 去除首尾空白的字符串；非字符串返回空字符串。
+ */
+function text(value: unknown): string {
+  return typeof value === "string" ? value.trim() : "";
+}
 
-const decodeHtmlEntities = (value: string): string =>
-  value.replace(
+/**
+ * 解码小说卡片中常见的 HTML 字符实体。
+ *
+ * @param value - 包含 HTML 实体的文本。
+ * @returns 解码后的文本。
+ */
+function decodeHtmlEntities(value: string): string {
+  return value.replace(
     /&(?:nbsp|amp|lt|gt|quot|apos|#39|#x[0-9a-f]+|#[0-9]+);/gi,
     (entity) => {
       const lower = entity.toLowerCase();
@@ -62,21 +82,43 @@ const decodeHtmlEntities = (value: string): string =>
       }
     },
   );
+}
 
-const stripHtmlText = (value: string): string =>
-  decodeHtmlEntities(value.replace(/<[^>]*>/g, " "))
+/**
+ * 移除 HTML 标签并压缩卡片文本中的空白。
+ *
+ * @param value - 原始 HTML 文本。
+ * @returns 适合页面展示的纯文本。
+ */
+function stripHtmlText(value: string): string {
+  return decodeHtmlEntities(value.replace(/<[^>]*>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
+}
 
-const attribute = (tag: string, name: string): string => {
+/**
+ * 从 HTML 标签中读取指定属性值。
+ *
+ * @param tag - 单个 HTML 标签文本。
+ * @param name - 需要读取的属性名。
+ * @returns 属性值；不存在时返回空字符串。
+ */
+function attribute(tag: string, name: string): string {
   const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const match = tag.match(
     new RegExp(`\\b${escaped}\\s*=\\s*(["'])(.*?)\\1`, "i"),
   );
   return match?.[2]?.trim() ?? "";
-};
+}
 
-const safeSfacgUrl = (value: string, baseUrl = DEFAULT_SFACG_BASE): string => {
+/**
+ * 将 SFACG 图片地址转换为可加载的绝对 HTTP 地址。
+ *
+ * @param value - 原始图片地址。
+ * @param baseUrl - 相对地址使用的基础地址。
+ * @returns 可加载的绝对地址；协议或格式不合法时返回空字符串。
+ */
+function safeSfacgUrl(value: string, baseUrl = DEFAULT_SFACG_BASE): string {
   const normalized = imageOr(value);
   if (!normalized) return "";
   try {
@@ -86,12 +128,26 @@ const safeSfacgUrl = (value: string, baseUrl = DEFAULT_SFACG_BASE): string => {
   } catch {
     return "";
   }
-};
+}
 
-const allowedSfacgHost = (hostname: string): boolean =>
-  hostname === "p.sfacg.com" || hostname === "www.sfacg.com";
+/**
+ * 判断主站地址是否属于允许读取的 SFACG 公共域名。
+ *
+ * @param hostname - 待判断的主机名。
+ * @returns 主机名属于公开 SFACG 域名时返回 true。
+ */
+function allowedSfacgHost(hostname: string): boolean {
+  return hostname === "p.sfacg.com" || hostname === "www.sfacg.com";
+}
 
-const normalizeBaseUrl = (value: string): string => {
+/**
+ * 校验并规范化 SFACG 公共书架主站地址。
+ *
+ * @param value - 配置中的主站地址。
+ * @returns 规范化后的站点源地址。
+ * @throws 地址格式或主机名不被支持时抛出 ProviderError。
+ */
+function normalizeBaseUrl(value: string): string {
   const input = value.trim() || DEFAULT_SFACG_BASE;
   let parsed: URL;
   try {
@@ -106,13 +162,19 @@ const normalizeBaseUrl = (value: string): string => {
     throw new ProviderError("SFACG 只支持 p.sfacg.com 公开书架地址");
   }
   return parsed.origin;
-};
+}
 
-/** 将公开书架 URL 或书架编号规范化为首个分页地址。 */
-export const parseSfacgShelfReference = (
+/**
+ * 将公开书架 URL 或书架编号规范化为首个分页地址。
+ *
+ * @param value - 书架 URL 或数字 ID。
+ * @param baseUrl - 数字 ID 使用的默认站点地址。
+ * @returns 规范化后的书架引用；输入无效时返回 null。
+ */
+export function parseSfacgShelfReference(
   value: string,
   baseUrl = DEFAULT_SFACG_BASE,
-): SfacgShelfReference | null => {
+): SfacgShelfReference | null {
   const base = normalizeBaseUrl(baseUrl);
   const input = value.trim();
   if (!input) return null;
@@ -129,15 +191,31 @@ export const parseSfacgShelfReference = (
   } catch {
     return null;
   }
-};
+}
 
-const shelfPageUrl = (
+/**
+ * 根据书架引用生成指定分页的公开页面地址。
+ *
+ * @param reference - 规范化后的书架引用。
+ * @param page - 需要请求的分页编号。
+ * @returns 对应分页的公开书架地址。
+ */
+function shelfPageUrl(
   reference: SfacgShelfReference,
   page: number,
-): string =>
-  `${reference.baseUrl}/p/${reference.shelfId}/${page > 1 ? `${page}/` : ""}`;
+): string {
+  return `${reference.baseUrl}/p/${reference.shelfId}/${page > 1 ? `${page}/` : ""}`;
+}
 
-const readSfacgHtml = async (url: string, referer?: string): Promise<string> => {
+/**
+ * 请求一个 SFACG 公开书架页面，并统一处理超时、大小和 HTTP 错误。
+ *
+ * @param url - 需要请求的书架分页地址。
+ * @param referer - 可选的来源页地址。
+ * @returns 书架页面 HTML 文本。
+ * @throws 网络、超时、HTTP 或页面大小异常时抛出 ProviderError。
+ */
+async function readSfacgHtml(url: string, referer?: string): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
   try {
@@ -172,9 +250,16 @@ const readSfacgHtml = async (url: string, referer?: string): Promise<string> => 
   } finally {
     clearTimeout(timer);
   }
-};
+}
 
-const novelFromCard = (card: string, baseUrl: string): SfacgBookSnapshot | null => {
+/**
+ * 从一个小说列表卡片中提取标题、作者、封面和详情地址。
+ *
+ * @param card - 单个小说列表卡片的 HTML。
+ * @param baseUrl - 卡片内相对图片地址使用的基础地址。
+ * @returns 小说快照；不是小说卡片或缺少标题时返回 null。
+ */
+function novelFromCard(card: string, baseUrl: string): SfacgBookSnapshot | null {
   const novelLink = card.match(
     /href\s*=\s*["'](?:https?:\/\/book\.sfacg\.com)?\/?Novel\/(\d+)(?:\/[^"']*)?["']/i,
   );
@@ -203,13 +288,19 @@ const novelFromCard = (card: string, baseUrl: string): SfacgBookSnapshot | null 
     cover,
     url: `https://book.sfacg.com/Novel/${id}/`,
   };
-};
+}
 
-/** 解析公开书架页面中的小说卡片；漫画卡片会被刻意忽略。 */
-export const parseSfacgShelfHtml = (
+/**
+ * 解析公开书架页面中的小说卡片；漫画卡片会被刻意忽略。
+ *
+ * @param html - 公开书架页面 HTML。
+ * @param baseUrl - 页面内相对资源使用的基础地址。
+ * @returns 书架标题、总数和小说快照。
+ */
+export function parseSfacgShelfHtml(
   html: string,
   baseUrl = DEFAULT_SFACG_BASE,
-): { shelfTitle: string; totalCount?: number; books: SfacgBookSnapshot[] } => {
+): { shelfTitle: string; totalCount?: number; books: SfacgBookSnapshot[] } {
   const titleMatch = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i);
   const shelfTitle = titleMatch ? stripHtmlText(titleMatch[1]) : "SFACG 公开书架";
   const totalMatch = html.match(/全部小说\s*\(\s*([\d,]+)\s*\)/i);
@@ -233,9 +324,16 @@ export const parseSfacgShelfHtml = (
     ...(Number.isFinite(totalValue) ? { totalCount: totalValue } : {}),
     books,
   };
-};
+}
 
-export const parseSfacgPageCount = (html: string, shelfId: string): number => {
+/**
+ * 从书架页面链接中读取最大分页，并限制单次同步的页数。
+ *
+ * @param html - 书架页面 HTML。
+ * @param shelfId - 书架 ID。
+ * @returns 不超过单次同步上限的最大分页编号。
+ */
+export function parseSfacgPageCount(html: string, shelfId: string): number {
   const escapedId = shelfId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   const pattern = new RegExp(
     `/p/${escapedId}/(\\d+)(?:/|["'<>\\s])`,
@@ -247,9 +345,15 @@ export const parseSfacgPageCount = (html: string, shelfId: string): number => {
     if (Number.isFinite(page)) maxPage = Math.max(maxPage, page);
   }
   return Math.min(MAX_PAGES, maxPage);
-};
+}
 
-const booksFromRaw = (rawData: unknown): SfacgBookSnapshot[] => {
+/**
+ * 从本地原始快照读取结构完整的小说条目。
+ *
+ * @param rawData - SFACG 本地原始快照。
+ * @returns 结构完整的小说快照列表。
+ */
+function booksFromRaw(rawData: unknown): SfacgBookSnapshot[] {
   if (!isRecord(rawData) || !Array.isArray(rawData.books)) return [];
   return rawData.books.flatMap((entry): SfacgBookSnapshot[] => {
     if (!isRecord(entry)) return [];
@@ -266,12 +370,19 @@ const booksFromRaw = (rawData: unknown): SfacgBookSnapshot[] => {
       },
     ];
   });
-};
+}
 
-export const projectSfacgRaw = (
+/**
+ * 将 SFACG 原始快照投影为当前配置允许公开的资料库条目。
+ *
+ * @param rawData - SFACG 本地原始快照。
+ * @param config - SFACG 来源配置。
+ * @returns 统一资料库书籍条目。
+ */
+export function projectSfacgRaw(
   rawData: unknown,
   config: LocalConfig["sources"]["sfacg"],
-): LibraryItem[] => {
+): LibraryItem[] {
   if (!config.content.sfacgBooks) return [];
   return booksFromRaw(rawData)
     .slice(0, sourceLimit(config.limit))
@@ -286,12 +397,18 @@ export const projectSfacgRaw = (
       sourceId: "sfacg" as const,
       sourceKind: "sfacgBooks" as const,
       metadata: { author: book.author },
-    }));
-};
+  }));
+}
 
-export const syncSfacg = async (
+/**
+ * 请求公开书架分页，合并去重条目并生成 SFACG 原始快照。
+ *
+ * @param config - SFACG 来源配置。
+ * @returns 包含原始书架快照和统一资料条目的同步数据。
+ */
+export async function syncSfacg(
   config: LocalConfig["sources"]["sfacg"],
-): Promise<ProviderSyncData> => {
+): Promise<ProviderSyncData> {
   const reference = parseSfacgShelfReference(config.username, config.endpoint);
   if (!config.enabled || !reference) {
     return {
@@ -309,12 +426,18 @@ export const syncSfacg = async (
   const limit = sourceLimit(config.limit);
   const books = new Map<string, SfacgBookSnapshot>();
 
-  const addBooks = (entries: SfacgBookSnapshot[]): void => {
+  /**
+   * 按 ID 去重写入当前同步批次，并在达到配置上限后停止追加。
+   *
+   * @param entries - 当前分页解析出的小说列表。
+   * @returns 无返回值；结果写入当前同步批次集合。
+   */
+  function addBooks(entries: SfacgBookSnapshot[]): void {
     for (const book of entries) {
       if (!books.has(book.id)) books.set(book.id, book);
       if (books.size >= limit) break;
     }
-  };
+  }
 
   addBooks(firstPage.books);
   let pagesFetched = 1;
@@ -354,4 +477,4 @@ export const syncSfacg = async (
       rawData.totalCount === undefined ? "" : `（书架共 ${rawData.totalCount} 部）`
     }`,
   };
-};
+}

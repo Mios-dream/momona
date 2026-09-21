@@ -12,22 +12,39 @@ export interface FriendFeedResult {
   articles: BrewArticle[];
 }
 
-const emptyResult = (
+/**
+ * 创建没有文章的订阅源结果。
+ *
+ * @param status - 订阅源当前状态。
+ * @param feedUrl - 订阅地址。
+ * @param type - 订阅协议类型。
+ * @returns 没有文章的订阅结果。
+ */
+function emptyResult(
   status: FriendFeedResult['status'],
   feedUrl: string | undefined,
   type: FriendFeedResult['type'],
-): FriendFeedResult => ({
-  status,
-  feedUrl,
-  type,
-  totalItems: 0,
-  articles: [],
-});
+): FriendFeedResult {
+  return {
+    status,
+    feedUrl,
+    type,
+    totalItems: 0,
+    articles: [],
+  };
+}
 
-const fetchWithTimeout = async (
+/**
+ * 发送带超时控制的浏览器请求。
+ *
+ * @param input - fetch 接受的请求地址或请求对象。
+ * @param init - 可选的请求配置。
+ * @returns 浏览器响应。
+ */
+async function fetchWithTimeout(
   input: RequestInfo | URL,
   init: RequestInit = {},
-): Promise<Response> => {
+): Promise<Response> {
   const controller = new AbortController();
   const timer = window.setTimeout(() => controller.abort(), FEED_TIMEOUT);
   try {
@@ -35,9 +52,16 @@ const fetchWithTimeout = async (
   } finally {
     window.clearTimeout(timer);
   }
-};
+}
 
-const requestFeedXml = async (feedUrl: string): Promise<string> => {
+/**
+ * 优先通过本地代理读取订阅源，静态部署再回退到跨域直连。
+ *
+ * @param feedUrl - 需要读取的订阅地址。
+ * @returns 订阅源 XML 文本。
+ * @throws 代理和直连都失败时抛出错误。
+ */
+async function requestFeedXml(feedUrl: string): Promise<string> {
   const proxyUrl = `/__momona/friend-rss?url=${encodeURIComponent(feedUrl)}`;
   let proxyReachable = false;
   try {
@@ -55,7 +79,7 @@ const requestFeedXml = async (feedUrl: string): Promise<string> => {
     }
   } catch (error) {
     if (proxyReachable) throw error;
-    // Static deployments do not have the local development proxy.
+    // 静态部署没有本地开发代理，因此继续尝试浏览器直连。
   }
 
   const directResponse = await fetchWithTimeout(feedUrl, {
@@ -68,29 +92,63 @@ const requestFeedXml = async (feedUrl: string): Promise<string> => {
   const xml = await directResponse.text();
   if (!xml.trim() || xml.length > MAX_FEED_SIZE) throw new Error('订阅源内容无效');
   return xml;
-};
+}
 
-const localName = (element: Element): string =>
-  (element.localName || element.tagName.split(':').pop() || '').toLowerCase();
+/**
+ * 读取 XML 元素的本地名称并统一为小写。
+ *
+ * @param element - XML 元素。
+ * @returns 小写的本地元素名称。
+ */
+function localName(element: Element): string {
+  return (element.localName || element.tagName.split(':').pop() || '').toLowerCase();
+}
 
-const childElement = (parent: Element, names: string[]): Element | null => {
+/**
+ * 在元素的直接子节点中查找指定名称的第一个元素。
+ *
+ * @param parent - 父 XML 元素。
+ * @param names - 可接受的子元素名称列表。
+ * @returns 匹配的第一个子元素；找不到时返回 null。
+ */
+function childElement(parent: Element, names: string[]): Element | null {
   const accepted = new Set(names.map((name) => name.toLowerCase()));
   return (
     Array.from(parent.children).find((child) => accepted.has(localName(child))) ?? null
   );
-};
+}
 
-const cleanText = (value: string): string => {
+/**
+ * 移除摘要 HTML 标签并压缩空白。
+ *
+ * @param value - 订阅源中的原始摘要文本。
+ * @returns 适合页面展示的纯文本摘要。
+ */
+function cleanText(value: string): string {
   const parsed = new DOMParser().parseFromString(value, 'text/html');
   return (parsed.body.textContent || '').replace(/\s+/g, ' ').trim();
-};
+}
 
-const childText = (parent: Element, names: string[]): string => {
+/**
+ * 读取并清洗指定子元素的文本。
+ *
+ * @param parent - 父 XML 元素。
+ * @param names - 可接受的子元素名称列表。
+ * @returns 清洗后的子元素文本；找不到时返回空字符串。
+ */
+function childText(parent: Element, names: string[]): string {
   const element = childElement(parent, names);
   return element ? cleanText(element.textContent || '') : '';
-};
+}
 
-const childLink = (parent: Element, atomEntry: boolean): string => {
+/**
+ * 按 RSS 或 Atom 规则读取文章链接。
+ *
+ * @param parent - 文章 XML 元素。
+ * @param atomEntry - 是否按 Atom entry 规则读取。
+ * @returns 文章链接；没有链接时返回空字符串。
+ */
+function childLink(parent: Element, atomEntry: boolean): string {
   const links = Array.from(parent.children).filter((child) => localName(child) === 'link');
   if (atomEntry) {
     const alternate = links.find(
@@ -99,15 +157,29 @@ const childLink = (parent: Element, atomEntry: boolean): string => {
     return alternate?.getAttribute('href')?.trim() || links[0]?.getAttribute('href')?.trim() || '';
   }
   return childText(parent, ['link']) || childText(parent, ['guid']);
-};
+}
 
-const displayDate = (value: string): string => {
+/**
+ * 将订阅源日期格式化为页面使用的月日文本。
+ *
+ * @param value - 订阅源日期文本。
+ * @returns 月日文本；日期无效时返回空字符串。
+ */
+function displayDate(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`;
-};
+}
 
-const parseFeedXml = (xml: string, friendId: string): FriendFeedResult => {
+/**
+ * 解析 RSS/Atom XML，并按时间返回有限数量的文章。
+ *
+ * @param xml - RSS 或 Atom XML 文本。
+ * @param friendId - 友联稳定 ID，用于生成文章 ID。
+ * @returns 解析后的订阅源结果。
+ * @throws XML 无效或根节点不是支持的订阅格式时抛出错误。
+ */
+function parseFeedXml(xml: string, friendId: string): FriendFeedResult {
   const parsed = new DOMParser().parseFromString(xml, 'application/xml');
   if (parsed.querySelector('parsererror')) throw new Error('订阅源 XML 无效');
 
@@ -154,9 +226,15 @@ const parseFeedXml = (xml: string, friendId: string): FriendFeedResult => {
     totalItems: items.length,
     articles,
   };
-};
+}
 
-export const fetchFriendFeed = async (friend: FriendLink): Promise<FriendFeedResult> => {
+/**
+ * 读取单个友联的订阅源并将网络失败转换为可展示状态。
+ *
+ * @param friend - 需要读取的友联配置。
+ * @returns 可直接展示在 Brew 页面中的订阅结果。
+ */
+export async function fetchFriendFeed(friend: FriendLink): Promise<FriendFeedResult> {
   const feedUrl = friend.feedUrl?.trim();
   const type = /atom/i.test(feedUrl || '') ? 'Atom' : 'RSS';
   if (!feedUrl) return emptyResult('unset', undefined, type);
@@ -167,13 +245,21 @@ export const fetchFriendFeed = async (friend: FriendLink): Promise<FriendFeedRes
   } catch {
     return emptyResult('unavailable', feedUrl, type);
   }
-};
+}
 
-export const applyFriendFeed = (
+/**
+ * 将运行时订阅结果合并回 Brew 来源卡片。
+ *
+ * @param source - 原始 Brew 来源卡片。
+ * @param index - 来源在列表中的索引，用于决定布局。
+ * @param result - 运行时读取到的订阅结果。
+ * @returns 合并订阅状态和文章后的 Brew 来源卡片。
+ */
+export function applyFriendFeed(
   source: BrewSource,
   index: number,
   result: FriendFeedResult,
-): BrewSource => {
+): BrewSource {
   const hasArticles = result.articles.length > 0;
   const latest = result.articles[0];
   return {
@@ -188,4 +274,4 @@ export const applyFriendFeed = (
     date: latest?.date || '',
     articles: result.articles,
   };
-};
+}

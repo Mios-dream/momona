@@ -25,21 +25,43 @@ export interface MusicPlaylistResult {
   trackCount: number;
 }
 
-export const musicPlatformLabel = (platform: MusicPlatform | string): string =>
-  platform === "qq" ? "QQ 音乐" : "网易云音乐";
+/**
+ * 返回音乐平台的中文展示名称。
+ *
+ * @param platform - 音乐平台标识。
+ * @returns 面向用户的音乐平台名称。
+ */
+export function musicPlatformLabel(platform: MusicPlatform | string): string {
+  return platform === "qq" ? "QQ 音乐" : "网易云音乐";
+}
 
-export const musicPlaylistUrl = (
+/**
+ * 根据平台和歌单 ID 生成歌单详情地址。
+ *
+ * @param platform - 音乐平台标识。
+ * @param playlistId - 歌单 ID。
+ * @returns 歌单详情地址。
+ */
+export function musicPlaylistUrl(
   platform: MusicPlatform | string,
   playlistId: string,
-): string =>
-  platform === "qq"
+): string {
+  return platform === "qq"
     ? `https://y.qq.com/n/ryqq/playlist/${encodeURIComponent(playlistId)}`
     : `https://music.163.com/#/playlist?id=${encodeURIComponent(playlistId)}`;
+}
 
-export const parseMusicPlaylistReference = (
+/**
+ * 从数字 ID、查询参数或歌单路径中解析平台和歌单 ID。
+ *
+ * @param platform - 用户选择的音乐平台标识。
+ * @param value - 数字 ID、查询参数或歌单路径。
+ * @returns 规范化的平台和歌单 ID；无法解析时返回 null。
+ */
+export function parseMusicPlaylistReference(
   platform: MusicPlatform | string,
   value: string,
-): { platform: MusicPlatform; playlistId: string } | null => {
+): { platform: MusicPlatform; playlistId: string } | null {
   const source = platform === "qq" || platform === "netease" ? platform : "netease";
   const input = value.trim();
   if (!input) return null;
@@ -48,20 +70,39 @@ export const parseMusicPlaylistReference = (
   const bareMatch = input.match(/^\d+$/);
   const playlistId = queryMatch?.[1] ?? pathMatch?.[1] ?? bareMatch?.[0] ?? "";
   return playlistId ? { platform: source, playlistId } : null;
-};
+}
 
-const asText = (value: unknown): string =>
-  typeof value === "string" || typeof value === "number" ? String(value) : "";
+/**
+ * 将音乐接口中的字符串或数字字段转换为文本。
+ *
+ * @param value - 待读取的未知字段。
+ * @returns 字符串或数字对应的文本；其他类型返回空字符串。
+ */
+function asText(value: unknown): string {
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
 
-const firstArtist = (value: unknown): string => {
+/**
+ * 读取接口艺人数组中的第一个艺人名称。
+ *
+ * @param value - 接口返回的艺人数组。
+ * @returns 第一位艺人名称；数据无效时返回空字符串。
+ */
+function firstArtist(value: unknown): string {
   if (!Array.isArray(value)) return "";
   const artist = value[0];
   if (!artist || typeof artist !== "object") return "";
   const record = artist as Record<string, unknown>;
   return asText(record.name ?? record.title);
-};
+}
 
-const artists = (value: unknown): string => {
+/**
+ * 将接口艺人数组合并为页面展示文本。
+ *
+ * @param value - 接口返回的艺人数组。
+ * @returns 以顿号连接的艺人名称。
+ */
+function artists(value: unknown): string {
   if (!Array.isArray(value)) return "";
   return value
     .flatMap((entry) => {
@@ -70,19 +111,36 @@ const artists = (value: unknown): string => {
       return name ? [name] : [];
     })
     .join("、");
-};
+}
 
-const musicTrackUrl = (platform: MusicPlatform, id: string): string =>
-  platform === "qq"
+/**
+ * 根据平台和曲目 ID 生成曲目详情地址。
+ *
+ * @param platform - 音乐平台标识。
+ * @param id - 曲目 ID。
+ * @returns 曲目详情地址。
+ */
+function musicTrackUrl(platform: MusicPlatform, id: string): string {
+  return platform === "qq"
     ? `https://y.qq.com/n/ryqq/songDetail/${encodeURIComponent(id)}`
     : `https://music.163.com/#/song?id=${encodeURIComponent(id)}`;
+}
 
-const normalizeTrack = (
+/**
+ * 将一个平台曲目响应转换为统一的音乐曲目。
+ *
+ * @param value - 平台曲目原始对象。
+ * @param platform - 音乐平台标识。
+ * @param playlistId - 曲目所属歌单 ID。
+ * @param fallbackCover - 曲目封面缺失时使用的回退封面。
+ * @returns 统一音乐曲目；数据不完整时返回 null。
+ */
+function normalizeTrack(
   value: unknown,
   platform: MusicPlatform,
   playlistId: string,
   fallbackCover: string,
-): MusicTrack | null => {
+): MusicTrack | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   if (platform === "netease") {
@@ -121,13 +179,21 @@ const normalizeTrack = (
     source: platform,
     playlistId,
   };
-};
+}
 
-export const normalizeMusicPlaylist = (
+/**
+ * 解析网易云或 QQ 音乐歌单响应，并提取第一首曲目作为播放器主曲目。
+ *
+ * @param payload - 平台歌单接口原始响应。
+ * @param platform - 音乐平台标识。
+ * @param playlistId - 歌单 ID。
+ * @returns 统一歌单结果；无法读取第一首有效曲目时返回 null。
+ */
+export function normalizeMusicPlaylist(
   payload: unknown,
   platform: MusicPlatform,
   playlistId: string,
-): MusicPlaylistResult | null => {
+): MusicPlaylistResult | null {
   if (!payload || typeof payload !== "object") return null;
   const root = payload as Record<string, unknown>;
   if (platform === "netease") {
@@ -200,20 +266,29 @@ export const normalizeMusicPlaylist = (
     cover: first.cover || cover,
     trackCount: Number(record.songnum) || normalizedTracks.length,
   };
-};
+}
 
-export const musicResultToSettings = (
+/**
+ * 将读取到的歌单结果写入现有播放器配置。
+ *
+ * @param result - 已规范化的歌单结果。
+ * @param previous - 当前播放器设置，用于保留未覆盖字段。
+ * @returns 更新后的播放器设置。
+ */
+export function musicResultToSettings(
   result: MusicPlaylistResult,
   previous: MusicSettings,
-): MusicSettings => ({
-  ...previous,
-  enabled: true,
-  source: result.platform,
-  playlistId: result.playlistId,
-  id: result.track.id,
-  title: result.track.title,
-  artist: result.track.artist,
-  album: result.track.album,
-  cover: result.track.cover,
-  audioUrl: result.track.audioUrl,
-});
+): MusicSettings {
+  return {
+    ...previous,
+    enabled: true,
+    source: result.platform,
+    playlistId: result.playlistId,
+    id: result.track.id,
+    title: result.track.title,
+    artist: result.track.artist,
+    album: result.track.album,
+    cover: result.track.cover,
+    audioUrl: result.track.audioUrl,
+  };
+}

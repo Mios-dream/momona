@@ -35,10 +35,17 @@ export const LIBRARY_CANVAS_FOCUS_MIN_SCALE = 0.62;
 export const LIBRARY_CANVAS_FOCUS_MAX_SCALE = 1.3;
 const LIBRARY_CANVAS_FOCUS_EXTENT = 1.7;
 
-const appendSquareRing = (
+/**
+ * 将指定半径的方形环按顺时针顺序追加到候选网格位置。
+ *
+ * @param candidates - 需要追加候选位置的数组。
+ * @param radius - 当前方形环半径。
+ * @returns 无返回值；候选坐标直接追加到输入数组。
+ */
+function appendSquareRing(
   candidates: Array<[number, number]>,
   radius: number,
-): void => {
+): void {
   for (let x = -radius; x <= radius; x += 1) {
     candidates.push([x, -radius]);
   }
@@ -51,34 +58,58 @@ const appendSquareRing = (
   for (let y = radius - 1; y > -radius; y -= 1) {
     candidates.push([-radius, y]);
   }
-};
+}
 
-/** 以中心为锚点、沿方形环向外寻找可用网格位置。 */
-export const buildCenterOutCanvasLayout = <T extends { id: string }>(
+/**
+ * 以中心为锚点、沿方形环向外寻找可用网格位置。
+ *
+ * @param items - 需要排版的条目列表。
+ * @param getGridSize - 获取条目网格宽高的函数。
+ * @returns 按条目 ID 索引的画布布局。
+ */
+export function buildCenterOutCanvasLayout<T extends { id: string }>(
   items: readonly T[],
   getGridSize: (item: T) => { w: number; h: number },
-): Map<string, LibraryCanvasLayout> => {
+): Map<string, LibraryCanvasLayout> {
   const occupied = new Set<string>();
   const layouts = new Map<string, LibraryCanvasLayout>();
   const candidates: Array<[number, number]> = [[0, 0]];
   let candidateRadius = 0;
 
-  const fits = (x: number, y: number, w: number, h: number): boolean => {
+  /**
+   * 判断候选矩形是否与已占用网格重叠。
+   *
+   * @param x - 候选矩形的网格起始列。
+   * @param y - 候选矩形的网格起始行。
+   * @param w - 候选矩形的网格宽度。
+   * @param h - 候选矩形的网格高度。
+   * @returns 没有占用冲突时返回 true。
+   */
+  function fits(x: number, y: number, w: number, h: number): boolean {
     for (let dx = 0; dx < w; dx += 1) {
       for (let dy = 0; dy < h; dy += 1) {
         if (occupied.has(`${x + dx},${y + dy}`)) return false;
       }
     }
     return true;
-  };
+  }
 
-  const occupy = (x: number, y: number, w: number, h: number): void => {
+  /**
+   * 将矩形覆盖的网格单元标记为已占用。
+   *
+   * @param x - 矩形的网格起始列。
+   * @param y - 矩形的网格起始行。
+   * @param w - 矩形的网格宽度。
+   * @param h - 矩形的网格高度。
+   * @returns 无返回值；占用信息写入内部集合。
+   */
+  function occupy(x: number, y: number, w: number, h: number): void {
     for (let dx = 0; dx < w; dx += 1) {
       for (let dy = 0; dy < h; dy += 1) {
         occupied.add(`${x + dx},${y + dy}`);
       }
     }
-  };
+  }
 
   items.forEach((item) => {
     const { w, h } = getGridSize(item);
@@ -122,14 +153,23 @@ export const buildCenterOutCanvasLayout = <T extends { id: string }>(
   }
 
   return layouts;
-};
+}
 
-export const getLibraryCanvasFocusScaleAt = (
+/**
+ * 计算视口聚焦指定卡片时应使用的缩放比例。
+ *
+ * @param centerX - 卡片中心的世界坐标 X。
+ * @param centerY - 卡片中心的世界坐标 Y。
+ * @param transform - 当前画布变换。
+ * @param viewport - 当前视口尺寸。
+ * @returns 适合聚焦卡片的缩放比例。
+ */
+export function getLibraryCanvasFocusScaleAt(
   centerX: number,
   centerY: number,
   transform: LibraryCanvasTransform,
   viewport: LibraryCanvasViewport,
-): number => {
+): number {
   if (viewport.width <= 0 || viewport.height <= 0) {
     return LIBRARY_CANVAS_FOCUS_MAX_SCALE;
   }
@@ -151,13 +191,21 @@ export const getLibraryCanvasFocusScaleAt = (
     (LIBRARY_CANVAS_FOCUS_MAX_SCALE - LIBRARY_CANVAS_FOCUS_MIN_SCALE) *
       easedProgress
   );
-};
+}
 
-export const getLibraryCanvasViewportBounds = (
+/**
+ * 将画布布局和变换转换为当前视口的矩形边界。
+ *
+ * @param transform - 当前画布变换。
+ * @param viewport - 当前视口尺寸。
+ * @param overscanPx - 视口外额外预加载的像素范围。
+ * @returns 世界坐标系中的可见边界。
+ */
+export function getLibraryCanvasViewportBounds(
   transform: LibraryCanvasTransform,
   viewport: LibraryCanvasViewport,
   overscanPx = 360,
-): LibraryCanvasBounds => {
+): LibraryCanvasBounds {
   const overscan = overscanPx / transform.scale;
   return {
     minX: (-viewport.width / 2 - transform.x) / transform.scale - overscan,
@@ -165,14 +213,23 @@ export const getLibraryCanvasViewportBounds = (
     minY: (-viewport.height / 2 - transform.y) / transform.scale - overscan,
     maxY: (viewport.height / 2 - transform.y) / transform.scale + overscan,
   };
-};
+}
 
-export const getLibraryCanvasViewportBinKey = (
+/**
+ * 将视口边界量化为稳定的空间索引键。
+ *
+ * @param transform - 当前画布变换。
+ * @param viewport - 当前视口尺寸。
+ * @param binSize - 空间索引单元大小。
+ * @param overscanPx - 视口外额外预加载的像素范围。
+ * @returns 当前视口对应的稳定索引键。
+ */
+export function getLibraryCanvasViewportBinKey(
   transform: LibraryCanvasTransform,
   viewport: LibraryCanvasViewport,
   binSize: number,
   overscanPx = 360,
-): string => {
+): string {
   if (
     viewport.width <= 0 ||
     viewport.height <= 0 ||
@@ -189,13 +246,23 @@ export const getLibraryCanvasViewportBinKey = (
     Math.floor(bounds.minY / binSize),
     Math.floor(bounds.maxY / binSize),
   ].join(",");
-};
+}
 
-export const libraryCanvasLayoutIntersects = (
+/**
+ * 判断画布卡片布局是否与视口边界相交。
+ *
+ * @param layout - 画布卡片布局。
+ * @param bounds - 当前视口世界坐标边界。
+ * @returns 卡片与边界相交时返回 true。
+ */
+export function libraryCanvasLayoutIntersects(
   layout: LibraryCanvasLayout,
   bounds: LibraryCanvasBounds,
-): boolean =>
-  layout.left + layout.width >= bounds.minX &&
-  layout.left <= bounds.maxX &&
-  layout.top + layout.height >= bounds.minY &&
-  layout.top <= bounds.maxY;
+): boolean {
+  return (
+    layout.left + layout.width >= bounds.minX &&
+    layout.left <= bounds.maxX &&
+    layout.top + layout.height >= bounds.minY &&
+    layout.top <= bounds.maxY
+  );
+}

@@ -1,4 +1,3 @@
-import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import {
   applyLocalConfigToSiteData,
@@ -22,18 +21,17 @@ import {
   saveSourceSnapshot,
 } from "../src/lib/sourceSnapshots";
 import { createSiteSnapshotStore } from "../src/lib/localSnapshot";
+import { readJsonFile } from "../src/lib/persistence/jsonFile";
 
 const configPath = resolve(process.cwd(), ".momona", "localConfig.json");
 
-const readJsonFile = async (path: string): Promise<unknown | null> => {
-  try {
-    return JSON.parse(await readFile(path, "utf8")) as unknown;
-  } catch {
-    return null;
-  }
-};
-
-const readConfigInput = async (): Promise<Partial<LocalConfig>> => {
+/**
+ * 读取环境变量或本地公开配置文件中的配置片段。
+ *
+ * @returns 未规范化的本地配置片段。
+ * @throws 环境变量存在但不是有效 JSON 时抛出错误。
+ */
+async function readConfigInput(): Promise<Partial<LocalConfig>> {
   const fromEnvironment = process.env.MOMONA_CONFIG_JSON?.trim();
   if (fromEnvironment) {
     try {
@@ -52,17 +50,33 @@ const readConfigInput = async (): Promise<Partial<LocalConfig>> => {
   return fromFile && typeof fromFile === "object" && !Array.isArray(fromFile)
     ? (fromFile as Partial<LocalConfig>)
     : {};
-};
+}
 
-const resultProjection = (
+/**
+ * 提取写入公开来源派生快照所需的投影字段。
+ *
+ * @param result - 一个来源的同步结果。
+ * @returns 需要写入公开派生快照的资料库、音乐和仓库字段。
+ */
+function resultProjection(
   result: Awaited<ReturnType<typeof syncDataSource>>,
-) => ({
-  libraryItems: result.libraryItems,
-  ...(result.musicCatalog ? { musicCatalog: result.musicCatalog } : {}),
-  repositories: result.repositories,
-});
+): Pick<
+  Awaited<ReturnType<typeof syncDataSource>>,
+  "libraryItems" | "musicCatalog" | "repositories"
+> {
+  return {
+    libraryItems: result.libraryItems,
+    ...(result.musicCatalog ? { musicCatalog: result.musicCatalog } : {}),
+    repositories: result.repositories,
+  };
+}
 
-const sync = async (): Promise<void> => {
+/**
+ * 执行命令行来源同步流程，并逐来源更新本地页面快照。
+ *
+ * @returns 所有来源处理完成后结束的异步任务。
+ */
+async function sync(): Promise<void> {
   const input = await readConfigInput();
   if (
     process.env.CI === "true" &&
@@ -126,7 +140,7 @@ const sync = async (): Promise<void> => {
   }
 
   console.log("[momona:sync] 已写入 .momona/generated.json");
-};
+}
 
 sync().catch((error: unknown) => {
   console.error(
