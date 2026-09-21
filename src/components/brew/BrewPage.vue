@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import type { BrewSource } from '../../data/types';
 import FriendAvatar from '../app/FriendAvatar.vue';
 import IconGlyph from '../app/IconGlyph.vue';
@@ -18,11 +18,44 @@ const shortcutOpen = ref(false);
 
 interface Props {
   sources: BrewSource[];
+  editable?: boolean;
 }
 
-const props = defineProps<Props>();
+const props = withDefaults(defineProps<Props>(), { editable: false });
 const sources = ref<BrewSource[]>(props.sources);
 const feedsLoading = ref(false);
+
+/**
+ * 开发环境进入 Brew 页时刷新友联文章，并把结果写入本地公开缓存。
+ *
+ * 静态构建产物只使用构建前生成的缓存，不在部署后依赖远程订阅源。
+ */
+onMounted(async () => {
+  if (!props.editable || !sources.value.some((source) => source.feedUrl)) return;
+
+  feedsLoading.value = true;
+  try {
+    const response = await fetch('/__momona/sync-brew', {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+      },
+      body: '{}',
+    });
+    if (!response.ok) return;
+    const payload = (await response.json()) as {
+      siteData?: { brewSources?: unknown };
+    };
+    if (Array.isArray(payload.siteData?.brewSources)) {
+      sources.value = payload.siteData.brewSources as BrewSource[];
+    }
+  } catch {
+    // 本地接口暂时不可用时继续展示构建期缓存。
+  } finally {
+    feedsLoading.value = false;
+  }
+});
 
 /**
  * 根据搜索词、信息源类型和排序方式计算当前列表。

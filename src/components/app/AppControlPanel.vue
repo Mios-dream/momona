@@ -58,6 +58,7 @@ interface QuoteState {
 type CollapsedItem = "quote" | "weather" | "greeting";
 
 const isExpanded = ref(false);
+const isTeleportReady = ref(false);
 const panelElement = ref<HTMLElement | null>(null);
 const activeCollapsedItem = ref<CollapsedItem>("quote");
 const weather = ref<WeatherData | null>(null);
@@ -275,9 +276,12 @@ async function loadQuote(): Promise<void> {
   quoteRequest = new AbortController();
   const timer = window.setTimeout(() => quoteRequest?.abort(), 8_000);
   try {
-    const response = await fetch("https://v1.hitokoto.cn/?c=a&c=b&c=c&encode=json", {
-      signal: quoteRequest.signal,
-    });
+    const response = await fetch(
+      "https://v1.hitokoto.cn/?c=a&c=b&c=c&encode=json",
+      {
+        signal: quoteRequest.signal,
+      },
+    );
     if (!response.ok) throw new Error("一言请求失败");
     const payload = (await response.json()) as {
       hitokoto?: unknown;
@@ -375,6 +379,7 @@ function handleDocumentPointerDown(event: PointerEvent): void {
 }
 
 onMounted(async () => {
+  isTeleportReady.value = true;
   window.addEventListener("music-player-state-change", handlePlayerState);
   window.addEventListener("keydown", handleKeydown);
   document.addEventListener("pointerdown", handleDocumentPointerDown);
@@ -396,293 +401,297 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <Teleport to="body">
+  <Teleport to="body" :disabled="!isTeleportReady">
     <aside
-    ref="panelElement"
-    class="control-panel"
-    :class="{ 'is-expanded': isExpanded, 'is-playlist-open': isPlaylistOpen }"
-    aria-label="状态控制台"
-  >
-    <div class="control-panel-viewport">
-      <Transition name="control-panel-swap">
-        <button
-          v-if="!isExpanded"
-          key="collapsed"
-          type="button"
-          class="control-collapsed"
-          :aria-label="`展开状态控制台，当前显示${collapsedLabel}`"
-          aria-expanded="false"
-          @click="toggleExpanded"
-        >
-          <span class="control-collapsed-icon">
-            <img
-              v-if="activeCollapsedItem === 'weather' && weather"
-              :src="weather.icon"
-              :alt="weather.weather"
-            />
-            <IconGlyph v-else :name="collapsedIcon" :size="16" />
-          </span>
-          <Transition name="control-copy" mode="out-in">
-            <span
-              :key="activeCollapsedItem"
-              class="control-collapsed-copy"
-              :class="{ 'is-weather': activeCollapsedItem === 'weather' }"
-            >
-              <template v-if="activeCollapsedItem === 'weather'">
-                <strong>{{ collapsedLabel }}</strong>
-                <small>{{ collapsedTitle }}</small>
-                <em>{{ collapsedDetail }}</em>
-              </template>
-              <template v-else>
-                <small>{{ collapsedLabel }}</small>
-                <strong>{{ collapsedTitle }}</strong>
-                <em>{{ collapsedDetail }}</em>
-              </template>
-            </span>
-          </Transition>
-          <span
-            v-if="
-              activeCollapsedItem === 'weather' &&
-              typeof weather?.aqi === 'number'
-            "
-            class="control-collapsed-aqi"
-            aria-label="空气质量指数"
+      ref="panelElement"
+      class="control-panel"
+      :class="{ 'is-expanded': isExpanded, 'is-playlist-open': isPlaylistOpen }"
+      aria-label="状态控制台"
+    >
+      <div class="control-panel-viewport">
+        <Transition name="control-panel-swap">
+          <button
+            v-if="!isExpanded"
+            key="collapsed"
+            type="button"
+            class="control-collapsed"
+            :aria-label="`展开状态控制台，当前显示${collapsedLabel}`"
+            aria-expanded="false"
+            @click="toggleExpanded"
           >
-            <i aria-hidden="true"></i>{{ weather.aqi }}
-          </span>
-          <IconGlyph
-            class="control-expand-icon"
-            name="chevronDown"
-            :size="14"
-          />
-        </button>
-
-        <div v-else key="expanded" class="control-expanded">
-          <div class="control-head">
-            <div>
-              <span>STATUS CONSOLE</span>
-              <strong>今日状态</strong>
-            </div>
-            <button
-              type="button"
-              class="control-close"
-              aria-label="收起状态控制台"
-              title="收起"
-              aria-expanded="true"
-              @click="toggleExpanded"
-            >
-              <IconGlyph name="chevronDown" :size="15" />
-            </button>
-          </div>
-
-          <section class="control-quote" aria-label="一言">
-            <IconGlyph name="messageCircle" :size="15" />
-            <div>
-              <span>一言</span>
-              <p>{{ quote.text }}</p>
-              <small v-if="quote.from">—— {{ quote.from }}</small>
-            </div>
-          </section>
-
-          <section
-            class="control-weather"
-            :class="{ 'is-unavailable': !weather }"
-            aria-label="天气信息"
-          >
-            <span class="control-weather-icon">
-              <img v-if="weather" :src="weather.icon" :alt="weather.weather" />
-              <IconGlyph
-                v-else
-                :name="weatherLoading ? 'refresh' : 'cloud'"
-                :size="22"
+            <span class="control-collapsed-icon">
+              <img
+                v-if="activeCollapsedItem === 'weather' && weather"
+                :src="weather.icon"
+                :alt="weather.weather"
               />
+              <IconGlyph v-else :name="collapsedIcon" :size="16" />
             </span>
-
-            <div v-if="weather" class="control-weather-copy">
-              <div class="control-weather-primary">
-                <strong>{{ weather.temperature }}<sup>°C</sup></strong>
-                <span>{{ weather.city }}</span>
-              </div>
-              <div class="control-weather-meta" aria-label="天气指标">
-                <span>{{ weather.weather }}</span>
-                <span
-                  ><IconGlyph name="droplets" :size="11" />{{
-                    weather.humidity
-                  }}%</span
-                >
-                <span
-                  ><IconGlyph name="wind" :size="11" />{{
-                    weather.windSpeed
-                  }}</span
-                >
-              </div>
-            </div>
-
-            <div
-              v-else
-              class="control-weather-copy control-weather-unavailable-copy"
-            >
-              <strong>{{
-                weatherLoading ? "正在读取天气" : "天气暂不可用"
-              }}</strong>
-              <span>{{ weatherLoading ? "正在定位" : "暂无可用定位" }}</span>
-            </div>
-
-            <div
-              v-if="weather"
-              class="control-weather-forecast"
-              aria-label="今日天气预报"
-            >
-              <span>{{ weather.weather }}</span>
-              <div>
-                <img :src="weather.icon" :alt="weather.weather" />
-                <strong>{{ forecastHigh }}°</strong>
-              </div>
-              <small>{{ forecastLow }}°</small>
-            </div>
-          </section>
-
-          <section
-            class="control-music"
-            :class="{ 'is-playlist': isPlaylistOpen }"
-            :aria-label="isPlaylistOpen ? '播放列表' : '音乐播放器'"
-          >
-            <Transition name="control-music-view" mode="out-in">
-              <MusicPicker
-                v-if="isPlaylistOpen"
-                key="playlist"
-                v-model:open="isPlaylistOpen"
-                :track="props.track"
-                :catalog="props.catalog"
-                :editable="props.editable"
-                compact
-                embedded
-              />
-
-              <div v-else key="player" class="control-music-player">
-                <div class="control-music-top">
-                  <span class="control-music-cover-wrap">
-                    <FallbackImage
-                      class="control-music-cover"
-                      :src="currentCover"
-                      :alt="`${currentTitle} 封面`"
-                      fallback-icon="music"
-                      :icon-size="20"
-                    />
-                  </span>
-                  <div class="control-section-copy control-music-copy">
-                    <strong>{{ currentTitle }}</strong>
-                    <small>{{ currentArtist }}</small>
-                  </div>
-                  <span
-                    class="control-music-equalizer"
-                    :class="{ 'is-playing': playerState.isPlaying }"
-                    aria-hidden="true"
-                  >
-                    <i></i><i></i><i></i>
-                  </span>
-                </div>
-
-                <div class="control-music-progress" aria-label="播放进度">
-                  <span
-                    class="control-music-progress-spacer"
-                    aria-hidden="true"
-                  ></span>
-                  <span>{{ currentTimeLabel }}</span>
-                  <input
-                    class="control-music-progress-input"
-                    type="range"
-                    min="0"
-                    :max="Math.max(playerState.duration || 0, 1)"
-                    :value="playerState.currentTime || 0"
-                    :style="{ '--music-progress': `${playbackProgress}%` }"
-                    aria-label="调整播放进度"
-                    @input="seekPlayback"
-                  />
-                  <span>{{ durationLabel }}</span>
-                </div>
-
-                <div class="control-music-toolbar">
-                  <button
-                    type="button"
-                    class="control-music-action"
-                    aria-label="歌词（暂无同步歌词）"
-                    title="暂无同步歌词"
-                    disabled
-                  >
-                    <IconGlyph name="messagesSquare" :size="14" />
-                  </button>
-                  <button
-                    type="button"
-                    class="control-music-action"
-                    :class="{ 'is-active': playbackMode !== 'sequential' }"
-                    :aria-label="repeatLabel"
-                    :title="repeatLabel"
-                    @click="cyclePlaybackMode"
-                  >
-                    <IconGlyph :name="playbackModeIcon" :size="14" />
-                  </button>
-                  <button
-                    type="button"
-                    class="control-music-action control-music-skip"
-                    aria-label="上一首"
-                    title="上一首"
-                    @click="publishPlayerEvent('music-player-previous')"
-                  >
-                    <IconGlyph name="skipBack" :size="15" />
-                  </button>
-                  <button
-                    type="button"
-                    class="control-play control-music-primary"
-                    :aria-label="
-                      playerState.isPlaying ? '暂停音乐' : '播放音乐'
-                    "
-                    :title="playerState.isPlaying ? '暂停音乐' : '播放音乐'"
-                    @click="publishPlayerToggle"
-                  >
-                    <IconGlyph
-                      :name="playerState.isPlaying ? 'pause' : 'play'"
-                      :size="17"
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    class="control-music-action control-music-skip"
-                    aria-label="下一首"
-                    title="下一首"
-                    @click="publishPlayerEvent('music-player-next')"
-                  >
-                    <IconGlyph name="skipForward" :size="15" />
-                  </button>
-                  <button
-                    type="button"
-                    class="control-music-action"
-                    :class="{ 'is-active': playerState.isMuted }"
-                    :aria-label="playerState.isMuted ? '取消静音' : '静音'"
-                    :title="playerState.isMuted ? '取消静音' : '静音'"
-                    @click="publishPlayerEvent('music-player-mute')"
-                  >
-                    <IconGlyph
-                      :name="playerState.isMuted ? 'volumeX' : 'volume'"
-                      :size="15"
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    class="control-music-action"
-                    aria-label="打开播放列表"
-                    title="打开播放列表"
-                    @click="isPlaylistOpen = true"
-                  >
-                    <IconGlyph name="listMusic" :size="14" />
-                  </button>
-                </div>
-              </div>
+            <Transition name="control-copy" mode="out-in">
+              <span
+                :key="activeCollapsedItem"
+                class="control-collapsed-copy"
+                :class="{ 'is-weather': activeCollapsedItem === 'weather' }"
+              >
+                <template v-if="activeCollapsedItem === 'weather'">
+                  <strong>{{ collapsedLabel }}</strong>
+                  <small>{{ collapsedTitle }}</small>
+                  <em>{{ collapsedDetail }}</em>
+                </template>
+                <template v-else>
+                  <small>{{ collapsedLabel }}</small>
+                  <strong>{{ collapsedTitle }}</strong>
+                  <em>{{ collapsedDetail }}</em>
+                </template>
+              </span>
             </Transition>
-          </section>
-        </div>
-      </Transition>
-    </div>
+            <span
+              v-if="
+                activeCollapsedItem === 'weather' &&
+                typeof weather?.aqi === 'number'
+              "
+              class="control-collapsed-aqi"
+              aria-label="空气质量指数"
+            >
+              <i aria-hidden="true"></i>{{ weather.aqi }}
+            </span>
+            <IconGlyph
+              class="control-expand-icon"
+              name="chevronDown"
+              :size="14"
+            />
+          </button>
+
+          <div v-else key="expanded" class="control-expanded">
+            <div class="control-head">
+              <div>
+                <span>STATUS CONSOLE</span>
+                <strong>今日状态</strong>
+              </div>
+              <button
+                type="button"
+                class="control-close"
+                aria-label="收起状态控制台"
+                title="收起"
+                aria-expanded="true"
+                @click="toggleExpanded"
+              >
+                <IconGlyph name="chevronDown" :size="15" />
+              </button>
+            </div>
+
+            <section class="control-quote" aria-label="一言">
+              <IconGlyph name="messageCircle" :size="15" />
+              <div>
+                <span>一言</span>
+                <p>{{ quote.text }}</p>
+                <small v-if="quote.from">—— {{ quote.from }}</small>
+              </div>
+            </section>
+
+            <section
+              class="control-weather"
+              :class="{ 'is-unavailable': !weather }"
+              aria-label="天气信息"
+            >
+              <span class="control-weather-icon">
+                <img
+                  v-if="weather"
+                  :src="weather.icon"
+                  :alt="weather.weather"
+                />
+                <IconGlyph
+                  v-else
+                  :name="weatherLoading ? 'refresh' : 'cloud'"
+                  :size="22"
+                />
+              </span>
+
+              <div v-if="weather" class="control-weather-copy">
+                <div class="control-weather-primary">
+                  <strong>{{ weather.temperature }}<sup>°C</sup></strong>
+                  <span>{{ weather.city }}</span>
+                </div>
+                <div class="control-weather-meta" aria-label="天气指标">
+                  <span>{{ weather.weather }}</span>
+                  <span
+                    ><IconGlyph name="droplets" :size="11" />{{
+                      weather.humidity
+                    }}%</span
+                  >
+                  <span
+                    ><IconGlyph name="wind" :size="11" />{{
+                      weather.windSpeed
+                    }}</span
+                  >
+                </div>
+              </div>
+
+              <div
+                v-else
+                class="control-weather-copy control-weather-unavailable-copy"
+              >
+                <strong>{{
+                  weatherLoading ? "正在读取天气" : "天气暂不可用"
+                }}</strong>
+                <span>{{ weatherLoading ? "正在定位" : "暂无可用定位" }}</span>
+              </div>
+
+              <div
+                v-if="weather"
+                class="control-weather-forecast"
+                aria-label="今日天气预报"
+              >
+                <span>{{ weather.weather }}</span>
+                <div>
+                  <img :src="weather.icon" :alt="weather.weather" />
+                  <strong>{{ forecastHigh }}°</strong>
+                </div>
+                <small>{{ forecastLow }}°</small>
+              </div>
+            </section>
+
+            <section
+              class="control-music"
+              :class="{ 'is-playlist': isPlaylistOpen }"
+              :aria-label="isPlaylistOpen ? '播放列表' : '音乐播放器'"
+            >
+              <Transition name="control-music-view" mode="out-in">
+                <MusicPicker
+                  v-if="isPlaylistOpen"
+                  key="playlist"
+                  v-model:open="isPlaylistOpen"
+                  :track="props.track"
+                  :catalog="props.catalog"
+                  :editable="props.editable"
+                  compact
+                  embedded
+                />
+
+                <div v-else key="player" class="control-music-player">
+                  <div class="control-music-top">
+                    <span class="control-music-cover-wrap">
+                      <FallbackImage
+                        class="control-music-cover"
+                        :src="currentCover"
+                        :alt="`${currentTitle} 封面`"
+                        fallback-icon="music"
+                        :icon-size="20"
+                      />
+                    </span>
+                    <div class="control-section-copy control-music-copy">
+                      <strong>{{ currentTitle }}</strong>
+                      <small>{{ currentArtist }}</small>
+                    </div>
+                    <span
+                      class="control-music-equalizer"
+                      :class="{ 'is-playing': playerState.isPlaying }"
+                      aria-hidden="true"
+                    >
+                      <i></i><i></i><i></i>
+                    </span>
+                  </div>
+
+                  <div class="control-music-progress" aria-label="播放进度">
+                    <span
+                      class="control-music-progress-spacer"
+                      aria-hidden="true"
+                    ></span>
+                    <span>{{ currentTimeLabel }}</span>
+                    <input
+                      class="control-music-progress-input"
+                      type="range"
+                      min="0"
+                      :max="Math.max(playerState.duration || 0, 1)"
+                      :value="playerState.currentTime || 0"
+                      :style="{ '--music-progress': `${playbackProgress}%` }"
+                      aria-label="调整播放进度"
+                      @input="seekPlayback"
+                    />
+                    <span>{{ durationLabel }}</span>
+                  </div>
+
+                  <div class="control-music-toolbar">
+                    <button
+                      type="button"
+                      class="control-music-action"
+                      aria-label="歌词（暂无同步歌词）"
+                      title="暂无同步歌词"
+                      disabled
+                    >
+                      <IconGlyph name="messagesSquare" :size="14" />
+                    </button>
+                    <button
+                      type="button"
+                      class="control-music-action"
+                      :class="{ 'is-active': playbackMode !== 'sequential' }"
+                      :aria-label="repeatLabel"
+                      :title="repeatLabel"
+                      @click="cyclePlaybackMode"
+                    >
+                      <IconGlyph :name="playbackModeIcon" :size="14" />
+                    </button>
+                    <button
+                      type="button"
+                      class="control-music-action control-music-skip"
+                      aria-label="上一首"
+                      title="上一首"
+                      @click="publishPlayerEvent('music-player-previous')"
+                    >
+                      <IconGlyph name="skipBack" :size="15" />
+                    </button>
+                    <button
+                      type="button"
+                      class="control-play control-music-primary"
+                      :aria-label="
+                        playerState.isPlaying ? '暂停音乐' : '播放音乐'
+                      "
+                      :title="playerState.isPlaying ? '暂停音乐' : '播放音乐'"
+                      @click="publishPlayerToggle"
+                    >
+                      <IconGlyph
+                        :name="playerState.isPlaying ? 'pause' : 'play'"
+                        :size="17"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      class="control-music-action control-music-skip"
+                      aria-label="下一首"
+                      title="下一首"
+                      @click="publishPlayerEvent('music-player-next')"
+                    >
+                      <IconGlyph name="skipForward" :size="15" />
+                    </button>
+                    <button
+                      type="button"
+                      class="control-music-action"
+                      :class="{ 'is-active': playerState.isMuted }"
+                      :aria-label="playerState.isMuted ? '取消静音' : '静音'"
+                      :title="playerState.isMuted ? '取消静音' : '静音'"
+                      @click="publishPlayerEvent('music-player-mute')"
+                    >
+                      <IconGlyph
+                        :name="playerState.isMuted ? 'volumeX' : 'volume'"
+                        :size="15"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      class="control-music-action"
+                      aria-label="打开播放列表"
+                      title="打开播放列表"
+                      @click="isPlaylistOpen = true"
+                    >
+                      <IconGlyph name="listMusic" :size="14" />
+                    </button>
+                  </div>
+                </div>
+              </Transition>
+            </section>
+          </div>
+        </Transition>
+      </div>
     </aside>
   </Teleport>
 </template>

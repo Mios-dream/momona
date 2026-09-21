@@ -410,6 +410,7 @@ export type IconName =
   | "library"
   | "link"
   | "layoutGrid"
+  | "listOrdered"
   | "listMusic"
   | "headphones"
   | "mail"
@@ -428,6 +429,7 @@ export type IconName =
   | "refresh"
   | "report"
   | "radio"
+  | "repeatOne"
   | "repeat"
   | "rss"
   | "save"
@@ -678,6 +680,16 @@ export interface BrewArticle {
   summary?: string;
   /** 文章原文地址。 */
   href?: string;
+}
+
+/** Brew 订阅源抓取后的公开缓存卡片。 */
+export interface BrewFeedCache {
+  /** 缓存文件中的版本号。 */
+  version: 1;
+  /** 最近一次成功写入缓存的时间。 */
+  updatedAt: string;
+  /** 已抓取的订阅源卡片。 */
+  sources: BrewSource[];
 }
 
 /**

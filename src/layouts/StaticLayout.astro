@@ -69,15 +69,6 @@ const faviconUrl = favicon?.trim() || "/favicon.svg";
         pointer-events: none;
       }
 
-      .momona-page-content {
-        opacity: 0;
-        transition: opacity 650ms ease;
-      }
-
-      .momona-page-content.is-visible {
-        opacity: 1;
-      }
-
       .momona-page-loader__spinner {
         width: 48px;
         height: 48px;
@@ -109,8 +100,7 @@ const faviconUrl = favicon?.trim() || "/favicon.svg";
       }
 
       @media (prefers-reduced-motion: reduce) {
-        .momona-page-loader,
-        .momona-page-content {
+        .momona-page-loader {
           transition-duration: 0.01ms;
         }
 
@@ -130,15 +120,10 @@ const faviconUrl = favicon?.trim() || "/favicon.svg";
       <span class="momona-page-loader__spinner" aria-hidden="true"></span>
       <span class="momona-page-loader__logo" aria-hidden="true">Momona</span>
     </div>
-    <div class="momona-page-content" data-momona-page-content>
-      <slot />
-    </div>
+    <slot />
     <script is:inline>
       (() => {
         const loader = document.querySelector("[data-momona-page-loader]");
-        const pageContent = document.querySelector(
-          "[data-momona-page-content]",
-        );
         if (!(loader instanceof HTMLElement)) return;
 
         let hasHidden = false;
@@ -146,7 +131,6 @@ const faviconUrl = favicon?.trim() || "/favicon.svg";
           if (hasHidden) return;
           hasHidden = true;
           loader.setAttribute("aria-hidden", "true");
-          pageContent?.classList.add("is-visible");
           loader.classList.add("is-hidden");
           window.setTimeout(() => loader.remove(), 700);
         };

@@ -39,10 +39,13 @@ function feedTypeFromUrl(feedUrl: string): BrewSource['type'] {
  * @param index - 友联在配置数组中的索引，用于循环分配主题色。
  * @returns 尚未读取文章的 Brew 来源。
  */
-function sourceFromFriend(friend: FriendLink, index: number): BrewSource {
+function sourceFromFriend(
+  friend: FriendLink,
+  index: number,
+  cachedSources: readonly BrewSource[],
+): BrewSource {
   const feedUrl = friend.feedUrl?.trim() || undefined;
-
-  return {
+  const source: BrewSource = {
     id: `friend-${friend.id}`,
     name: friend.nickname,
     author: getHost(friend.href),
@@ -60,14 +63,45 @@ function sourceFromFriend(friend: FriendLink, index: number): BrewSource {
     tags: [...friend.tags],
     articles: [],
   };
+
+  if (!feedUrl) return source;
+  const cached = cachedSources.find(
+    (candidate) =>
+      candidate.id === source.id &&
+      candidate.feedUrl === feedUrl &&
+      candidate.feedStatus === 'available',
+  );
+  if (!cached) return source;
+
+  return {
+    ...source,
+    type: cached.type === 'Atom' || cached.type === 'RSS' ? cached.type : source.type,
+    layout: cached.articles.length
+      ? index % 4 === 0
+        ? 'featured'
+        : 'standard'
+      : 'link',
+    articleCount: cached.articleCount,
+    latestTitle: cached.latestTitle,
+    summary: cached.summary,
+    date: cached.date,
+    feedStatus: 'available',
+    articles: cached.articles,
+  };
 }
 
 /**
- * 根据当前友联配置创建 Brew 来源；文章必须由运行时验证订阅源后填充。
+ * 根据当前友联配置创建 Brew 来源，并恢复与订阅地址匹配的文章缓存。
  *
  * @param friends - 当前友联配置列表。
+ * @param cachedSources - 上一次抓取成功的 Brew 来源缓存。
  * @returns 与友联一一对应的 Brew 来源列表。
  */
-export function createBrewSources(friends: FriendLink[]): BrewSource[] {
-  return friends.map(sourceFromFriend);
+export function createBrewSources(
+  friends: FriendLink[],
+  cachedSources: readonly BrewSource[] = [],
+): BrewSource[] {
+  return friends.map((friend, index) =>
+    sourceFromFriend(friend, index, cachedSources),
+  );
 }

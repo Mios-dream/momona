@@ -22,6 +22,11 @@ import {
 } from "../src/lib/sourceSnapshots";
 import { createSiteSnapshotStore } from "../src/lib/localSnapshot";
 import { readJsonFile } from "../src/lib/persistence/jsonFile";
+import {
+  readBrewFeedCache,
+  syncBrewFeeds,
+  writeBrewFeedCache,
+} from "../src/lib/brewFeedCache";
 
 const configPath = resolve(process.cwd(), ".momona", "localConfig.json");
 
@@ -105,6 +110,23 @@ async function sync(): Promise<void> {
 
   await snapshot.update((current) =>
     applyLocalConfigToSiteData(current, config),
+  );
+
+  const cachedBrewSources = await readBrewFeedCache();
+  const currentSnapshot = await snapshot.read();
+  const brewResult = await syncBrewFeeds(
+    config.friends,
+    cachedBrewSources ?? currentSnapshot.brewSources ?? [],
+  );
+  await writeBrewFeedCache(brewResult.sources);
+  await snapshot.update((current) =>
+    applyLocalConfigToSiteData(
+      { ...current, brewSources: brewResult.sources },
+      config,
+    ),
+  );
+  console.log(
+    `[momona:sync] brew: ${brewResult.results.filter((item) => item.status === "available").length} 个订阅源已更新，${brewResult.results.filter((item) => item.status === "unavailable").length} 个订阅源不可用`,
   );
 
   for (const sourceId of dataSourceIds) {

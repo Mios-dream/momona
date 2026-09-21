@@ -275,6 +275,7 @@ export const localSettingsServerPlugin = {
         api.syncSource(payload),
       );
       register("/__momona/sync", "POST", (payload) => api.sync(payload));
+      register("/__momona/sync-brew", "POST", () => api.syncBrew());
       register("/__momona/save-friends", "POST", (payload) =>
         api.saveFriends(payload),
       );

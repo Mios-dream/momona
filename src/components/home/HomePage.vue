@@ -42,10 +42,7 @@ import HomeMediaPairCard from "./HomeMediaPairCard.vue";
 import HomeMusicCard from "./HomeMusicCard.vue";
 import HomeWeatherCard from "./HomeWeatherCard.vue";
 import HomeWidgetEditor from "./HomeWidgetEditor.vue";
-import {
-  findNearestWidgetPosition,
-  widgetStyle,
-} from "../../utils/homeGrid";
+import { findNearestWidgetPosition, widgetStyle } from "../../utils/homeGrid";
 
 interface Props {
   siteData: SiteData;
@@ -419,10 +416,7 @@ function startDrag(event: PointerEvent, widget: HomeWidget): void {
  * @param widget - 被点击的首页组件配置。
  * @returns 无返回值；拖拽后的短暂窗口内会阻止误点击。
  */
-function handleWidgetSurfaceClick(
-  event: MouseEvent,
-  widget: HomeWidget,
-): void {
+function handleWidgetSurfaceClick(event: MouseEvent, widget: HomeWidget): void {
   if (suppressWidgetClick.value) {
     event.preventDefault();
     event.stopPropagation();
@@ -861,7 +855,7 @@ onBeforeUnmount(() => {
   z-index: 0;
   margin: 0;
   color: rgba(70, 72, 139, 0.8);
-  font-family: "Momona Script", "Momona Flourish", cursive;
+  font-family: "Momona Script", cursive;
   font-size: 6rem;
   font-weight: 700;
   line-height: 1.5;

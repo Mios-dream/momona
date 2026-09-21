@@ -89,7 +89,7 @@ function deriveSiteData(
     socialLinks: config.socialLinks,
     friends: config.friends,
     libraryTiles: libraryTiles,
-    brewSources: createBrewSources(config.friends),
+    brewSources: createBrewSources(config.friends, base.brewSources),
     collections,
     feedCards: feedCardsWithRepos(base.feedCards, orderedRepositories),
     activities,

@@ -27,6 +27,11 @@ import {
   writeLocalConfigFile,
 } from "./localConfigStore";
 import { createSiteSnapshotStore } from "./localSnapshot";
+import {
+  readBrewFeedCache,
+  syncBrewFeeds,
+  writeBrewFeedCache,
+} from "./brewFeedCache";
 
 /** 表示本地设置接口可以直接返回给浏览器的请求错误。 */
 export class LocalSettingsRequestError extends Error {
@@ -261,6 +266,37 @@ export function createLocalSettingsApi() {
         sourceInfo,
         saved: true,
       };
+    },
+
+    /**
+     * 抓取全部友联文章并保存 Brew 公开缓存。
+     *
+     * @returns 保存后的页面快照和本轮订阅源同步摘要。
+     */
+    async syncBrew() {
+      const config = await readLocalConfigFile();
+      const current = await snapshot.read();
+      const cached = await readBrewFeedCache();
+      const previousSources = cached ?? current.brewSources ?? [];
+      const result = await syncBrewFeeds(config.friends, previousSources);
+
+      return enqueueWrite(async () => {
+        await writeBrewFeedCache(result.sources);
+        const siteData = await snapshot.update((latest) =>
+          applyLocalConfigToSiteData(
+            { ...latest, brewSources: result.sources },
+            config,
+          ),
+        );
+        return {
+          siteData,
+          updated: result.results.filter((item) => item.status === "available")
+            .length,
+          unavailable: result.results.filter(
+            (item) => item.status === "unavailable",
+          ).length,
+        };
+      });
     },
 
     /**

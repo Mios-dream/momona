@@ -61,22 +61,7 @@ Momona 将个人资料、公开动态、收藏、友联、音乐和数据摘要�
 | 网易云音乐                            | `netease`  | 喜欢的音乐、创建的歌单、收藏的歌单                            |
 | QQ 音乐                               | `qqmusic`  | 喜欢的音乐、创建的歌单、收藏的歌单                            |
 
-## 🏗️ 工作方式
 
-```text
-本地配置 + 数据源快照
-          │
-          ▼
-    src/lib/dataCenter/
-          │  构建期读取并转换
-          ▼
-    Astro 静态页面 + Vue 交互岛
-          │
-          ▼
-         dist/
-```
-
-数据源同步可在本地开发服务器或 GitHub Actions 中执行。同步结果会被拆分为公开页面快照和本地原始缓存，静态构建只读取已经保存的快照，不会在部署后请求远程 API。
 
 ## 🚀 快速开始
 
@@ -179,6 +164,7 @@ pnpm build
 ├── localConfig.json         # 本地配置，不提交
 ├── credentials.json         # 本地凭据，不提交
 ├── generated.json         # 公开页面快照
+├── brew-feeds.json        # RSS / Atom 文章缓存
 └── sources/               # 原始响应与派生缓存
 ```
 

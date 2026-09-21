@@ -451,6 +451,7 @@ onBeforeUnmount(() => {
             v-else-if="currentPage === 'brew'"
             key="brew"
             :sources="runtimeSiteData.brewSources"
+            :editable="props.editable"
           />
           <ReportsPage
             v-else-if="currentPage === 'reports'"
