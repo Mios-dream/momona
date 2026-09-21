@@ -1,25 +1,9 @@
 @font-face {
-  font-family: "Momona Inter";
-  src: url("/assets/inter.woff2") format("woff2");
-  font-display: swap;
-  font-style: normal;
-  font-weight: 100 900;
-}
-
-@font-face {
   font-family: "Momona Script";
   src: url("/assets/qwitcher-grypen.woff2") format("woff2");
   font-display: swap;
   font-style: normal;
   font-weight: 700;
-}
-
-@font-face {
-  font-family: "Momona Flourish";
-  src: url("/assets/fleur-de-leah.woff2") format("woff2");
-  font-display: swap;
-  font-style: normal;
-  font-weight: 400;
 }
 
 /* Layout tiers: mobile <=820px, compact desktop 821-1199px, wide desktop >=1200px. */
@@ -42,7 +26,7 @@
   --orange: #ee9661;
   --page-padding: 24px;
   --rail-width: 76px;
-  font-family: "Momona Inter", "Segoe UI", sans-serif;
+  font-family: "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }

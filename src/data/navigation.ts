@@ -33,7 +33,7 @@ export const navigationItems: NavigationItem[] = [
   {
     id: "friends",
     label: "友联",
-    description: "一起写字的人",
+    description: "我的朋友们",
     path: "/friends",
     icon: "link",
   },

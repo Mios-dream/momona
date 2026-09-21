@@ -16,9 +16,10 @@ interface Props {
 
 const { title, description, siteTitle, siteDescription, favicon } = Astro.props;
 const normalizedSiteTitle = siteTitle?.trim();
-const browserTitle = normalizedSiteTitle && !title.includes(normalizedSiteTitle)
-  ? `${title} · ${normalizedSiteTitle}`
-  : title;
+const browserTitle =
+  normalizedSiteTitle && !title.includes(normalizedSiteTitle)
+    ? `${title} · ${normalizedSiteTitle}`
+    : title;
 const browserDescription = siteDescription?.trim() || description;
 const faviconUrl = favicon?.trim() || "/favicon.svg";
 ---
@@ -33,10 +34,142 @@ const faviconUrl = favicon?.trim() || "/favicon.svg";
     />
     <meta name="description" content={browserDescription} />
     <meta name="theme-color" content="#d5dbf3" />
+    <link
+      rel="preload"
+      href="/assets/qwitcher-grypen.woff2"
+      as="font"
+      type="font/woff2"
+      crossorigin
+      fetchpriority="high"
+    />
     <link rel="icon" data-momona-favicon href={faviconUrl} />
     <title>{browserTitle}</title>
+    <style is:inline>
+      .momona-page-loader {
+        position: fixed;
+        z-index: 1000;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        background: #f7f7f7;
+        opacity: 1;
+        visibility: visible;
+        pointer-events: auto;
+        transition:
+          opacity 600ms ease,
+          transform 600ms cubic-bezier(0.22, 1, 0.36, 1),
+          visibility 0s linear 600ms;
+      }
+
+      .momona-page-loader.is-hidden {
+        opacity: 0;
+        transform: scale(1.012);
+        visibility: hidden;
+        pointer-events: none;
+      }
+
+      .momona-page-content {
+        opacity: 0;
+        transition: opacity 650ms ease;
+      }
+
+      .momona-page-content.is-visible {
+        opacity: 1;
+      }
+
+      .momona-page-loader__spinner {
+        width: 48px;
+        height: 48px;
+        border: 3px solid #e3e7ec;
+        border-top-color: #8fa5bd;
+        border-radius: 50%;
+        animation: momona-loader-spin 900ms linear infinite;
+      }
+
+      .momona-page-loader__logo {
+        position: absolute;
+        right: 24px;
+        bottom: clamp(28px, 7vh, 64px);
+        left: 24px;
+        color: #253247;
+        font-family: "Momona Script", cursive;
+        font-size: 50px;
+        font-weight: 400;
+        line-height: 1;
+        text-align: center;
+        letter-spacing: 0.015em;
+        user-select: none;
+      }
+
+      @keyframes momona-loader-spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .momona-page-loader,
+        .momona-page-content {
+          transition-duration: 0.01ms;
+        }
+
+        .momona-page-loader__spinner {
+          animation-duration: 0.01ms;
+        }
+      }
+    </style>
   </head>
   <body>
-    <slot />
+    <div
+      class="momona-page-loader"
+      data-momona-page-loader
+      role="status"
+      aria-label="加载中"
+    >
+      <span class="momona-page-loader__spinner" aria-hidden="true"></span>
+      <span class="momona-page-loader__logo" aria-hidden="true">Momona</span>
+    </div>
+    <div class="momona-page-content" data-momona-page-content>
+      <slot />
+    </div>
+    <script is:inline>
+      (() => {
+        const loader = document.querySelector("[data-momona-page-loader]");
+        const pageContent = document.querySelector(
+          "[data-momona-page-content]",
+        );
+        if (!(loader instanceof HTMLElement)) return;
+
+        let hasHidden = false;
+        const hideLoader = () => {
+          if (hasHidden) return;
+          hasHidden = true;
+          loader.setAttribute("aria-hidden", "true");
+          pageContent?.classList.add("is-visible");
+          loader.classList.add("is-hidden");
+          window.setTimeout(() => loader.remove(), 700);
+        };
+
+        const finishLoading = () => {
+          const fontsReady = document.fonts?.ready ?? Promise.resolve();
+          Promise.resolve(fontsReady)
+            .catch(() => undefined)
+            .finally(() => {
+              window.requestAnimationFrame(() => {
+                window.requestAnimationFrame(hideLoader);
+              });
+            });
+        };
+
+        if (document.readyState === "complete") {
+          finishLoading();
+        } else {
+          window.addEventListener("load", finishLoading, { once: true });
+        }
+
+        window.setTimeout(hideLoader, 15000);
+      })();
+    </script>
   </body>
 </html>

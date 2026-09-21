@@ -6,22 +6,22 @@ import {
   onMounted,
   ref,
   watch,
-} from 'vue';
+} from "vue";
 import {
   cloneFriendLinks,
   normalizeFriendTags,
   normalizeFriendUrl,
-} from '../../data/friends';
-import type { FriendLink } from '../../data/types';
-import { usePanZoom } from '../../composables/usePanZoom';
+} from "../../data/friends";
+import type { FriendLink } from "../../data/types";
+import { usePanZoom } from "../../composables/usePanZoom";
 import {
   createFriendWallLayout,
   type PositionedFriend,
-} from './friendWallLayout';
-import FriendAvatar from '../app/FriendAvatar.vue';
-import IconGlyph from '../app/IconGlyph.vue';
+} from "./friendWallLayout";
+import FriendAvatar from "../app/FriendAvatar.vue";
+import IconGlyph from "../app/IconGlyph.vue";
 
-type FriendTone = FriendLink['tone'];
+type FriendTone = FriendLink["tone"];
 interface FriendDraft {
   nickname: string;
   href: string;
@@ -50,10 +50,9 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  'friends-change': [friends: FriendLink[]];
+  "friends-change": [friends: FriendLink[]];
 }>();
 
-const compactViewport = ref(false);
 const pageReady = ref(false);
 const friends = ref<FriendLink[]>(cloneFriendLinks(props.friends));
 const editorOpen = ref(false);
@@ -61,7 +60,7 @@ const editingId = ref<string | null>(null);
 const deletePending = ref(false);
 const draft = ref<FriendDraft>(createDraft());
 const nicknameInput = ref<HTMLInputElement | null>(null);
-const toastMessage = ref('');
+const toastMessage = ref("");
 let toastTimer: number | null = null;
 
 const {
@@ -85,36 +84,36 @@ const {
  */
 function createDraft(): FriendDraft {
   return {
-    nickname: '',
-    href: '',
-    avatar: '',
-    signature: '',
-    feedUrl: '',
-    tagsText: '',
-    tone: 'lilac',
+    nickname: "",
+    href: "",
+    avatar: "",
+    signature: "",
+    feedUrl: "",
+    tagsText: "",
+    tone: "lilac",
   };
 }
 
 /** 读取当前正在编辑的友联。 */
 const currentFriend = computed(() =>
   editingId.value
-    ? friends.value.find((friend) => friend.id === editingId.value) ?? null
+    ? (friends.value.find((friend) => friend.id === editingId.value) ?? null)
     : null,
 );
 
 /** 生成友联编辑器标题。 */
 const editorTitle = computed(() =>
-  editingId.value ? '编辑这张友联卡' : '添加一位新朋友',
+  editingId.value ? "编辑这张友联卡" : "添加一位新朋友",
 );
 
 /** 生成友联编辑器的辅助标题。 */
 const editorEyebrow = computed(() =>
-  editingId.value ? 'EDIT FRIEND' : 'NEW FRIEND',
+  editingId.value ? "EDIT FRIEND" : "NEW FRIEND",
 );
 
 /** 生成友联数量统计文案。 */
 const statsLabel = computed(() =>
-  friends.value.length ? `${friends.value.length} 位朋友在这里` : '暂无友联',
+  friends.value.length ? `${friends.value.length} 位朋友在这里` : "暂无友联",
 );
 
 /**
@@ -125,7 +124,7 @@ const statsLabel = computed(() =>
  */
 function getFriendHost(href: string): string {
   try {
-    return new URL(href).hostname.replace(/^www\./, '');
+    return new URL(href).hostname.replace(/^www\./, "");
   } catch {
     return href;
   }
@@ -138,10 +137,11 @@ function getFriendHost(href: string): string {
  * @returns 可用于编辑和持久化的唯一 ID。
  */
 function makeId(nickname: string): string {
-  const base = nickname
-    .toLowerCase()
-    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
-    .replace(/^-|-$/g, '') || 'friend';
+  const base =
+    nickname
+      .toLowerCase()
+      .replace(/[^a-z0-9\u4e00-\u9fff]+/g, "-")
+      .replace(/^-|-$/g, "") || "friend";
   return `${base}-${Date.now().toString(36)}`;
 }
 
@@ -158,16 +158,17 @@ async function persistFriends(
 ): Promise<boolean> {
   if (!props.editable) return false;
   try {
-    const response = await fetch('/__momona/save-friends', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+    const response = await fetch("/__momona/save-friends", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ friends: nextFriends }),
     });
     const payload = (await response.json().catch(() => null)) as {
       message?: string;
     } | null;
-    if (!response.ok) throw new Error(payload?.message || '本地友联文件写入失败');
-    emit('friends-change', cloneFriendLinks(nextFriends));
+    if (!response.ok)
+      throw new Error(payload?.message || "本地友联文件写入失败");
+    emit("friends-change", cloneFriendLinks(nextFriends));
     return true;
   } catch (error) {
     friends.value = previousFriends;
@@ -186,7 +187,7 @@ function showToast(message: string): void {
   toastMessage.value = message;
   if (toastTimer !== null) window.clearTimeout(toastTimer);
   toastTimer = window.setTimeout(() => {
-    toastMessage.value = '';
+    toastMessage.value = "";
     toastTimer = null;
   }, 2400);
 }
@@ -217,8 +218,8 @@ function openEdit(friend: FriendLink): void {
     href: friend.href,
     avatar: friend.avatar,
     signature: friend.signature,
-    feedUrl: friend.feedUrl ?? '',
-    tagsText: friend.tags.join(', '),
+    feedUrl: friend.feedUrl ?? "",
+    tagsText: friend.tags.join(", "),
     tone: friend.tone,
   };
   editorOpen.value = true;
@@ -247,7 +248,7 @@ async function saveFriend(): Promise<void> {
   const feedUrl = normalizeFriendUrl(draft.value.feedUrl);
 
   if (!nickname || !signature || !href) {
-    showToast('请补全昵称、签名和有效网址');
+    showToast("请补全昵称、签名和有效网址");
     return;
   }
 
@@ -259,7 +260,7 @@ async function saveFriend(): Promise<void> {
     signature,
     tags: normalizeFriendTags(draft.value.tagsText).length
       ? normalizeFriendTags(draft.value.tagsText)
-      : ['友联'],
+      : ["友联"],
     ...(feedUrl ? { feedUrl } : {}),
     tone: draft.value.tone,
   };
@@ -267,12 +268,12 @@ async function saveFriend(): Promise<void> {
   const previousFriends = cloneFriendLinks(friends.value);
   const nextFriends = editingId.value
     ? friends.value.map((friend) =>
-      friend.id === editingId.value ? nextFriend : friend,
+        friend.id === editingId.value ? nextFriend : friend,
       )
     : [nextFriend, ...friends.value];
   friends.value = nextFriends;
   if (!(await persistFriends(nextFriends, previousFriends))) return;
-  showToast(editingId.value ? '友联卡片已更新' : '新的友联已加入');
+  showToast(editingId.value ? "友联卡片已更新" : "新的友联已加入");
   closeEditor();
 }
 
@@ -299,22 +300,11 @@ async function confirmDelete(): Promise<void> {
   friends.value = nextFriends;
   if (!(await persistFriends(nextFriends, previousFriends))) return;
   closeEditor();
-  showToast('友联已移除');
+  showToast("友联已移除");
 }
 
-/**
- * 根据窗口宽度切换友联墙的桌面或移动排版。
- *
- * @returns 无返回值；布局计算会从响应式视口模式重新派生。
- */
-function updateViewportMode(): void {
-  compactViewport.value = window.innerWidth <= 820;
-}
-
-/** 响应友联数据和视口模式变化重新计算墙面布局。 */
-const displayedLayout = computed(() =>
-  createFriendWallLayout(friends.value, compactViewport.value),
-);
+/** 根据友联数据重新计算整面自由画布。 */
+const displayedLayout = computed(() => createFriendWallLayout(friends.value));
 
 /** 组合画布缩放样式和排版后的固定尺寸。 */
 const canvasFrameStyle = computed(() => ({
@@ -335,8 +325,8 @@ function getFriendStyle(item: PositionedFriend): Record<string, string> {
     top: `${item.top}px`,
     width: `${item.width}px`,
     height: `${item.height}px`,
-    '--friend-tilt': `${item.tilt}deg`,
-    '--friend-delay': `${item.delay}ms`,
+    "--friend-tilt": `${item.tilt}deg`,
+    "--friend-delay": `${item.delay}ms`,
   };
 }
 
@@ -365,13 +355,10 @@ watch(editorOpen, async (open) => {
 });
 
 onMounted(() => {
-  updateViewportMode();
   pageReady.value = true;
-  window.addEventListener('resize', updateViewportMode);
 });
 
 onBeforeUnmount(() => {
-  window.removeEventListener('resize', updateViewportMode);
   if (toastTimer !== null) window.clearTimeout(toastTimer);
 });
 </script>
@@ -384,11 +371,13 @@ onBeforeUnmount(() => {
   >
     <section class="friends-intro" aria-labelledby="friends-title">
       <div class="friends-intro-heading">
-        <span class="friends-eyebrow"><IconGlyph name="link" :size="13" /> FRIEND LINKS</span>
+        <span class="friends-eyebrow"
+          ><IconGlyph name="link" :size="13" /> FRIEND LINKS</span
+        >
         <span class="friends-count">{{ statsLabel }}</span>
       </div>
-      <h1 id="friends-title">在互联网上相遇</h1>
-      <p>一些温柔的站点，一些正在发光的人。</p>
+      <h1 id="friends-title">我的朋友们</h1>
+      <p>在这里，你可以看到我的朋友们的链接。</p>
       <button
         v-if="props.editable"
         class="friends-add-button"
@@ -417,10 +406,7 @@ onBeforeUnmount(() => {
         <strong>暂无友联</strong>
         <span>添加友联后，它们会从本地配置文件读取。</span>
       </div>
-      <div
-        class="friends-canvas"
-        :style="canvasFrameStyle"
-      >
+      <div class="friends-canvas" :style="canvasFrameStyle">
         <div
           v-for="(item, index) in displayedLayout.friends"
           :key="item.friend.id"
@@ -456,12 +442,22 @@ onBeforeUnmount(() => {
                   <div class="friend-card-identity">
                     <h2>{{ item.friend.nickname }}</h2>
                     <div class="friend-card-subline">
-                      <span class="friend-card-type"><IconGlyph name="link" :size="10" /> LINK</span>
-                      <span class="friend-card-number">#{{ String(index + 1).padStart(2, '0') }}</span>
+                      <span class="friend-card-type"
+                        ><IconGlyph name="link" :size="10" /> LINK</span
+                      >
+                      <span class="friend-card-number"
+                        >#{{ String(index + 1).padStart(2, "0") }}</span
+                      >
                     </div>
                   </div>
-                  <div v-if="item.friend.tags.length" class="friend-tags" aria-label="友联标签">
-                    <span v-for="tag in item.friend.tags" :key="tag">#{{ tag }}</span>
+                  <div
+                    v-if="item.friend.tags.length"
+                    class="friend-tags"
+                    aria-label="友联标签"
+                  >
+                    <span v-for="tag in item.friend.tags" :key="tag"
+                      >#{{ tag }}</span
+                    >
                   </div>
                 </header>
 
@@ -469,7 +465,9 @@ onBeforeUnmount(() => {
                   <div class="friend-card-feature-line">
                     <span class="friend-dot" aria-hidden="true"></span>
                     <strong>友联站点</strong>
-                    <span class="friend-card-host">{{ getFriendHost(item.friend.href) }}</span>
+                    <span class="friend-card-host">{{
+                      getFriendHost(item.friend.href)
+                    }}</span>
                   </div>
                   <p class="friend-signature">{{ item.friend.signature }}</p>
                 </section>
@@ -498,11 +496,21 @@ onBeforeUnmount(() => {
     </section>
 
     <div class="friends-toolbar" role="toolbar" aria-label="友联画布控制">
-      <button type="button" aria-label="缩小画布" title="缩小画布" @click="zoomOut">
+      <button
+        type="button"
+        aria-label="缩小画布"
+        title="缩小画布"
+        @click="zoomOut"
+      >
         <IconGlyph name="zoomOut" :size="17" />
       </button>
       <output aria-live="polite">{{ scaleLabel }}</output>
-      <button type="button" aria-label="放大画布" title="放大画布" @click="zoomIn">
+      <button
+        type="button"
+        aria-label="放大画布"
+        title="放大画布"
+        @click="zoomIn"
+      >
         <IconGlyph name="zoomIn" :size="17" />
       </button>
       <span class="friends-toolbar-divider" aria-hidden="true"></span>
@@ -555,7 +563,10 @@ onBeforeUnmount(() => {
 
           <form class="friend-form" @submit.prevent="saveFriend">
             <div class="friend-form-preview">
-              <div class="friend-avatar friend-avatar-large" :class="`tone-${draft.tone}`">
+              <div
+                class="friend-avatar friend-avatar-large"
+                :class="`tone-${draft.tone}`"
+              >
                 <FriendAvatar
                   :src="draft.avatar"
                   alt="头像预览"
@@ -564,8 +575,10 @@ onBeforeUnmount(() => {
                 />
               </div>
               <div>
-                <strong>{{ draft.nickname || '你的朋友' }}</strong>
-                <span>{{ draft.signature || '写下一句签名，让大家认识你。' }}</span>
+                <strong>{{ draft.nickname || "你的朋友" }}</strong>
+                <span>{{
+                  draft.signature || "写下一句签名，让大家认识你。"
+                }}</span>
               </div>
             </div>
 
@@ -636,10 +649,20 @@ onBeforeUnmount(() => {
               <legend>卡片色调</legend>
               <div class="friend-tone-options">
                 <button
-                  v-for="tone in ['lilac', 'peach', 'mint', 'sky', 'butter', 'rose']"
+                  v-for="tone in [
+                    'lilac',
+                    'peach',
+                    'mint',
+                    'sky',
+                    'butter',
+                    'rose',
+                  ]"
                   :key="tone"
                   class="friend-tone-button"
-                  :class="[`tone-${tone}`, { 'is-active': draft.tone === tone }]"
+                  :class="[
+                    `tone-${tone}`,
+                    { 'is-active': draft.tone === tone },
+                  ]"
                   type="button"
                   :aria-label="`选择 ${tone} 色调`"
                   :aria-pressed="draft.tone === tone"
@@ -654,8 +677,12 @@ onBeforeUnmount(() => {
                 <span>操作会写入本地友联配置文件。</span>
               </div>
               <div class="friend-delete-actions">
-                <button type="button" @click="deletePending = false">保留</button>
-                <button class="is-danger" type="button" @click="confirmDelete">确认移除</button>
+                <button type="button" @click="deletePending = false">
+                  保留
+                </button>
+                <button class="is-danger" type="button" @click="confirmDelete">
+                  确认移除
+                </button>
               </div>
             </div>
 
@@ -671,7 +698,13 @@ onBeforeUnmount(() => {
               </button>
               <span v-else></span>
               <div>
-                <button class="friend-cancel-button" type="button" @click="closeEditor">取消</button>
+                <button
+                  class="friend-cancel-button"
+                  type="button"
+                  @click="closeEditor"
+                >
+                  取消
+                </button>
                 <button class="friend-save-button" type="submit">
                   <IconGlyph name="save" :size="15" />
                   保存友联
@@ -703,19 +736,32 @@ onBeforeUnmount(() => {
   z-index: 0;
   inset: 0;
   pointer-events: none;
-  content: '';
+  content: "";
 }
 
 .friends-page::before {
-  background-image: radial-gradient(circle, rgba(91, 109, 151, 0.22) 1px, transparent 1.1px);
+  background-image: radial-gradient(
+    circle,
+    rgba(91, 109, 151, 0.22) 1px,
+    transparent 1.1px
+  );
   background-position: 1px 1px;
   background-size: 25px 25px;
-  mask-image: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.28) 24%, #000 80%);
+  mask-image: linear-gradient(
+    180deg,
+    transparent 0%,
+    rgba(0, 0, 0, 0.28) 24%,
+    #000 80%
+  );
   opacity: 0.55;
 }
 
 .friends-page::after {
-  background: linear-gradient(180deg, rgba(250, 251, 255, 0.03), rgba(250, 251, 255, 0.18));
+  background: linear-gradient(
+    180deg,
+    rgba(250, 251, 255, 0.03),
+    rgba(250, 251, 255, 0.18)
+  );
 }
 
 .friends-intro {
@@ -789,7 +835,10 @@ onBeforeUnmount(() => {
   box-shadow: 0 8px 18px rgba(85, 65, 181, 0.2);
   font-size: 0.64rem;
   font-weight: 720;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
 }
 
 .friends-add-button:hover {
@@ -840,7 +889,10 @@ onBeforeUnmount(() => {
   min-height: 720px;
   margin: 0;
   transform-origin: center;
-  transition: transform 0.22s ease, width 0.42s ease, height 0.42s ease;
+  transition:
+    transform 0.22s ease,
+    width 0.42s ease,
+    height 0.42s ease;
 }
 
 .friends-viewport.is-panning .friends-canvas {
@@ -881,9 +933,13 @@ onBeforeUnmount(() => {
   box-shadow: 0 10px 25px rgba(72, 56, 135, 0.08);
   pointer-events: auto;
   transform: rotate(var(--friend-tilt));
-  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease,
+  transition:
+    transform 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease,
     opacity 0.24s ease;
-  animation: friend-card-in 0.72s var(--friend-delay) cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: friend-card-in 0.72s var(--friend-delay)
+    cubic-bezier(0.22, 1, 0.36, 1) both;
   backdrop-filter: blur(18px) saturate(132%);
   will-change: transform;
 }
@@ -949,7 +1005,11 @@ onBeforeUnmount(() => {
   border-radius: 9px;
   color: var(--muted);
   background: transparent;
-  transition: color 0.18s ease, background 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    opacity 0.18s ease,
+    transform 0.18s ease;
 }
 
 .friend-card-edit {
@@ -1143,7 +1203,8 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   border-radius: 50%;
   background: var(--friend-dot, var(--blue));
-  box-shadow: 0 0 0 4px color-mix(in srgb, var(--friend-dot, var(--blue)) 10%, transparent);
+  box-shadow: 0 0 0 4px
+    color-mix(in srgb, var(--friend-dot, var(--blue)) 10%, transparent);
 }
 
 .friend-card-feature-line strong {
@@ -1431,7 +1492,10 @@ onBeforeUnmount(() => {
   color: var(--ink);
   background: rgba(255, 255, 255, 0.68);
   font-size: 0.67rem;
-  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+  transition:
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    background 0.18s ease;
 }
 
 .friend-form-grid textarea {
@@ -1472,7 +1536,9 @@ onBeforeUnmount(() => {
   border: 3px solid rgba(255, 255, 255, 0.92);
   border-radius: 50%;
   box-shadow: 0 2px 7px rgba(54, 45, 106, 0.13);
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition:
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
 }
 
 .friend-tone-button.tone-lilac {
@@ -1616,7 +1682,9 @@ onBeforeUnmount(() => {
 
 .modal-enter-active .friend-editor,
 .modal-leave-active .friend-editor {
-  transition: transform 0.3s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.24s ease;
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.24s ease;
 }
 
 .modal-enter-from,
@@ -1680,16 +1748,6 @@ onBeforeUnmount(() => {
   .friends-add-button {
     min-height: 32px;
     margin-top: 12px;
-  }
-
-  .friends-canvas {
-    width: 430px;
-    min-height: 900px;
-    margin: 0;
-  }
-
-  .friend-card-link {
-    padding: 15px 16px 14px;
   }
 
   .friend-card-edit {

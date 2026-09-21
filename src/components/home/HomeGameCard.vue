@@ -122,7 +122,7 @@ function rarityRing(rarity?: number): string {
  * @param index - 角色在当前列表中的索引。
  * @returns 选中态或普通态的 CSS 颜色值。
  */
-function characterRing(character: Character, index: number): string {
+function characterRing(character: GameShowcaseItem, index: number): string {
   return index === activeCharacterIndex.value
     ? gameMeta.value.accent
     : rarityRing(character.rarity);
@@ -384,7 +384,7 @@ function selectCharacter(index: number): void {
 }
 
 .home-game-card.game-genshin {
-  font-family: "Momona Inter", "Segoe UI", sans-serif;
+  font-family: "Segoe UI", sans-serif;
 }
 
 .home-game-card.game-hsr {

@@ -56,29 +56,17 @@ const desktopCardVariants: FriendWallSlot[] = [
   { width: 300, height: 300, shape: "portrait", tilt: 0.95 },
 ];
 
-const mobileCardVariants: FriendWallSlot[] = [
-  { width: 346, height: 236, shape: "wide", tilt: -0.8 },
-  { width: 322, height: 300, shape: "portrait", tilt: 0.65 },
-  { width: 340, height: 244, shape: "wide", tilt: -0.45 },
-  { width: 330, height: 318, shape: "square", tilt: 0.85 },
-];
-
 /**
- * 根据视口模式把友联卡片转换为稳定的墙面排版结果。
+ * 把友联卡片转换为稳定的墙面排版结果。
  *
  * @param items - 需要放入友联墙的友联列表。
- * @param compact - 是否使用移动端紧凑画布规格。
  * @returns 包含画布尺寸、卡片位置和动画参数的排版结果。
  */
-export function createFriendWallLayout(
-  items: FriendLink[],
-  compact: boolean,
-): FriendLayout {
-  const variants = compact ? mobileCardVariants : desktopCardVariants;
-  const canvasWidth = compact ? 430 : 2100;
+export function createFriendWallLayout(items: FriendLink[]): FriendLayout {
+  const canvasWidth = 2100;
   const packedItems = packItems(
     items.map((friend, index) => {
-      const slot = variants[index % variants.length];
+      const slot = desktopCardVariants[index % desktopCardVariants.length];
       return {
         friend,
         width: slot.width,
@@ -90,8 +78,8 @@ export function createFriendWallLayout(
     }),
     {
       canvasWidth,
-      gap: compact ? 16 : 26,
-      padding: compact ? 20 : 86,
+      gap: 26,
+      padding: 86,
       minHeight: 900,
     },
   );
