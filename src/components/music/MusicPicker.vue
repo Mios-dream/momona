@@ -756,7 +756,7 @@ onBeforeUnmount(() =>
   font-size: 0.51rem;
 }
 
-@media (max-width: 520px) {
+@media (max-width: 820px) {
   .music-picker-panel {
     position: fixed;
     top: auto;

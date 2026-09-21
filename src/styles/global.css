@@ -22,6 +22,7 @@
   font-weight: 400;
 }
 
+/* Layout tiers: mobile <=820px, compact desktop 821-1199px, wide desktop >=1200px. */
 :root {
   color-scheme: light;
   --ink: #172133;

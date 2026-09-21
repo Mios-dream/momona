@@ -1589,7 +1589,7 @@ onBeforeUnmount(() => {
   transform: translateY(-5px);
 }
 
-@media (max-width: 560px) {
+@media (max-width: 820px) {
   .control-panel {
     top: 12px;
     right: 12px;

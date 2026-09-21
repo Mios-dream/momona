@@ -560,17 +560,13 @@ function openSubmenuFor(page: AppPage): void {
 @media (max-width: 820px) {
   .navigation-rail {
     top: auto;
-    bottom: -4px;
+    bottom: 16px;
     left: 50%;
     width: min(344px, calc(100vw - 16px));
     min-height: 72px;
     padding: 13px 10px;
     border-radius: 30px;
     transform: translateX(-50%);
-  }
-
-  .navigation-rail--reports {
-    bottom: 16px;
   }
 
   .navigation-rail--brew {

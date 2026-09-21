@@ -1384,14 +1384,14 @@ onBeforeUnmount(() => {
   border-radius: 13px;
 }
 
-@media (max-width: 980px) and (min-width: 821px) {
+@media (max-width: 1199px) and (min-width: 821px) {
   .home-page {
     padding-right: 24px;
     padding-left: 24px;
   }
 
   .home-stage {
-    width: 100%;
+    width: min(1280px, calc(100vw - 160px));
   }
 }
 

@@ -488,7 +488,10 @@ onBeforeUnmount(() => {
 .reports-stage-heading {
   position: absolute;
   top: -90px;
-  left: 4px;
+  left: max(
+    4px,
+    calc(116px - max(32px, calc((100vw - 1264px) / 2)))
+  );
   display: flex;
   flex-direction: column;
 }
@@ -505,7 +508,10 @@ onBeforeUnmount(() => {
 .reports-status {
   position: absolute;
   top: 4px;
-  left: 4px;
+  left: max(
+    4px,
+    calc(116px - max(32px, calc((100vw - 1264px) / 2)))
+  );
   display: flex;
   width: min(281px, calc(100vw - 117px));
   height: 52px;
@@ -613,12 +619,12 @@ onBeforeUnmount(() => {
   display: flex;
   width: 100vw;
   height: calc((min(100vw - 48px, 1280px) - 16px) / 8 + 80px);
-  padding: 32px 32px 48px max(36px, calc((100vw - 1264px) / 2 + 4px));
+  padding: 32px 32px 48px max(116px, calc((100vw - 1264px) / 2 + 4px));
   gap: 16px;
   overflow-x: auto;
   overflow-y: hidden;
   scrollbar-width: none;
-  scroll-padding-left: max(36px, calc((100vw - 1264px) / 2 + 4px));
+  scroll-padding-left: max(116px, calc((100vw - 1264px) / 2 + 4px));
   scroll-snap-type: x mandatory;
   transform: translateX(-50%);
   cursor: grab;
@@ -740,7 +746,7 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 1199px) and (min-width: 641px) {
+@media (max-width: 1199px) and (min-width: 821px) {
   .reports-page {
     --report-visible-cards: 2;
   }
@@ -758,14 +764,7 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 1487px) and (min-width: 821px) {
-  .reports-stage-heading,
-  .reports-status {
-    left: calc(116px - max(32px, calc((100vw - 1264px) / 2)));
-  }
-}
-
-@media (max-width: 640px) {
+@media (max-width: 820px) {
   .reports-page {
     --report-page-padding: 16px;
     --report-visible-cards: 1;
@@ -793,6 +792,11 @@ onBeforeUnmount(() => {
 
   .reports-stage-head {
     height: 60px;
+  }
+
+  .reports-stage-heading,
+  .reports-status {
+    left: 4px;
   }
 
   .reports-status {
@@ -823,7 +827,7 @@ onBeforeUnmount(() => {
   }
 
   .reports-card-slot {
-    flex-basis: calc(100vw - 48px);
+    flex-basis: min(350px, calc(100vw - 48px));
   }
 }
 

@@ -450,7 +450,7 @@ function handleOpen(): void {
   font-weight: 500;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 820px) {
   .brew-source-card {
     height: auto;
   }

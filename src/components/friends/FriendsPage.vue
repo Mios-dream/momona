@@ -1722,9 +1722,7 @@ onBeforeUnmount(() => {
     right: 62px;
     bottom: 18px;
   }
-}
 
-@media (max-width: 560px) {
   .friend-form-grid {
     grid-template-columns: 1fr;
   }

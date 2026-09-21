@@ -2168,7 +2168,7 @@ button:disabled {
   justify-content: flex-end;
   margin-top: 8px;
 }
-@media (max-width: 1060px) {
+@media (max-width: 1199px) and (min-width: 821px) {
   .settings-source-workspace {
     grid-template-columns: 220px minmax(0, 1fr);
   }
@@ -2314,8 +2314,7 @@ button:disabled {
   .settings-status-message {
     grid-column: 2 / -1;
   }
-}
-@media (max-width: 520px) {
+
   .settings-header {
     gap: 8px;
   }

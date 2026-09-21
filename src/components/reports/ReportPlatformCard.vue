@@ -895,7 +895,7 @@ onMounted(() => {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 820px) {
   .report-card-chip {
     bottom: 10px;
     left: 10px;

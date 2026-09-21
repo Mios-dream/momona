@@ -1164,7 +1164,7 @@ a.detail-article-row:focus-visible {
   transform: translateY(18px) scale(0.97);
 }
 
-@media (max-width: 1199px) and (min-width: 641px) {
+@media (max-width: 1199px) and (min-width: 821px) {
   .brew-current-update {
     width: 164px;
   }
@@ -1186,7 +1186,7 @@ a.detail-article-row:focus-visible {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 820px) {
   .brew-page {
     padding-bottom: 106px;
   }

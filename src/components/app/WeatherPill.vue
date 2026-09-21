@@ -158,7 +158,7 @@ onMounted(async () => {
   font-size: 0.72rem;
 }
 
-@media (max-width: 460px) {
+@media (max-width: 820px) {
   .weather-pill-wrap {
     top: 12px;
     right: 12px;
