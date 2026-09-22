@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="./public/assets/cover.png" alt="Momona背景" width="30%" />
+  <img src="./docs/assets/cover.png" alt="Momona背景" width="30%" />
 </div>
 
 <div align="center">
@@ -60,8 +60,6 @@ Momona 将个人资料、公开动态、收藏、友联、音乐和数据摘要�
 | [SFACG](https://p.sfacg.com/)         | `sfacg`    | 输入公开书架地址，同步书架中的小说                            |
 | 网易云音乐                            | `netease`  | 喜欢的音乐、创建的歌单、收藏的歌单                            |
 | QQ 音乐                               | `qqmusic`  | 喜欢的音乐、创建的歌单、收藏的歌单                            |
-
-
 
 ## 🚀 快速开始
 
@@ -124,6 +122,51 @@ pnpm astro dev status
 pnpm astro dev logs
 pnpm astro dev stop
 ```
+
+### 编写与发布文章
+
+文章使用 Astro 内容集合管理，文件放在 `src/content/articles/`。推荐为每篇文章建立一个
+独立目录，目录中的 `index.md` 会成为文章正文；`draft: true` 的文章不会生成页面。
+
+```markdown
+---
+title: "我的第一篇文章"
+description: "文章列表中的摘要。"
+pubDate: 2026-09-22
+tags:
+  - 随笔
+  - 记录
+draft: false
+---
+
+## 正文标题
+
+这里写文章正文，支持标准 Markdown。
+```
+
+例如保存为 `src/content/articles/first-note/index.md` 后，打开 `Brew 阅读` 的第一个二级
+Tab“我的文章”即可看到文章列表；详情页地址为 `/blog/first-note/`。
+
+文章正文中的本地图片也放在这篇文章的目录里，并使用相对路径引用：
+
+```text
+src/content/articles/
+└── first-note/
+    ├── index.md
+    └── screenshot.png
+```
+
+```markdown
+![构建结果截图](./screenshot.png)
+```
+
+Astro 会在构建时处理这类相对图片路径，不要填写 Windows 本地绝对路径。若图片由多篇文章
+共用，可以放到 `public/assets/articles/`，然后使用站点绝对路径，例如
+`![头像](/assets/articles/avatar.png)`。文章 frontmatter 中的 `cover` 目前是公开资源路径，
+例如 `cover: "/assets/articles/first-note/cover.jpg"`，封面应放在 `public/assets/` 下。
+
+本地预览时运行 `pnpm astro dev`，打开 `/brew/` 的“我的文章”Tab；发布前运行 `pnpm astro check` 和
+`pnpm build`。文章列表数据和详情页都是构建期生成的静态资源
 
 ## 📦 构建与部署
 

@@ -5,6 +5,7 @@ import { cloneLocalConfig, normalizeLocalConfig } from "../../data/localConfig";
 import { applyLocalConfigToSiteData } from "../../lib/dataSources/index";
 import type {
   AppPage,
+  BrewSection,
   LibraryFilter,
   LocalConfig,
   MusicSettings,
@@ -31,9 +32,12 @@ interface Props {
   editable?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), { editable: false });
+const props = withDefaults(defineProps<Props>(), {
+  editable: false,
+});
 
 const activeLibraryFilter = ref<LibraryFilter>("all");
+const activeBrewSection = ref<BrewSection>("articles");
 
 /**
  * 应用壳层内的当前页面。Astro 首次渲染提供初始值，之后由地址栏和 History API
@@ -253,6 +257,11 @@ function updateLibraryFilter(filter: LibraryFilter): void {
   activeLibraryFilter.value = filter;
 }
 
+/** 在 Brew 阅读页的二级内容区域之间切换。 */
+function updateBrewSection(section: BrewSection): void {
+  activeBrewSection.value = section;
+}
+
 /**
  * 延迟保存编辑后的本地配置，合并短时间内连续变更。
  *
@@ -361,6 +370,12 @@ watch(
 
 watch(currentPage, syncSettingsViewportLock);
 
+watch(currentPage, (page, previousPage) => {
+  if (page === "brew" && previousPage !== "brew") {
+    activeBrewSection.value = "articles";
+  }
+});
+
 onMounted(() => {
   currentPage.value = getAppPageFromPath(window.location.pathname, props.page);
   syncDocumentHead();
@@ -410,7 +425,9 @@ onBeforeUnmount(() => {
     <NavigationRail
       :page="currentPage"
       :library-filter="activeLibraryFilter"
+      :brew-section="activeBrewSection"
       @update:library-filter="updateLibraryFilter"
+      @update:brew-section="updateBrewSection"
     />
     <MusicPlayerHost
       :track="runtimeSiteData.music"
@@ -451,6 +468,7 @@ onBeforeUnmount(() => {
             v-else-if="currentPage === 'brew'"
             key="brew"
             :sources="runtimeSiteData.brewSources"
+            :section="activeBrewSection"
             :editable="props.editable"
           />
           <ReportsPage

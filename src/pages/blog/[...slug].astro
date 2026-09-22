@@ -1,0 +1,292 @@
+---
+import { getCollection, render, type CollectionEntry } from "astro:content";
+import StaticLayout from "../../layouts/StaticLayout.astro";
+import { getDataCenter } from "../../lib/dataCenter";
+import { formatBlogDate } from "../../lib/blog";
+
+export async function getStaticPaths() {
+  const articles = await getCollection(
+    "articles",
+    ({ data }) => !data.draft,
+  );
+
+  return articles.map((article) => ({
+    params: { slug: article.id },
+    props: { article },
+  }));
+}
+
+interface Props {
+  article: CollectionEntry<"articles">;
+}
+
+const { article } = Astro.props as Props;
+const { Content } = await render(article);
+const { localConfig } = await getDataCenter();
+const publishedDate = formatBlogDate(article.data.pubDate);
+const updatedDate = article.data.updatedDate
+  ? formatBlogDate(article.data.updatedDate)
+  : undefined;
+const description =
+  article.data.description || `${article.data.title} · ${localConfig.site.title}`;
+---
+
+<StaticLayout
+  title={article.data.title}
+  description={description}
+  siteTitle={localConfig.site.title}
+  siteDescription={localConfig.site.description}
+  favicon={localConfig.site.favicon}
+>
+  <main class="blog-post-shell">
+    <div class="blog-post-frame">
+      <a class="blog-post-back" href="/brew/">&larr; 返回 Brew 阅读</a>
+
+      <article class="blog-post">
+        <header class="blog-post-header">
+          <div class="blog-post-meta">
+            <time datetime={article.data.pubDate.toISOString()}>{publishedDate}</time>
+            {updatedDate && <span>更新于 {updatedDate}</span>}
+            {article.data.tags.length > 0 && (
+              <div class="blog-post-tags" aria-label="文章标签">
+                {article.data.tags.map((tag) => <span>{tag}</span>)}
+              </div>
+            )}
+          </div>
+          <h1>{article.data.title}</h1>
+          {article.data.description && <p>{article.data.description}</p>}
+        </header>
+
+        {article.data.cover && (
+          <img class="blog-post-cover" src={article.data.cover} alt={article.data.title} />
+        )}
+
+        <div class="blog-markdown">
+          <Content />
+        </div>
+
+        <footer class="blog-post-footer">
+          <a href="/brew/">返回我的文章</a>
+        </footer>
+      </article>
+    </div>
+  </main>
+</StaticLayout>
+
+<style is:global>
+  .blog-post-shell {
+    min-height: 100vh;
+    padding: 54px 24px 90px;
+    background:
+      linear-gradient(180deg, rgba(213, 219, 243, 0.24), rgba(255, 255, 255, 0.64)),
+      #d5dbf3;
+  }
+
+  .blog-post-frame {
+    width: min(820px, 100%);
+    margin: 0 auto;
+  }
+
+  .blog-post-back {
+    display: inline-flex;
+    margin-bottom: 18px;
+    color: var(--purple-deep);
+    font-size: 0.76rem;
+    font-weight: 700;
+  }
+
+  .blog-post {
+    padding: clamp(25px, 5vw, 58px) clamp(20px, 6vw, 72px) 50px;
+    border: 1px solid var(--glass-border);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.76);
+    box-shadow: 0 22px 58px rgba(54, 45, 106, 0.14);
+    backdrop-filter: blur(20px) saturate(135%);
+  }
+
+  .blog-post-header {
+    padding-bottom: 31px;
+    border-bottom: 1px solid rgba(117, 100, 222, 0.14);
+  }
+
+  .blog-post-meta {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 13px;
+    color: var(--muted);
+    font-size: 0.68rem;
+  }
+
+  .blog-post-tags {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .blog-post-tags span {
+    padding: 4px 8px;
+    border-radius: 999px;
+    color: var(--purple-deep);
+    background: rgba(242, 239, 255, 0.74);
+  }
+
+  .blog-post-header h1 {
+    margin: 22px 0 0;
+    color: var(--ink);
+    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-weight: 790;
+    line-height: 1.18;
+  }
+
+  .blog-post-header p {
+    margin: 17px 0 0;
+    color: var(--muted-strong);
+    font-size: 0.9rem;
+    line-height: 1.8;
+  }
+
+  .blog-post-cover {
+    display: block;
+    width: 100%;
+    max-height: 410px;
+    margin: 30px 0 0;
+    border-radius: 10px;
+    object-fit: cover;
+  }
+
+  .blog-markdown {
+    padding-top: 34px;
+    color: var(--ink-soft);
+    font-family: Georgia, "Times New Roman", "Noto Serif SC", serif;
+    font-size: 1rem;
+    line-height: 1.95;
+    overflow-wrap: anywhere;
+  }
+
+  .blog-markdown > :first-child {
+    margin-top: 0;
+  }
+
+  .blog-markdown h2,
+  .blog-markdown h3,
+  .blog-markdown h4 {
+    margin: 2em 0 0.65em;
+    color: var(--ink);
+    font-family: "Segoe UI", sans-serif;
+    line-height: 1.35;
+  }
+
+  .blog-markdown h2 {
+    font-size: 1.45rem;
+  }
+
+  .blog-markdown h3 {
+    font-size: 1.2rem;
+  }
+
+  .blog-markdown h4 {
+    font-size: 1.05rem;
+  }
+
+  .blog-markdown p,
+  .blog-markdown ul,
+  .blog-markdown ol,
+  .blog-markdown blockquote,
+  .blog-markdown pre {
+    margin: 1.05em 0;
+  }
+
+  .blog-markdown ul,
+  .blog-markdown ol {
+    padding-left: 1.4em;
+  }
+
+  .blog-markdown li + li {
+    margin-top: 0.35em;
+  }
+
+  .blog-markdown a {
+    color: var(--purple-deep);
+    text-decoration: underline;
+    text-decoration-color: rgba(117, 100, 222, 0.35);
+    text-underline-offset: 3px;
+  }
+
+  .blog-markdown strong {
+    color: var(--ink);
+  }
+
+  .blog-markdown blockquote {
+    padding: 8px 0 8px 18px;
+    border-left: 3px solid var(--pink);
+    color: var(--muted-strong);
+  }
+
+  .blog-markdown code {
+    padding: 0.15em 0.4em;
+    border-radius: 5px;
+    color: var(--purple-deep);
+    background: rgba(242, 239, 255, 0.86);
+    font-family: Consolas, "SFMono-Regular", monospace;
+    font-size: 0.86em;
+  }
+
+  .blog-markdown pre {
+    padding: 17px 18px;
+    overflow-x: auto;
+    border: 1px solid rgba(117, 100, 222, 0.12);
+    border-radius: 9px;
+    color: #eff3ff;
+    background: #20263b;
+    line-height: 1.65;
+  }
+
+  .blog-markdown pre code {
+    padding: 0;
+    color: inherit;
+    background: transparent;
+    font-size: 0.88em;
+  }
+
+  .blog-markdown img {
+    display: block;
+    max-width: 100%;
+    margin: 1.5em auto;
+    border-radius: 9px;
+  }
+
+  .blog-markdown hr {
+    margin: 2.2em 0;
+    border: 0;
+    border-top: 1px solid rgba(117, 100, 222, 0.15);
+  }
+
+  .blog-post-footer {
+    margin-top: 38px;
+    padding-top: 22px;
+    border-top: 1px solid rgba(117, 100, 222, 0.14);
+  }
+
+  .blog-post-footer a {
+    color: var(--purple-deep);
+    font-size: 0.76rem;
+    font-weight: 700;
+  }
+
+  @media (max-width: 620px) {
+    .blog-post-shell {
+      padding: 28px 14px 42px;
+    }
+
+    .blog-post {
+      border-radius: 13px;
+      padding: 24px 19px 34px;
+    }
+
+    .blog-markdown {
+      font-size: 0.96rem;
+    }
+  }
+</style>

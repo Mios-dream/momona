@@ -9,6 +9,9 @@ export type AppPage =
   | "reports"
   | "settings";
 
+/** Brew 阅读页的二级内容区域。 */
+export type BrewSection = "articles" | "feeds" | "favorites";
+
 /** 能够被本地同步器读取的公开数据源。 */
 export type DataSourceId =
   | "bangumi"

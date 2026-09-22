@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue';
-import type { BrewSource } from '../../data/types';
+import { computed, onMounted, ref, watch } from 'vue';
+import type { BlogArticleSummary } from '../../data/blog';
+import type { BrewSection, BrewSource } from '../../data/types';
+import BlogPage from '../blog/BlogPage.vue';
 import FriendAvatar from '../app/FriendAvatar.vue';
 import IconGlyph from '../app/IconGlyph.vue';
 import BrewSourceCard from './BrewSourceCard.vue';
@@ -18,12 +20,79 @@ const shortcutOpen = ref(false);
 
 interface Props {
   sources: BrewSource[];
+  section?: BrewSection;
   editable?: boolean;
 }
 
-const props = withDefaults(defineProps<Props>(), { editable: false });
+const props = withDefaults(defineProps<Props>(), {
+  section: 'articles' as BrewSection,
+  editable: false,
+});
 const sources = ref<BrewSource[]>(props.sources);
+const articles = ref<BlogArticleSummary[]>([]);
+const articlesLoading = ref(true);
+const articlesError = ref(false);
 const feedsLoading = ref(false);
+
+let cachedArticles: BlogArticleSummary[] | null = null;
+let articlesRequest: Promise<BlogArticleSummary[]> | null = null;
+
+function isBlogArticleSummary(value: unknown): value is BlogArticleSummary {
+  if (!value || typeof value !== 'object') return false;
+
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.slug === 'string' &&
+    typeof record.title === 'string' &&
+    typeof record.description === 'string' &&
+    typeof record.date === 'string' &&
+    typeof record.isoDate === 'string' &&
+    Array.isArray(record.tags) &&
+    record.tags.every((tag) => typeof tag === 'string') &&
+    (record.cover === undefined || typeof record.cover === 'string')
+  );
+}
+
+/** 读取构建期生成的文章摘要，并在当前应用会话中复用结果。 */
+function requestArticles(): Promise<BlogArticleSummary[]> {
+  if (cachedArticles !== null) return Promise.resolve(cachedArticles);
+  if (articlesRequest) return articlesRequest;
+
+  articlesRequest = fetch(`${import.meta.env.BASE_URL}articles.json`, {
+    headers: { Accept: 'application/json' },
+  })
+    .then(async (response) => {
+      if (!response.ok) {
+        throw new Error(`文章列表请求失败：${response.status}`);
+      }
+
+      const payload: unknown = await response.json();
+      if (!Array.isArray(payload) || !payload.every(isBlogArticleSummary)) {
+        throw new Error('文章列表格式无效');
+      }
+
+      cachedArticles = payload as BlogArticleSummary[];
+      return cachedArticles;
+    })
+    .finally(() => {
+      articlesRequest = null;
+    });
+
+  return articlesRequest;
+}
+
+async function loadArticles(): Promise<void> {
+  articlesLoading.value = true;
+  articlesError.value = false;
+
+  try {
+    articles.value = await requestArticles();
+  } catch {
+    articlesError.value = true;
+  } finally {
+    articlesLoading.value = false;
+  }
+}
 
 /**
  * 开发环境进入 Brew 页时刷新友联文章，并把结果写入本地公开缓存。
@@ -31,6 +100,8 @@ const feedsLoading = ref(false);
  * 静态构建产物只使用构建前生成的缓存，不在部署后依赖远程订阅源。
  */
 onMounted(async () => {
+  void loadArticles();
+
   if (!props.editable || !sources.value.some((source) => source.feedUrl)) return;
 
   feedsLoading.value = true;
@@ -86,6 +157,21 @@ const filteredSources = computed(() => {
 
 const latestSource = computed(
   () => sources.value.find((source) => source.latestTitle) ?? sources.value[0] ?? null,
+);
+
+/** 离开订阅源区域时收起只属于订阅源的弹层和工具面板。 */
+watch(
+  () => props.section,
+  (section) => {
+    if (section === 'articles' && articlesError.value) {
+      void loadArticles();
+    }
+    if (section === 'feeds') return;
+    selectedSource.value = null;
+    searchOpen.value = false;
+    sortOpen.value = false;
+    shortcutOpen.value = false;
+  },
 );
 
 /**
@@ -173,7 +259,21 @@ function clearSearch(): void {
 </script>
 
 <template>
-  <div class="brew-page" @keydown.esc="closeSource">
+  <BlogPage
+    v-if="props.section === 'articles'"
+    :articles="articles"
+    :loading="articlesLoading"
+    :error="articlesError"
+    @retry="loadArticles"
+  />
+
+  <section v-else-if="props.section === 'favorites'" class="brew-section-empty glass-panel" aria-label="收藏">
+    <IconGlyph name="star" :size="23" />
+    <strong>还没有收藏文章</strong>
+    <span>收藏的订阅文章会出现在这里。</span>
+  </section>
+
+  <div v-else class="brew-page" @keydown.esc="closeSource">
     <main class="brew-content" aria-label="Brew 阅读">
       <header v-if="latestSource" class="brew-mobile-controls">
         <FriendAvatar
@@ -428,6 +528,28 @@ function clearSearch(): void {
 </template>
 
 <style scoped>
+.brew-section-empty {
+  display: flex;
+  width: min(620px, calc(100% - 48px));
+  min-height: 260px;
+  margin: 132px auto 0;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 9px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.brew-section-empty strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.brew-section-empty span {
+  font-size: 0.7rem;
+}
+
 .brew-page {
   position: relative;
   display: flow-root;
@@ -1220,6 +1342,12 @@ a.detail-article-row:focus-visible {
 }
 
 @media (max-width: 820px) {
+  .brew-section-empty {
+    width: calc(100% - 28px);
+    min-height: 220px;
+    margin-top: 74px;
+  }
+
   .brew-page {
     padding-bottom: 106px;
   }

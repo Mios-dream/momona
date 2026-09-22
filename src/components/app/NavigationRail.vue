@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { navigationItems } from '../../data/navigation';
-import type { AppPage, IconName, LibraryFilter } from '../../data/types';
+import type { AppPage, BrewSection, IconName, LibraryFilter } from '../../data/types';
 import IconGlyph from './IconGlyph.vue';
 
 interface Props {
@@ -9,6 +9,8 @@ interface Props {
   page: AppPage;
   /** 资料库筛选栏当前选中的分类。 */
   libraryFilter: LibraryFilter;
+  /** Brew 阅读页当前选中的二级内容区域。 */
+  brewSection: BrewSection;
 }
 
 const props = defineProps<Props>();
@@ -16,6 +18,8 @@ const props = defineProps<Props>();
 const emit = defineEmits<{
   /** 切换资料库筛选分类。 */
   'update:libraryFilter': [filter: LibraryFilter];
+  /** 切换 Brew 阅读页的二级内容区域。 */
+  'update:brewSection': [section: BrewSection];
 }>();
 
 interface FilterItem {
@@ -222,6 +226,11 @@ function selectLibraryFilter(filter: LibraryFilter): void {
   emit('update:libraryFilter', filter);
 }
 
+/** 切换 Brew 阅读页的二级内容区域。 */
+function selectBrewSection(section: BrewSection): void {
+  emit('update:brewSection', section);
+}
+
 /**
  * 返回当前页面的一级导航，同时保留页面地址和主体内容。
  *
@@ -286,13 +295,34 @@ function openSubmenuFor(page: AppPage): void {
             <IconGlyph name="arrowLeft" :size="18" />
           </button>
           <div class="rail-brew-submenu">
-            <button class="rail-button brew-nav-button is-active" type="button" aria-label="全部订阅源" title="全部订阅源">
+            <button
+              class="rail-button brew-nav-button"
+              :class="{ 'is-active': props.brewSection === 'articles' }"
+              type="button"
+              aria-label="我的文章"
+              title="我的文章"
+              @click="selectBrewSection('articles')"
+            >
+              <IconGlyph name="bookMarked" :size="17" />
+            </button>
+            <button
+              class="rail-button brew-nav-button"
+              :class="{ 'is-active': props.brewSection === 'feeds' }"
+              type="button"
+              aria-label="全部订阅源"
+              title="全部订阅源"
+              @click="selectBrewSection('feeds')"
+            >
               <IconGlyph name="rss" :size="17" />
             </button>
-            <button class="rail-button brew-nav-button" type="button" aria-label="我" title="我">
-              <IconGlyph name="user" :size="17" />
-            </button>
-            <button class="rail-button brew-nav-button" type="button" aria-label="收藏" title="收藏">
+            <button
+              class="rail-button brew-nav-button"
+              :class="{ 'is-active': props.brewSection === 'favorites' }"
+              type="button"
+              aria-label="收藏"
+              title="收藏"
+              @click="selectBrewSection('favorites')"
+            >
               <IconGlyph name="star" :size="17" />
             </button>
           </div>
