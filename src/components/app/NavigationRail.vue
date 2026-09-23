@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
-import { navigationItems } from '../../data/navigation';
-import type { AppPage, BrewSection, IconName, LibraryFilter } from '../../data/types';
-import IconGlyph from './IconGlyph.vue';
+import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { navigationItems } from "../../data/navigation";
+import type {
+  AppPage,
+  BrewSection,
+  IconName,
+  LibraryFilter,
+} from "../../data/types";
+import IconGlyph from "./IconGlyph.vue";
 
 interface Props {
   /** 当前正在显示的页面。 */
@@ -17,9 +22,9 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
   /** 切换资料库筛选分类。 */
-  'update:libraryFilter': [filter: LibraryFilter];
+  "update:libraryFilter": [filter: LibraryFilter];
   /** 切换 Brew 阅读页的二级内容区域。 */
-  'update:brewSection': [section: BrewSection];
+  "update:brewSection": [section: BrewSection];
 }>();
 
 interface FilterItem {
@@ -29,12 +34,12 @@ interface FilterItem {
 }
 
 const filterItems: FilterItem[] = [
-  { id: 'all', label: '显示全部内容', icon: 'layoutGrid' },
-  { id: 'game', label: '显示游戏', icon: 'game' },
-  { id: 'video', label: '显示视频', icon: 'video' },
-  { id: 'music', label: '显示音乐', icon: 'music' },
-  { id: 'anime', label: '显示追番', icon: 'bookMarked' },
-  { id: 'book', label: '显示书籍', icon: 'book' },
+  { id: "all", label: "显示全部内容", icon: "layoutGrid" },
+  { id: "game", label: "显示游戏", icon: "game" },
+  { id: "video", label: "显示视频", icon: "video" },
+  { id: "music", label: "显示音乐", icon: "music" },
+  { id: "anime", label: "显示追番", icon: "bookMarked" },
+  { id: "book", label: "显示书籍", icon: "book" },
 ];
 
 /**
@@ -44,20 +49,20 @@ const filterItems: FilterItem[] = [
  * @returns 页面属于资料库或 Brew 时返回 true。
  */
 function isSubmenuPage(page: AppPage): boolean {
-  return page === 'library' || page === 'brew';
+  return page === "library" || page === "brew";
 }
 const isSubmenuOpen = ref(isSubmenuPage(props.page));
 
-const navigationMode = computed<'app' | 'library' | 'brew'>(() => {
-  if (isSubmenuOpen.value && props.page === 'library') return 'library';
-  if (isSubmenuOpen.value && props.page === 'brew') return 'brew';
-  return 'app';
+const navigationMode = computed<"app" | "library" | "brew">(() => {
+  if (isSubmenuOpen.value && props.page === "library") return "library";
+  if (isSubmenuOpen.value && props.page === "brew") return "brew";
+  return "app";
 });
 
 const railLabel = computed(() => {
-  if (navigationMode.value === 'library') return '资料库筛选';
-  if (navigationMode.value === 'brew') return 'Brew 导航';
-  return '主导航';
+  if (navigationMode.value === "library") return "资料库筛选";
+  if (navigationMode.value === "brew") return "Brew 导航";
+  return "主导航";
 });
 
 const railElement = ref<HTMLElement | null>(null);
@@ -105,11 +110,11 @@ function getRailBoxExtraHeight(element: HTMLElement): number {
  */
 function getTargetRailBoxExtraHeight(element: HTMLElement): number {
   const probe = element.cloneNode(false) as HTMLElement;
-  probe.style.position = 'absolute';
-  probe.style.visibility = 'hidden';
-  probe.style.pointerEvents = 'none';
-  probe.style.height = 'auto';
-  probe.style.transition = 'none';
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.pointerEvents = "none";
+  probe.style.height = "auto";
+  probe.style.transition = "none";
   document.body.appendChild(probe);
   const extraHeight = getRailBoxExtraHeight(probe);
   probe.remove();
@@ -152,13 +157,21 @@ function lockRailHeight(): void {
   railHeight.value = Math.ceil(rail.getBoundingClientRect().height);
 }
 
-watch(() => props.page, (page, previousPage) => {
-  if (page !== previousPage) isSubmenuOpen.value = isSubmenuPage(page);
-}, { flush: 'sync' });
+watch(
+  () => props.page,
+  (page, previousPage) => {
+    if (page !== previousPage) isSubmenuOpen.value = isSubmenuPage(page);
+  },
+  { flush: "sync" },
+);
 
-watch(navigationMode, () => {
-  lockRailHeight();
-}, { flush: 'sync' });
+watch(
+  navigationMode,
+  () => {
+    lockRailHeight();
+  },
+  { flush: "sync" },
+);
 
 /**
  * 用进入中的按钮组测量目标高度，并让常驻边框平滑过渡到新高度。
@@ -181,7 +194,8 @@ function animateRailHeight(enteringElement: Element): void {
 
   const currentHeight = rail.getBoundingClientRect().height;
   const targetHeight = Math.ceil(
-    enteringElement.getBoundingClientRect().height + getTargetRailBoxExtraHeight(rail),
+    enteringElement.getBoundingClientRect().height +
+      getTargetRailBoxExtraHeight(rail),
   );
 
   if (Math.abs(currentHeight - targetHeight) < 1) {
@@ -207,12 +221,14 @@ function animateRailHeight(enteringElement: Element): void {
  * @returns 无返回值。
  */
 function handleRailTransitionEnd(event: TransitionEvent): void {
-  if (event.target !== event.currentTarget || event.propertyName !== 'height') return;
+  if (event.target !== event.currentTarget || event.propertyName !== "height")
+    return;
   releaseRailHeight();
 }
 
 onBeforeUnmount(() => {
-  if (heightAnimationFrame !== null) window.cancelAnimationFrame(heightAnimationFrame);
+  if (heightAnimationFrame !== null)
+    window.cancelAnimationFrame(heightAnimationFrame);
   if (heightResetTimer !== null) window.clearTimeout(heightResetTimer);
 });
 
@@ -223,12 +239,12 @@ onBeforeUnmount(() => {
  * @returns 无返回值；分类由父组件统一维护。
  */
 function selectLibraryFilter(filter: LibraryFilter): void {
-  emit('update:libraryFilter', filter);
+  emit("update:libraryFilter", filter);
 }
 
 /** 切换 Brew 阅读页的二级内容区域。 */
 function selectBrewSection(section: BrewSection): void {
-  emit('update:brewSection', section);
+  emit("update:brewSection", section);
 }
 
 /**
@@ -267,12 +283,18 @@ function openSubmenuFor(page: AppPage): void {
     @transitionend="handleRailTransitionEnd"
   >
     <div class="rail-content-stage">
-      <Transition
-        name="rail-content"
-        @enter="animateRailHeight"
-      >
-        <div v-if="navigationMode === 'library'" key="library" class="rail-content rail-content-library">
-          <button class="rail-button rail-filter-back" type="button" aria-label="返回一级导航" @click="showPrimaryNavigation">
+      <Transition name="rail-content" @enter="animateRailHeight">
+        <div
+          v-if="navigationMode === 'library'"
+          key="library"
+          class="rail-content rail-content-library"
+        >
+          <button
+            class="rail-button rail-filter-back"
+            type="button"
+            aria-label="返回一级导航"
+            @click="showPrimaryNavigation"
+          >
             <IconGlyph name="arrowLeft" :size="21" />
           </button>
           <span class="rail-filter-divider" aria-hidden="true"></span>
@@ -290,8 +312,18 @@ function openSubmenuFor(page: AppPage): void {
           </button>
         </div>
 
-        <div v-else-if="navigationMode === 'brew'" key="brew" class="rail-content rail-content-brew">
-          <button class="rail-button brew-nav-button brew-nav-back" type="button" aria-label="返回一级导航" title="返回一级导航" @click="showPrimaryNavigation">
+        <div
+          v-else-if="navigationMode === 'brew'"
+          key="brew"
+          class="rail-content rail-content-brew"
+        >
+          <button
+            class="rail-button brew-nav-button brew-nav-back"
+            type="button"
+            aria-label="返回一级导航"
+            title="返回一级导航"
+            @click="showPrimaryNavigation"
+          >
             <IconGlyph name="arrowLeft" :size="18" />
           </button>
           <div class="rail-brew-submenu">
@@ -328,7 +360,12 @@ function openSubmenuFor(page: AppPage): void {
           </div>
         </div>
 
-        <nav v-else key="app" class="rail-content rail-content-app" aria-label="主导航">
+        <nav
+          v-else
+          key="app"
+          class="rail-content rail-content-app"
+          aria-label="主导航"
+        >
           <a
             v-for="item in navigationItems"
             :key="item.id"
@@ -340,7 +377,9 @@ function openSubmenuFor(page: AppPage): void {
             :aria-label="`${item.label}，${item.description}`"
             @click="openSubmenuFor(item.id)"
           >
-            <span class="rail-link-icon"><IconGlyph :name="item.icon" :size="19" /></span>
+            <span class="rail-link-icon"
+              ><IconGlyph :name="item.icon" :size="19"
+            /></span>
             <span class="rail-link-copy">
               <strong>{{ item.label }}</strong>
               <small>{{ item.description }}</small>
@@ -365,11 +404,16 @@ function openSubmenuFor(page: AppPage): void {
   border: 1px solid rgba(255, 255, 255, 0.84);
   border-radius: 26px;
   background: rgba(255, 255, 255, 0.68);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.52) inset, 0 13px 34px rgba(54, 45, 106, 0.13);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.52) inset,
+    0 13px 34px rgba(54, 45, 106, 0.13);
   backdrop-filter: blur(21px) saturate(148%);
   transform: translateY(-50%);
-  transition: height 0.52s cubic-bezier(0.22, 1, 0.36, 1), width 0.34s ease,
-    padding 0.34s ease, border-radius 0.34s ease;
+  transition:
+    height 0.52s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.34s ease,
+    padding 0.34s ease,
+    border-radius 0.34s ease;
 }
 
 .navigation-rail.is-height-animating {
@@ -419,7 +463,10 @@ function openSubmenuFor(page: AppPage): void {
   border-radius: 14px;
   color: rgba(43, 50, 79, 0.65);
   background: transparent;
-  transition: color 0.34s ease, background 0.34s ease, opacity 0.4s ease,
+  transition:
+    color 0.34s ease,
+    background 0.34s ease,
+    opacity 0.4s ease,
     transform 0.46s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -456,10 +503,12 @@ function openSubmenuFor(page: AppPage): void {
   height: 20px;
   border-radius: 0 4px 4px 0;
   background: var(--pink);
-  content: '';
+  content: "";
   opacity: 0;
   transform: translateX(-5px) scaleY(0.6);
-  transition: opacity 0.38s ease, transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 0.38s ease,
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .rail-link.is-active::before,
@@ -489,7 +538,9 @@ function openSubmenuFor(page: AppPage): void {
   opacity: 0;
   pointer-events: none;
   transform: translateX(-6px);
-  transition: opacity 0.28s ease, transform 0.32s ease;
+  transition:
+    opacity 0.28s ease,
+    transform 0.32s ease;
   backdrop-filter: blur(15px);
 }
 
@@ -513,7 +564,7 @@ function openSubmenuFor(page: AppPage): void {
 
 .rail-brew-submenu {
   display: flex;
-  margin-top: 25px;
+  margin-top: 12px;
   flex-direction: column;
   gap: 12px;
 }
@@ -527,7 +578,9 @@ function openSubmenuFor(page: AppPage): void {
 .rail-content-enter-active,
 .rail-content-leave-active {
   z-index: 1;
-  transition: opacity 0.32s ease, transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 0.32s ease,
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .rail-content-enter-from {

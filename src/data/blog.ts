@@ -10,6 +10,9 @@ export interface BlogArticleSummary {
   description: string;
   date: string;
   isoDate: string;
+  wordCount: number;
+  readingMinutes: number;
+  category: string;
   tags: string[];
   cover?: string;
 }

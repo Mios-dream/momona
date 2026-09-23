@@ -391,6 +391,7 @@ export type IconName =
   | "chart"
   | "check"
   | "chevronDown"
+  | "clock"
   | "circlePlus"
   | "circleUser"
   | "cloud"

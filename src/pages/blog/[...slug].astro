@@ -2,7 +2,7 @@
 import { getCollection, render, type CollectionEntry } from "astro:content";
 import StaticLayout from "../../layouts/StaticLayout.astro";
 import { getDataCenter } from "../../lib/dataCenter";
-import { formatBlogDate } from "../../lib/blog";
+import { formatBlogDate, getBlogCoverSource } from "../../lib/blog";
 
 export async function getStaticPaths() {
   const articles = await getCollection(
@@ -27,6 +27,7 @@ const publishedDate = formatBlogDate(article.data.pubDate);
 const updatedDate = article.data.updatedDate
   ? formatBlogDate(article.data.updatedDate)
   : undefined;
+const coverSource = getBlogCoverSource(article.data.cover);
 const description =
   article.data.description || `${article.data.title} · ${localConfig.site.title}`;
 ---
@@ -57,8 +58,8 @@ const description =
           {article.data.description && <p>{article.data.description}</p>}
         </header>
 
-        {article.data.cover && (
-          <img class="blog-post-cover" src={article.data.cover} alt={article.data.title} />
+        {coverSource && (
+          <img class="blog-post-cover" src={coverSource} alt={article.data.title} />
         )}
 
         <div class="blog-markdown">
@@ -77,9 +78,7 @@ const description =
   .blog-post-shell {
     min-height: 100vh;
     padding: 54px 24px 90px;
-    background:
-      linear-gradient(180deg, rgba(213, 219, 243, 0.24), rgba(255, 255, 255, 0.64)),
-      #d5dbf3;
+    background: #f4f6fb;
   }
 
   .blog-post-frame {
@@ -97,11 +96,10 @@ const description =
 
   .blog-post {
     padding: clamp(25px, 5vw, 58px) clamp(20px, 6vw, 72px) 50px;
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
-    background: rgba(255, 255, 255, 0.76);
+    border: 1px solid var(--content-border);
+    border-radius: 15px;
+    background: var(--content-surface);
     box-shadow: 0 22px 58px rgba(54, 45, 106, 0.14);
-    backdrop-filter: blur(20px) saturate(135%);
   }
 
   .blog-post-header {
@@ -135,7 +133,7 @@ const description =
   .blog-post-header h1 {
     margin: 22px 0 0;
     color: var(--ink);
-    font-size: clamp(2rem, 5vw, 3.2rem);
+    font-size: clamp(2rem, 5vw, 2.9rem);
     font-weight: 790;
     line-height: 1.18;
   }
@@ -159,7 +157,7 @@ const description =
   .blog-markdown {
     padding-top: 34px;
     color: var(--ink-soft);
-    font-family: Georgia, "Times New Roman", "Noto Serif SC", serif;
+    font-family: "Segoe UI", "Microsoft YaHei", "Noto Sans SC", sans-serif;
     font-size: 1rem;
     line-height: 1.95;
     overflow-wrap: anywhere;

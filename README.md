@@ -4,7 +4,7 @@
 
 <div align="center">
   <h1>Momona</h1>
-  <p>本地生成、静态部署的个人数字生活展示站点</p>
+  <p>本地生成、静态部署的个人数字生活展示博客</p>
 </div>
 
 <div align="center">
@@ -76,18 +76,6 @@ pnpm install
 pnpm astro dev --background
 ```
 
-1. 在“个人资料”中填写名称、签名和头像。
-2. 在“数据来源”中启用来源，填写用户名或用户 ID，并勾选需要同步的内容。
-3. 在设置页的“数据管理”中调整来源内容范围、游戏账号和音乐目录。
-4. 对需要更新的来源执行“同步并保存”，然后刷新其他页面查看结果。
-
-配置和快照写入 `.momona/`。首次使用时复制公开示例配置；真实的 `localConfig.json` 会被 Git 忽略，不应提交到公开仓库。
-
-```powershell
-New-Item -ItemType Directory -Force .momona
-Copy-Item .momona/localConfig.example.json .momona/localConfig.json
-```
-
 ### 环境变量配置
 
 也可以通过 `MOMONA_CONFIG_JSON` 提供按 `LocalConfig` 结构组织的 JSON 配置。环境
@@ -111,62 +99,10 @@ GitHub Actions 等环境中由用户自行注入仓库 Secret；各数据源的�
 }
 ```
 
-配置读取时会自动剥离所有 `token`，所以凭据不会进入页面数据或公开配置；执行
-数据同步时才会恢复凭据。`MOMONA_CONFIG_JSON` 只提供配置，不会让 `astro build`
-自动请求远程数据，仍需在构建前按需执行现有的 `pnpm momona:sync`。
-
-### 开发服务器管理
-
-```powershell
-pnpm astro dev status
-pnpm astro dev logs
-pnpm astro dev stop
-```
-
 ### 编写与发布文章
 
 文章使用 Astro 内容集合管理，文件放在 `src/content/articles/`。推荐为每篇文章建立一个
 独立目录，目录中的 `index.md` 会成为文章正文；`draft: true` 的文章不会生成页面。
-
-```markdown
----
-title: "我的第一篇文章"
-description: "文章列表中的摘要。"
-pubDate: 2026-09-22
-tags:
-  - 随笔
-  - 记录
-draft: false
----
-
-## 正文标题
-
-这里写文章正文，支持标准 Markdown。
-```
-
-例如保存为 `src/content/articles/first-note/index.md` 后，打开 `Brew 阅读` 的第一个二级
-Tab“我的文章”即可看到文章列表；详情页地址为 `/blog/first-note/`。
-
-文章正文中的本地图片也放在这篇文章的目录里，并使用相对路径引用：
-
-```text
-src/content/articles/
-└── first-note/
-    ├── index.md
-    └── screenshot.png
-```
-
-```markdown
-![构建结果截图](./screenshot.png)
-```
-
-Astro 会在构建时处理这类相对图片路径，不要填写 Windows 本地绝对路径。若图片由多篇文章
-共用，可以放到 `public/assets/articles/`，然后使用站点绝对路径，例如
-`![头像](/assets/articles/avatar.png)`。文章 frontmatter 中的 `cover` 目前是公开资源路径，
-例如 `cover: "/assets/articles/first-note/cover.jpg"`，封面应放在 `public/assets/` 下。
-
-本地预览时运行 `pnpm astro dev`，打开 `/brew/` 的“我的文章”Tab；发布前运行 `pnpm astro check` 和
-`pnpm build`。文章列表数据和详情页都是构建期生成的静态资源
 
 ## 📦 构建与部署
 

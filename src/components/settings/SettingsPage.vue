@@ -286,7 +286,7 @@ function updateGameWidget(patch: {
           ...item,
           settings: {
             ...item.settings,
-            game: { ...item.settings.game, ...patch },
+            game: { ...item.settings?.game, ...patch },
           },
         }
       : item,
@@ -1134,6 +1134,7 @@ button:disabled {
   background: rgba(255, 255, 255, 0.38);
   box-shadow: 0 14px 32px rgba(54, 45, 106, 0.08);
   backdrop-filter: blur(18px) saturate(132%);
+  gap: 6px;
 }
 .settings-sidebar-label {
   padding: 6px 10px 9px;

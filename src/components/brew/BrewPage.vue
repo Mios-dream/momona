@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue';
-import type { BlogArticleSummary } from '../../data/blog';
-import type { BrewSection, BrewSource } from '../../data/types';
-import BlogPage from '../blog/BlogPage.vue';
-import FriendAvatar from '../app/FriendAvatar.vue';
-import IconGlyph from '../app/IconGlyph.vue';
-import BrewSourceCard from './BrewSourceCard.vue';
+import { computed, onMounted, ref, watch } from "vue";
+import type { BlogArticleSummary } from "../../data/blog";
+import type { BrewSection, BrewSource } from "../../data/types";
+import BlogPage from "../blog/BlogPage.vue";
+import FriendAvatar from "../app/FriendAvatar.vue";
+import IconGlyph from "../app/IconGlyph.vue";
+import BrewSourceCard from "./BrewSourceCard.vue";
 
-type SortMode = 'latest' | 'name';
-type SourceFilter = 'all' | BrewSource['type'];
+type SortMode = "latest" | "name";
+type SourceFilter = "all" | BrewSource["type"];
 
-const query = ref('');
-const activeFilter = ref<SourceFilter>('all');
-const sortMode = ref<SortMode>('latest');
+const query = ref("");
+const activeFilter = ref<SourceFilter>("all");
+const sortMode = ref<SortMode>("latest");
 const selectedSource = ref<BrewSource | null>(null);
 const searchOpen = ref(false);
 const sortOpen = ref(false);
@@ -25,7 +25,7 @@ interface Props {
 }
 
 const props = withDefaults(defineProps<Props>(), {
-  section: 'articles' as BrewSection,
+  section: "articles" as BrewSection,
   editable: false,
 });
 const sources = ref<BrewSource[]>(props.sources);
@@ -37,20 +37,54 @@ const feedsLoading = ref(false);
 let cachedArticles: BlogArticleSummary[] | null = null;
 let articlesRequest: Promise<BlogArticleSummary[]> | null = null;
 
-function isBlogArticleSummary(value: unknown): value is BlogArticleSummary {
-  if (!value || typeof value !== 'object') return false;
+function normalizeBlogArticleSummary(value: unknown): BlogArticleSummary | null {
+  if (!value || typeof value !== "object") return null;
 
   const record = value as Record<string, unknown>;
-  return (
-    typeof record.slug === 'string' &&
-    typeof record.title === 'string' &&
-    typeof record.description === 'string' &&
-    typeof record.date === 'string' &&
-    typeof record.isoDate === 'string' &&
-    Array.isArray(record.tags) &&
-    record.tags.every((tag) => typeof tag === 'string') &&
-    (record.cover === undefined || typeof record.cover === 'string')
-  );
+  const slug = record.slug;
+  const title = record.title;
+  const description = record.description;
+  const date = record.date;
+  const isoDate = record.isoDate;
+  const wordCount = record.wordCount;
+  const readingMinutes = record.readingMinutes;
+  const tags = record.tags;
+  const cover = record.cover;
+
+  if (
+    typeof slug !== "string" ||
+    typeof title !== "string" ||
+    typeof description !== "string" ||
+    typeof date !== "string" ||
+    typeof isoDate !== "string" ||
+    typeof wordCount !== "number" ||
+    !Number.isFinite(wordCount) ||
+    typeof readingMinutes !== "number" ||
+    !Number.isFinite(readingMinutes) ||
+    !Array.isArray(tags) ||
+    !tags.every((tag) => typeof tag === "string") ||
+    (cover !== undefined && typeof cover !== "string")
+  ) {
+    return null;
+  }
+
+  const category =
+    typeof record.category === "string" && record.category.trim()
+      ? record.category.trim()
+      : tags[0] ?? "未分类";
+
+  return {
+    slug,
+    title,
+    description,
+    date,
+    isoDate,
+    wordCount,
+    readingMinutes,
+    category,
+    tags,
+    ...(cover ? { cover } : {}),
+  };
 }
 
 /** 读取构建期生成的文章摘要，并在当前应用会话中复用结果。 */
@@ -59,7 +93,7 @@ function requestArticles(): Promise<BlogArticleSummary[]> {
   if (articlesRequest) return articlesRequest;
 
   articlesRequest = fetch(`${import.meta.env.BASE_URL}articles.json`, {
-    headers: { Accept: 'application/json' },
+    headers: { Accept: "application/json" },
   })
     .then(async (response) => {
       if (!response.ok) {
@@ -67,11 +101,18 @@ function requestArticles(): Promise<BlogArticleSummary[]> {
       }
 
       const payload: unknown = await response.json();
-      if (!Array.isArray(payload) || !payload.every(isBlogArticleSummary)) {
-        throw new Error('文章列表格式无效');
+      if (!Array.isArray(payload)) {
+        throw new Error("文章列表格式无效");
       }
 
-      cachedArticles = payload as BlogArticleSummary[];
+      const normalized = payload.map(normalizeBlogArticleSummary);
+      if (normalized.some((article) => article === null)) {
+        throw new Error("文章列表格式无效");
+      }
+
+      cachedArticles = normalized.filter(
+        (article): article is BlogArticleSummary => article !== null,
+      );
       return cachedArticles;
     })
     .finally(() => {
@@ -102,17 +143,18 @@ async function loadArticles(): Promise<void> {
 onMounted(async () => {
   void loadArticles();
 
-  if (!props.editable || !sources.value.some((source) => source.feedUrl)) return;
+  if (!props.editable || !sources.value.some((source) => source.feedUrl))
+    return;
 
   feedsLoading.value = true;
   try {
-    const response = await fetch('/__momona/sync-brew', {
-      method: 'POST',
+    const response = await fetch("/__momona/sync-brew", {
+      method: "POST",
       headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
+        Accept: "application/json",
+        "Content-Type": "application/json",
       },
-      body: '{}',
+      body: "{}",
     });
     if (!response.ok) return;
     const payload = (await response.json()) as {
@@ -134,7 +176,8 @@ onMounted(async () => {
 const filteredSources = computed(() => {
   const normalizedQuery = query.value.trim().toLocaleLowerCase();
   const result = sources.value.filter((source) => {
-    const matchesType = activeFilter.value === 'all' || source.type === activeFilter.value;
+    const matchesType =
+      activeFilter.value === "all" || source.type === activeFilter.value;
     const searchable = [
       source.name,
       source.author,
@@ -144,29 +187,36 @@ const filteredSources = computed(() => {
       ...source.tags,
       ...source.articles.map((item) => item.title),
     ]
-      .join(' ')
+      .join(" ")
       .toLocaleLowerCase();
 
-    return matchesType && (!normalizedQuery || searchable.includes(normalizedQuery));
+    return (
+      matchesType && (!normalizedQuery || searchable.includes(normalizedQuery))
+    );
   });
 
-  return sortMode.value === 'name'
-    ? [...result].sort((first, second) => first.name.localeCompare(second.name, 'zh-CN'))
+  return sortMode.value === "name"
+    ? [...result].sort((first, second) =>
+        first.name.localeCompare(second.name, "zh-CN"),
+      )
     : result;
 });
 
 const latestSource = computed(
-  () => sources.value.find((source) => source.latestTitle) ?? sources.value[0] ?? null,
+  () =>
+    sources.value.find((source) => source.latestTitle) ??
+    sources.value[0] ??
+    null,
 );
 
 /** 离开订阅源区域时收起只属于订阅源的弹层和工具面板。 */
 watch(
   () => props.section,
   (section) => {
-    if (section === 'articles' && articlesError.value) {
+    if (section === "articles" && articlesError.value) {
       void loadArticles();
     }
-    if (section === 'feeds') return;
+    if (section === "feeds") return;
     selectedSource.value = null;
     searchOpen.value = false;
     sortOpen.value = false;
@@ -253,27 +303,35 @@ function toggleShortcuts(): void {
  * @returns 无返回值。
  */
 function clearSearch(): void {
-  query.value = '';
+  query.value = "";
   searchOpen.value = false;
 }
 </script>
 
 <template>
+  <div class="brew-section-stage">
+    <Transition name="brew-section" mode="out-in">
   <BlogPage
     v-if="props.section === 'articles'"
+    key="articles"
     :articles="articles"
     :loading="articlesLoading"
     :error="articlesError"
     @retry="loadArticles"
   />
 
-  <section v-else-if="props.section === 'favorites'" class="brew-section-empty glass-panel" aria-label="收藏">
+  <section
+    v-else-if="props.section === 'favorites'"
+    key="favorites"
+    class="brew-section-empty glass-panel"
+    aria-label="收藏"
+  >
     <IconGlyph name="star" :size="23" />
     <strong>还没有收藏文章</strong>
     <span>收藏的订阅文章会出现在这里。</span>
   </section>
 
-  <div v-else class="brew-page" @keydown.esc="closeSource">
+  <div v-else key="feeds" class="brew-page" @keydown.esc="closeSource">
     <main class="brew-content" aria-label="Brew 阅读">
       <header v-if="latestSource" class="brew-mobile-controls">
         <FriendAvatar
@@ -287,27 +345,42 @@ function clearSearch(): void {
           <strong>午后时光</strong>
           <small>适合轻松阅读</small>
         </div>
-        <button type="button" aria-label="排序方式" title="排序方式" @click="toggleSort">
+        <button
+          type="button"
+          aria-label="排序方式"
+          title="排序方式"
+          @click="toggleSort"
+        >
           <IconGlyph name="arrowUpDown" :size="18" />
         </button>
       </header>
 
       <section class="brew-grid" aria-live="polite">
         <div
-          v-if="!feedsLoading && !sources.length && activeFilter === 'all' && !query"
+          v-if="
+            !feedsLoading && !sources.length && activeFilter === 'all' && !query
+          "
           class="brew-feed-empty"
         >
           <IconGlyph name="rss" :size="20" />
-          <strong>{{ sources.length ? '暂无可用订阅源' : '暂无订阅源' }}</strong>
+          <strong>{{
+            sources.length ? "暂无可用订阅源" : "暂无订阅源"
+          }}</strong>
           <span>为友联设置有效的 RSS / Atom 地址后，这里会显示文章。</span>
         </div>
         <BrewSourceCard
-          v-for="source in filteredSources"
+          v-for="(source, index) in filteredSources"
           :key="source.id"
           :source="source"
+          :style="{
+            '--brew-source-card-delay': `${Math.min(index, 8) * 28}ms`,
+          }"
           @open="openSource"
         />
-        <div v-if="sources.length > 0 && filteredSources.length === 0" class="brew-empty">
+        <div
+          v-if="sources.length > 0 && filteredSources.length === 0"
+          class="brew-empty"
+        >
           <IconGlyph name="search" :size="23" />
           <strong>没有找到匹配内容</strong>
           <span>换个关键词，或者清除筛选条件。</span>
@@ -318,28 +391,88 @@ function clearSearch(): void {
 
     <div v-if="searchOpen" class="brew-search-panel glass-panel">
       <IconGlyph name="search" :size="15" />
-      <input v-model="query" autofocus type="search" placeholder="搜索订阅源或文章" aria-label="搜索订阅源或文章" />
-      <button v-if="query" type="button" aria-label="清除搜索" title="清除搜索" @click="clearSearch">
+      <input
+        v-model="query"
+        autofocus
+        type="search"
+        placeholder="搜索订阅源或文章"
+        aria-label="搜索订阅源或文章"
+      />
+      <button
+        v-if="query"
+        type="button"
+        aria-label="清除搜索"
+        title="清除搜索"
+        @click="clearSearch"
+      >
         <IconGlyph name="x" :size="15" />
       </button>
     </div>
 
-    <div v-if="sortOpen" class="brew-sort-menu glass-panel" aria-label="排序和筛选">
+    <div
+      v-if="sortOpen"
+      class="brew-sort-menu glass-panel"
+      aria-label="排序和筛选"
+    >
       <strong>排序方式</strong>
-      <button :class="{ 'is-active': sortMode === 'latest' }" type="button" @click="sortMode = 'latest'; sortOpen = false">
+      <button
+        :class="{ 'is-active': sortMode === 'latest' }"
+        type="button"
+        @click="
+          sortMode = 'latest';
+          sortOpen = false;
+        "
+      >
         <span>自由排序</span>
         <IconGlyph v-if="sortMode === 'latest'" name="sparkles" :size="13" />
       </button>
-      <button :class="{ 'is-active': sortMode === 'name' }" type="button" @click="sortMode = 'name'; sortOpen = false">
+      <button
+        :class="{ 'is-active': sortMode === 'name' }"
+        type="button"
+        @click="
+          sortMode = 'name';
+          sortOpen = false;
+        "
+      >
         <span>按名称</span>
         <IconGlyph v-if="sortMode === 'name'" name="sparkles" :size="13" />
       </button>
       <div class="brew-type-filters">
-        <button :class="{ 'is-active': activeFilter === 'all' }" type="button" @click="activeFilter = 'all'">全部</button>
-        <button :class="{ 'is-active': activeFilter === 'Brewlia' }" type="button" @click="activeFilter = 'Brewlia'">Brewlia</button>
-        <button :class="{ 'is-active': activeFilter === 'Atom' }" type="button" @click="activeFilter = 'Atom'">Atom</button>
-        <button :class="{ 'is-active': activeFilter === 'RSS' }" type="button" @click="activeFilter = 'RSS'">RSS</button>
-        <button :class="{ 'is-active': activeFilter === '链接' }" type="button" @click="activeFilter = '链接'">链接</button>
+        <button
+          :class="{ 'is-active': activeFilter === 'all' }"
+          type="button"
+          @click="activeFilter = 'all'"
+        >
+          全部
+        </button>
+        <button
+          :class="{ 'is-active': activeFilter === 'Brewlia' }"
+          type="button"
+          @click="activeFilter = 'Brewlia'"
+        >
+          Brewlia
+        </button>
+        <button
+          :class="{ 'is-active': activeFilter === 'Atom' }"
+          type="button"
+          @click="activeFilter = 'Atom'"
+        >
+          Atom
+        </button>
+        <button
+          :class="{ 'is-active': activeFilter === 'RSS' }"
+          type="button"
+          @click="activeFilter = 'RSS'"
+        >
+          RSS
+        </button>
+        <button
+          :class="{ 'is-active': activeFilter === '链接' }"
+          type="button"
+          @click="activeFilter = '链接'"
+        >
+          链接
+        </button>
       </div>
     </div>
 
@@ -350,7 +483,12 @@ function clearSearch(): void {
     </div>
 
     <div v-if="latestSource" class="brew-bottom-bar glass-panel">
-      <button class="brew-current-update" type="button" :aria-label="latestSource.name" @click="openSource(latestSource)">
+      <button
+        class="brew-current-update"
+        type="button"
+        :aria-label="latestSource.name"
+        @click="openSource(latestSource)"
+      >
         <FriendAvatar
           class="brew-current-avatar"
           :src="latestSource.image"
@@ -359,21 +497,36 @@ function clearSearch(): void {
           loading="eager"
         />
         <span>
-          <strong>{{ latestSource.latestTitle || '暂无最新文章' }}</strong>
+          <strong>{{ latestSource.latestTitle || "暂无最新文章" }}</strong>
           <small>来自 {{ latestSource.name }}</small>
         </span>
       </button>
       <div class="brew-toolbar-actions">
-        <button type="button" aria-label="排序方式" title="排序方式" @click="toggleSort">
+        <button
+          type="button"
+          aria-label="排序方式"
+          title="排序方式"
+          @click="toggleSort"
+        >
           <IconGlyph name="arrowUpDown" :size="15" />
           <span>自由排序</span>
           <IconGlyph name="chevronDown" :size="12" />
         </button>
-        <button type="button" aria-label="搜索" title="搜索" @click="toggleSearch">
+        <button
+          type="button"
+          aria-label="搜索"
+          title="搜索"
+          @click="toggleSearch"
+        >
           <IconGlyph name="search" :size="15" />
           <span>搜索</span>
         </button>
-        <button type="button" aria-label="快捷键" title="快捷键" @click="toggleShortcuts">
+        <button
+          type="button"
+          aria-label="快捷键"
+          title="快捷键"
+          @click="toggleShortcuts"
+        >
           <IconGlyph name="keyboard" :size="15" />
           <span>快捷键</span>
         </button>
@@ -405,34 +558,63 @@ function clearSearch(): void {
               />
               <div class="detail-source-copy">
                 <div class="detail-meta">
-                  <span class="detail-type" :class="{ 'is-link': selectedSource.type === '链接' }">
-                    <IconGlyph :name="selectedSource.type === '链接' ? 'link' : 'rss'" :size="12" />
+                  <span
+                    class="detail-type"
+                    :class="{ 'is-link': selectedSource.type === '链接' }"
+                  >
+                    <IconGlyph
+                      :name="selectedSource.type === '链接' ? 'link' : 'rss'"
+                      :size="12"
+                    />
                     {{ selectedSource.type }}
                   </span>
-                  <span v-if="selectedSource.feedStatus === 'available'" class="detail-status">已更新</span>
+                  <span
+                    v-if="selectedSource.feedStatus === 'available'"
+                    class="detail-status"
+                    >已更新</span
+                  >
                   <span v-if="selectedSource.articleCount" class="detail-count">
                     {{ selectedSource.articleCount }} 篇文章
                   </span>
                 </div>
-                <h2 :id="`brew-detail-title-${selectedSource.id}`">{{ selectedSource.name }}</h2>
+                <h2 :id="`brew-detail-title-${selectedSource.id}`">
+                  {{ selectedSource.name }}
+                </h2>
                 <span class="detail-author">{{ selectedSource.author }}</span>
               </div>
             </div>
-            <button class="brew-detail-close" type="button" aria-label="关闭详情" title="关闭详情" @click="closeSource">
+            <button
+              class="brew-detail-close"
+              type="button"
+              aria-label="关闭详情"
+              title="关闭详情"
+              @click="closeSource"
+            >
               <IconGlyph name="x" :size="17" />
             </button>
           </header>
 
           <div class="brew-detail-scroll">
-            <div v-if="selectedSource.tags.length" class="detail-tags" aria-label="信息源标签">
-              <span v-for="tag in selectedSource.tags" :key="tag">{{ tag }}</span>
+            <div
+              v-if="selectedSource.tags.length"
+              class="detail-tags"
+              aria-label="信息源标签"
+            >
+              <span v-for="tag in selectedSource.tags" :key="tag">{{
+                tag
+              }}</span>
             </div>
 
             <template v-if="selectedSource.articles.length">
-              <section class="detail-section detail-latest" aria-labelledby="brew-detail-latest-title">
+              <section
+                class="detail-section detail-latest"
+                aria-labelledby="brew-detail-latest-title"
+              >
                 <div class="detail-section-heading">
                   <h3 id="brew-detail-latest-title">最新文章</h3>
-                  <time v-if="selectedSource.date">{{ selectedSource.date }}</time>
+                  <time v-if="selectedSource.date">{{
+                    selectedSource.date
+                  }}</time>
                 </div>
                 <a
                   class="detail-latest-card"
@@ -443,8 +625,16 @@ function clearSearch(): void {
                 >
                   <span class="detail-latest-mark"><span></span>LATEST</span>
                   <strong>{{ selectedSource.articles[0].title }}</strong>
-                  <p v-if="selectedSource.articles[0].summary || selectedSource.summary">
-                    {{ selectedSource.articles[0].summary || selectedSource.summary }}
+                  <p
+                    v-if="
+                      selectedSource.articles[0].summary ||
+                      selectedSource.summary
+                    "
+                  >
+                    {{
+                      selectedSource.articles[0].summary ||
+                      selectedSource.summary
+                    }}
                   </p>
                   <span class="detail-read-link">
                     阅读全文 <IconGlyph name="external" :size="14" />
@@ -452,13 +642,27 @@ function clearSearch(): void {
                 </a>
               </section>
 
-              <section class="detail-section detail-recent" aria-labelledby="brew-detail-recent-title">
+              <section
+                class="detail-section detail-recent"
+                aria-labelledby="brew-detail-recent-title"
+              >
                 <div class="detail-section-heading">
                   <h3 id="brew-detail-recent-title">近期文章</h3>
-                  <span>{{ Math.max(selectedSource.articles.length - 1, 0) }} 篇</span>
+                  <span
+                    >{{
+                      Math.max(selectedSource.articles.length - 1, 0)
+                    }}
+                    篇</span
+                  >
                 </div>
-                <div v-if="selectedSource.articles.length > 1" class="detail-article-list">
-                  <template v-for="(item, index) in selectedSource.articles.slice(1)" :key="item.id">
+                <div
+                  v-if="selectedSource.articles.length > 1"
+                  class="detail-article-list"
+                >
+                  <template
+                    v-for="(item, index) in selectedSource.articles.slice(1)"
+                    :key="item.id"
+                  >
                     <a
                       v-if="item.href"
                       class="detail-article-row"
@@ -467,7 +671,9 @@ function clearSearch(): void {
                       rel="noreferrer"
                       @click.stop
                     >
-                      <span class="detail-article-index">{{ String(index + 2).padStart(2, '0') }}</span>
+                      <span class="detail-article-index">{{
+                        String(index + 2).padStart(2, "0")
+                      }}</span>
                       <span class="detail-article-copy">
                         <strong>{{ item.title }}</strong>
                         <time v-if="item.date">{{ item.date }}</time>
@@ -475,7 +681,9 @@ function clearSearch(): void {
                       <IconGlyph name="external" :size="14" />
                     </a>
                     <div v-else class="detail-article-row">
-                      <span class="detail-article-index">{{ String(index + 2).padStart(2, '0') }}</span>
+                      <span class="detail-article-index">{{
+                        String(index + 2).padStart(2, "0")
+                      }}</span>
                       <span class="detail-article-copy">
                         <strong>{{ item.title }}</strong>
                         <time v-if="item.date">{{ item.date }}</time>
@@ -483,30 +691,35 @@ function clearSearch(): void {
                     </div>
                   </template>
                 </div>
-                <p v-else class="detail-list-empty">订阅源暂时只有这一篇文章。</p>
+                <p v-else class="detail-list-empty">
+                  订阅源暂时只有这一篇文章。
+                </p>
               </section>
             </template>
 
             <section v-else class="detail-no-feed" aria-live="polite">
               <span class="detail-no-feed-icon">
-                <IconGlyph :name="selectedSource.type === '链接' ? 'link' : 'rss'" :size="20" />
+                <IconGlyph
+                  :name="selectedSource.type === '链接' ? 'link' : 'rss'"
+                  :size="20"
+                />
               </span>
               <strong>
                 {{
-                  selectedSource.feedStatus === 'unset'
-                    ? '未设置订阅源'
-                    : selectedSource.feedStatus === 'unavailable'
-                      ? '订阅源暂时不可用'
-                      : '暂无文章'
+                  selectedSource.feedStatus === "unset"
+                    ? "未设置订阅源"
+                    : selectedSource.feedStatus === "unavailable"
+                      ? "订阅源暂时不可用"
+                      : "暂无文章"
                 }}
               </strong>
               <p>
                 {{
-                  selectedSource.feedStatus === 'unset'
-                    ? '这是一个友联入口，可以访问站点查看内容。'
-                    : selectedSource.feedStatus === 'unavailable'
-                      ? '当前无法读取 RSS / Atom 内容，请稍后再试。'
-                      : '订阅源已连接，暂时还没有可展示的文章。'
+                  selectedSource.feedStatus === "unset"
+                    ? "这是一个友联入口，可以访问站点查看内容。"
+                    : selectedSource.feedStatus === "unavailable"
+                      ? "当前无法读取 RSS / Atom 内容，请稍后再试。"
+                      : "订阅源已连接，暂时还没有可展示的文章。"
                 }}
               </p>
             </section>
@@ -514,15 +727,28 @@ function clearSearch(): void {
 
           <footer class="detail-footer">
             <span class="detail-footer-state">
-              <span class="detail-footer-dot" :class="{ 'is-live': selectedSource.feedStatus === 'available' }"></span>
-              {{ selectedSource.feedStatus === 'available' ? '实时订阅' : '友联站点' }}
+              <span
+                class="detail-footer-dot"
+                :class="{
+                  'is-live': selectedSource.feedStatus === 'available',
+                }"
+              ></span>
+              友联站点
             </span>
-            <a class="detail-action" :href="selectedSource.href" target="_blank" rel="noreferrer" @click.stop>
+            <a
+              class="detail-action"
+              :href="selectedSource.href"
+              target="_blank"
+              rel="noreferrer"
+              @click.stop
+            >
               访问站点 <IconGlyph name="external" :size="14" />
             </a>
           </footer>
         </section>
       </aside>
+    </Transition>
+  </div>
     </Transition>
   </div>
 </template>
@@ -541,6 +767,23 @@ function clearSearch(): void {
   text-align: center;
 }
 
+.brew-section-stage {
+  display: flow-root;
+  min-height: 100vh;
+}
+
+.brew-section-enter-active,
+.brew-section-leave-active {
+  /* Keep fixed toolbars viewport-anchored while cards fade in independently. */
+  transition: opacity 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: opacity;
+}
+
+.brew-section-enter-from,
+.brew-section-leave-to {
+  opacity: 0;
+}
+
 .brew-section-empty strong {
   color: var(--ink);
   font-size: 0.9rem;
@@ -553,12 +796,13 @@ function clearSearch(): void {
 .brew-page {
   position: relative;
   display: flow-root;
+  width: 100vw;
   min-height: 100vh;
   padding-bottom: 120px;
 }
 
 .brew-content {
-  width: min(1280px, calc(100% - 48px));
+  width: min(1280px, calc(100% - 220px));
   margin: 80px auto 0;
 }
 
@@ -643,7 +887,7 @@ function clearSearch(): void {
   position: fixed;
   z-index: 30;
   bottom: 32px;
-  left: 50%;
+  left: 50vw;
   display: flex;
   width: clamp(461px, 35vw, 502px);
   height: 54px;
@@ -752,7 +996,7 @@ function clearSearch(): void {
 }
 
 .brew-search-panel {
-  left: 50%;
+  left: 50vw;
   display: flex;
   width: min(340px, calc(100vw - 32px));
   height: 43px;
@@ -787,7 +1031,7 @@ function clearSearch(): void {
 }
 
 .brew-sort-menu {
-  left: calc(50% + 140px);
+  left: calc(50vw + 140px);
   display: flex;
   width: 170px;
   padding: 10px;
@@ -846,7 +1090,7 @@ function clearSearch(): void {
 }
 
 .brew-shortcut-panel {
-  left: calc(50% + 155px);
+  left: calc(50vw + 155px);
   display: flex;
   width: 142px;
   padding: 10px;
@@ -1015,7 +1259,10 @@ kbd {
   border-radius: 50%;
   color: var(--muted-strong);
   background: rgba(234, 231, 245, 0.68);
-  transition: color 0.18s ease, background 0.18s ease, transform 0.18s ease;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease;
 }
 
 .brew-detail-close:hover,
@@ -1083,7 +1330,10 @@ kbd {
   color: inherit;
   background: rgba(234, 231, 247, 0.7);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.56);
-  transition: background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+  transition:
+    background 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
 }
 
 .detail-latest-card:hover,
@@ -1160,7 +1410,9 @@ kbd {
 }
 
 a.detail-article-row {
-  transition: color 0.18s ease, padding 0.18s ease;
+  transition:
+    color 0.18s ease,
+    padding 0.18s ease;
 }
 
 a.detail-article-row:hover,
@@ -1289,7 +1541,9 @@ a.detail-article-row:focus-visible {
   box-shadow: 0 5px 12px rgba(117, 100, 222, 0.2);
   font-size: 0.62rem;
   font-weight: 720;
-  transition: background 0.18s ease, transform 0.18s ease;
+  transition:
+    background 0.18s ease,
+    transform 0.18s ease;
 }
 
 .detail-action:hover,
@@ -1305,7 +1559,9 @@ a.detail-article-row:focus-visible {
 
 .brew-detail-enter-active .brew-detail,
 .brew-detail-leave-active .brew-detail {
-  transition: opacity 0.24s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+  transition:
+    opacity 0.24s ease,
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 .brew-detail-enter-from,
@@ -1353,7 +1609,7 @@ a.detail-article-row:focus-visible {
   }
 
   .brew-content {
-    width: calc(100% - 32px);
+    width: calc(100% - 24px);
     margin-top: 80px;
   }
 

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { backgroundBlurModeByPage } from "../../data/background";
 import { getAppPageFromPath } from "../../data/routes";
 import { cloneLocalConfig, normalizeLocalConfig } from "../../data/localConfig";
 import { applyLocalConfigToSiteData } from "../../lib/dataSources/index";
@@ -102,10 +103,16 @@ function syncSettingsViewportLock(): void {
 const parallaxX = ref(0);
 const parallaxY = ref(0);
 const backgroundFocus = ref(0);
+const backgroundBlurMode = computed(
+  () => backgroundBlurModeByPage[currentPage.value],
+);
 const backgroundStyle = computed(() => ({
   "--parallax-x": `${parallaxX.value.toFixed(2)}px`,
   "--parallax-y": `${parallaxY.value.toFixed(2)}px`,
-  "--background-focus": backgroundFocus.value.toFixed(3),
+  "--background-focus":
+    backgroundBlurMode.value === "pointer"
+      ? backgroundFocus.value.toFixed(3)
+      : "0.000",
 }));
 
 let animationFrame: number | null = null;
@@ -302,10 +309,7 @@ function scheduleConfigSave(config: LocalConfig): void {
  * @param persist - 是否将配置延迟写入本地开发接口。
  * @returns 无返回值；非编辑模式下忽略变更。
  */
-function handleHomeConfigChange(
-  nextConfig: LocalConfig,
-  persist = true,
-): void {
+function handleHomeConfigChange(nextConfig: LocalConfig, persist = true): void {
   if (!props.editable) return;
   const config = normalizeLocalConfig(cloneLocalConfig(nextConfig));
   runtimeConfig.value = config;
@@ -354,7 +358,10 @@ function handleMusicConfigChange(event: Event): void {
     },
   });
   runtimeConfig.value = config;
-  runtimeSiteData.value = applyLocalConfigToSiteData(runtimeSiteData.value, config);
+  runtimeSiteData.value = applyLocalConfigToSiteData(
+    runtimeSiteData.value,
+    config,
+  );
   syncDocumentHead();
   scheduleConfigSave(config);
 }
@@ -394,7 +401,10 @@ onMounted(() => {
     window.addEventListener("scroll", handleScroll, { passive: true });
   }
   window.addEventListener("popstate", handlePopState);
-  window.addEventListener("music-player-config-change", handleMusicConfigChange);
+  window.addEventListener(
+    "music-player-config-change",
+    handleMusicConfigChange,
+  );
 });
 
 onBeforeUnmount(() => {
@@ -404,7 +414,10 @@ onBeforeUnmount(() => {
   window.removeEventListener("pointerleave", handlePointerLeave);
   window.removeEventListener("scroll", handleScroll);
   window.removeEventListener("popstate", handlePopState);
-  window.removeEventListener("music-player-config-change", handleMusicConfigChange);
+  window.removeEventListener(
+    "music-player-config-change",
+    handleMusicConfigChange,
+  );
   if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
   if (configSaveTimer !== null) window.clearTimeout(configSaveTimer);
 });
@@ -414,6 +427,8 @@ onBeforeUnmount(() => {
   <div
     class="app-frame"
     :data-page="currentPage"
+    :data-background-blur-mode="backgroundBlurMode"
+    :data-brew-section="currentPage === 'brew' ? activeBrewSection : undefined"
     @click.capture="handleAppClick"
   >
     <div
@@ -421,7 +436,7 @@ onBeforeUnmount(() => {
       :style="backgroundStyle"
       aria-hidden="true"
     ></div>
-    <div class="app-background-overlay" aria-hidden="true"></div>
+     <div class="app-background-overlay" aria-hidden="true"></div>
     <NavigationRail
       :page="currentPage"
       :library-filter="activeLibraryFilter"

@@ -122,6 +122,7 @@ function handleOpen(): void {
 .brew-source-card {
   position: relative;
   display: flex;
+  --brew-source-card-delay: 0ms;
   min-width: 0;
   height: 100%;
   padding: 17px 15px 16px;
@@ -134,6 +135,9 @@ function handleOpen(): void {
   box-shadow: 0 10px 25px rgba(72, 56, 135, 0.08);
   backdrop-filter: blur(18px) saturate(132%);
   transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+  animation: brew-source-card-in 0.52s var(--brew-source-card-delay)
+    cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: opacity;
 }
 
 .brew-source-card:hover,
@@ -448,6 +452,22 @@ function handleOpen(): void {
   color: var(--muted-strong);
   font-size: 0.72rem;
   font-weight: 500;
+}
+
+@keyframes brew-source-card-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .brew-source-card {
+    animation: none;
+    will-change: auto;
+  }
 }
 
 @media (max-width: 820px) {

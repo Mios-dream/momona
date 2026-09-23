@@ -2,6 +2,8 @@
 title: "图片引用参考"
 description: "这是文章中添加图片的参考文件。"
 pubDate: 2026-09-22
+category: "示例"
+cover: "./cover.png"
 tags:
   - 示例
   - 草稿

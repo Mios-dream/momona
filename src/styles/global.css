@@ -18,6 +18,9 @@
   --glass-soft: rgba(255, 255, 255, 0.42);
   --glass-border: rgba(255, 255, 255, 0.84);
   --glass-shadow: 0 18px 44px rgba(54, 45, 106, 0.14);
+  --content-surface: #fbfcff;
+  --content-border: rgba(255, 255, 255, 0.84);
+  --content-shadow: 0 10px 25px rgba(72, 56, 135, 0.08);
   --purple: #7564de;
   --purple-deep: #5541b5;
   --blue: #119dd9;
@@ -40,6 +43,7 @@ html {
   min-height: 100%;
   background: #d5dbf3;
   scrollbar-width: none;
+  scrollbar-gutter: stable;
 }
 
 html::-webkit-scrollbar {
@@ -54,6 +58,7 @@ body {
   color: var(--ink);
   background: #d5dbf3;
   scrollbar-width: none;
+  scrollbar-gutter: stable;
 }
 
 body::-webkit-scrollbar {
@@ -162,6 +167,16 @@ img {
   --background-blur-base: 1px;
   filter: saturate(0.96) brightness(1.02)
     blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.42s ease;
+}
+
+.app-frame[data-page="brew"][data-brew-section="articles"] .app-background {
+  --background-scale: 1.03;
+  --background-blur-base: 7px;
+  filter: saturate(0.48) brightness(1.13)
+    blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
 }
 
 .app-shell {
@@ -262,6 +277,14 @@ body.is-settings-view {
   background: var(--glass);
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(18px) saturate(132%);
+  /* border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.28) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.04) inset,
+    0 8px 28px rgba(31, 38, 135, 0.1);
+  backdrop-filter: blur(13.6px) saturate(180%); */
 }
 
 .compact-button {
@@ -338,6 +361,13 @@ body.is-settings-view {
     --background-scale: 1.015;
     --background-blur-base: 7px;
     filter: saturate(0.72) brightness(1.05)
+      blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
+  }
+
+  .app-frame[data-page="brew"][data-brew-section="articles"] .app-background {
+    --background-scale: 1.02;
+    --background-blur-base: 10px;
+    filter: saturate(0.42) brightness(1.12)
       blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
   }
 

@@ -2,6 +2,7 @@
 title: "你好，Momona"
 description: "这是文章 frontmatter 和 Markdown 正文的参考文件。"
 pubDate: 2026-09-22
+category: "示例"
 tags:
   - 示例
   - 草稿

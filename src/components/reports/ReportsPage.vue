@@ -279,11 +279,9 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="reports-page" :class="{ 'is-stage-open': stageOpen }">
-    <div class="reports-atmosphere" aria-hidden="true">
-      <span class="reports-orbit reports-orbit-one"></span>
-      <span class="reports-orbit reports-orbit-two"></span>
+    <!-- <div class="reports-atmosphere" aria-hidden="true">
       <span class="reports-grid"></span>
-    </div>
+    </div> -->
 
     <section v-if="activeCard" class="reports-stage" aria-label="平台报告舞台">
       <div class="reports-stage-head">
@@ -429,31 +427,7 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
-.reports-orbit {
-  position: absolute;
-  display: block;
-  border: 1px solid rgba(255, 255, 255, 0.34);
-  border-radius: 50%;
-  opacity: 0.55;
-  transform: rotate(-18deg);
-}
-
-.reports-orbit-one {
-  top: 20%;
-  right: -7%;
-  width: min(46vw, 620px);
-  aspect-ratio: 1.5;
-}
-
-.reports-orbit-two {
-  top: 27%;
-  right: -3%;
-  width: min(37vw, 500px);
-  aspect-ratio: 1.5;
-  border-color: rgba(117, 100, 222, 0.22);
-}
-
-.reports-grid {
+/* .reports-grid {
   position: absolute;
   right: 7%;
   bottom: 17%;
@@ -466,7 +440,7 @@ onBeforeUnmount(() => {
   background-size: 22px 22px;
   mask-image: linear-gradient(to left, #000, transparent);
   transform: perspective(400px) rotateX(58deg) rotateZ(-5deg);
-}
+} */
 
 .reports-stage {
   position: absolute;
@@ -488,10 +462,7 @@ onBeforeUnmount(() => {
 .reports-stage-heading {
   position: absolute;
   top: -90px;
-  left: max(
-    4px,
-    calc(116px - max(32px, calc((100vw - 1264px) / 2)))
-  );
+  left: max(4px, calc(116px - max(32px, calc((100vw - 1264px) / 2))));
   display: flex;
   flex-direction: column;
 }
@@ -508,10 +479,7 @@ onBeforeUnmount(() => {
 .reports-status {
   position: absolute;
   top: 4px;
-  left: max(
-    4px,
-    calc(116px - max(32px, calc((100vw - 1264px) / 2)))
-  );
+  left: max(4px, calc(116px - max(32px, calc((100vw - 1264px) / 2))));
   display: flex;
   width: min(281px, calc(100vw - 117px));
   height: 52px;
@@ -519,14 +487,6 @@ onBeforeUnmount(() => {
   padding: 0 8px 0 12px;
   align-items: center;
   gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.28) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.04) inset,
-    0 8px 28px rgba(31, 38, 135, 0.1);
-  backdrop-filter: blur(13.6px) saturate(180%);
   box-sizing: border-box;
   transition:
     width 0.52s cubic-bezier(0.22, 1, 0.36, 1),
