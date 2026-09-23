@@ -939,6 +939,9 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   padding: 4px;
+  animation: home-widget-enter 0.56s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--widget-enter-delay, 0ms);
+  will-change: opacity, transform;
 }
 
 .home-slot > *:first-child {
@@ -955,6 +958,17 @@ onBeforeUnmount(() => {
 .home-slot.is-dragging > *:first-child {
   outline: 2px solid rgba(117, 100, 222, 0.72);
   outline-offset: 2px;
+}
+
+@keyframes home-widget-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
 }
 
 .home-editor-backdrop {
@@ -995,6 +1009,13 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .home-slot {
+    animation: none;
+    opacity: 1;
+    transform: none;
+    will-change: auto;
+  }
+
   .home-editor-backdrop-enter-active,
   .home-editor-backdrop-leave-active,
   :deep(.home-editor-panel-enter-active),

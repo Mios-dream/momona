@@ -132,7 +132,7 @@ export function widgetStyle(
   index = 0,
 ): Record<string, string> {
   return {
-    "--widget-index": String(index),
+    "--widget-enter-delay": `${Math.min(index, 8) * 42}ms`,
     "--widget-col-start": String(safeColumn(widget)),
     "--widget-row-start": String(safeRow(widget)),
     "--widget-col-span": String(widget.colSpan),

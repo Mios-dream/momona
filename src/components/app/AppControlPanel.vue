@@ -170,7 +170,7 @@ function cyclePlaybackMode(): void {
   );
 }
 
-const collapsedLabel = computed(() => {
+const collapsedTitle = computed(() => {
   if (activeCollapsedItem.value === "weather") {
     return weather.value
       ? `${weather.value.temperature}° ${weather.value.weather}`
@@ -178,13 +178,6 @@ const collapsedLabel = computed(() => {
         ? "正在读取天气"
         : "天气暂不可用";
   }
-  if (activeCollapsedItem.value === "greeting") return "问候";
-  return "一言";
-});
-
-const collapsedTitle = computed(() => {
-  if (activeCollapsedItem.value === "weather")
-    return weather.value?.city || "当前位置";
   if (activeCollapsedItem.value === "greeting") return greeting.value;
   return quote.value.text;
 });
@@ -415,7 +408,7 @@ onBeforeUnmount(() => {
             key="collapsed"
             type="button"
             class="control-collapsed"
-            :aria-label="`展开状态控制台，当前显示${collapsedLabel}`"
+            aria-label="展开状态控制台"
             aria-expanded="false"
             @click="toggleExpanded"
           >
@@ -428,21 +421,9 @@ onBeforeUnmount(() => {
               <IconGlyph v-else :name="collapsedIcon" :size="16" />
             </span>
             <Transition name="control-copy" mode="out-in">
-              <span
-                :key="activeCollapsedItem"
-                class="control-collapsed-copy"
-                :class="{ 'is-weather': activeCollapsedItem === 'weather' }"
-              >
-                <template v-if="activeCollapsedItem === 'weather'">
-                  <strong>{{ collapsedLabel }}</strong>
-                  <small>{{ collapsedTitle }}</small>
-                  <em>{{ collapsedDetail }}</em>
-                </template>
-                <template v-else>
-                  <small>{{ collapsedLabel }}</small>
-                  <strong>{{ collapsedTitle }}</strong>
-                  <em>{{ collapsedDetail }}</em>
-                </template>
+              <span :key="activeCollapsedItem" class="control-collapsed-copy">
+                <strong>{{ collapsedTitle }}</strong>
+                <em>{{ collapsedDetail }}</em>
               </span>
             </Transition>
             <span
@@ -480,10 +461,8 @@ onBeforeUnmount(() => {
               </button>
             </div>
 
-            <section class="control-quote" aria-label="一言">
-              <IconGlyph name="messageCircle" :size="15" />
+            <section class="control-quote glass-panel" aria-label="一言">
               <div>
-                <span>一言</span>
                 <p>{{ quote.text }}</p>
                 <small v-if="quote.from">—— {{ quote.from }}</small>
               </div>
@@ -721,13 +700,13 @@ onBeforeUnmount(() => {
 
 .control-panel.is-expanded {
   width: min(400px, calc(100vw - 32px));
-  height: min(400px, calc(100svh - 32px));
+  height: min(384px, calc(100svh - 32px));
   border-radius: 18px;
   box-shadow: 0 18px 42px rgba(54, 45, 106, 0.16);
 }
 
 .control-panel.is-expanded.is-playlist-open {
-  height: min(500px, calc(100svh - 32px));
+  height: min(487px, calc(100svh - 32px));
 }
 
 .control-panel:not(.is-expanded) {
@@ -772,11 +751,12 @@ onBeforeUnmount(() => {
 }
 
 .control-collapsed-icon {
-  display: grid;
+  display: flex;
   width: 22px;
   height: 26px;
   flex: 0 0 auto;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
   color: var(--purple-deep);
 }
 
@@ -787,9 +767,10 @@ onBeforeUnmount(() => {
 }
 
 .control-collapsed-copy {
-  display: grid;
+  display: flex;
   min-width: 0;
   flex: 1;
+  flex-direction: column;
   gap: 1px;
   line-height: 1.12;
 }
@@ -811,15 +792,6 @@ onBeforeUnmount(() => {
 .control-collapsed-copy strong {
   font-size: 0.62rem;
   font-weight: 760;
-}
-
-.control-collapsed-copy.is-weather strong {
-  font-size: 0.82rem;
-  line-height: 1;
-}
-
-.control-collapsed-copy.is-weather small {
-  color: var(--muted);
 }
 
 .control-collapsed-copy em {
@@ -859,15 +831,25 @@ onBeforeUnmount(() => {
 }
 
 .control-expanded {
-  display: grid;
+  display: flex;
   width: 100%;
   height: auto;
   min-height: 0;
   padding: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: flex-start;
   overflow-y: auto;
   scrollbar-width: none;
   gap: 9px;
   border-radius: 18px;
+}
+
+.control-expanded > .control-head,
+.control-expanded > .control-quote,
+.control-expanded > .control-weather,
+.control-expanded > .control-music {
+  flex: 0 0 auto;
 }
 
 .control-expanded::-webkit-scrollbar {
@@ -882,7 +864,8 @@ onBeforeUnmount(() => {
 }
 
 .control-head > div {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
 }
 
@@ -898,12 +881,13 @@ onBeforeUnmount(() => {
 
 .control-close,
 .control-play {
-  display: grid;
+  display: flex;
   width: 34px;
   height: 34px;
   padding: 0;
   flex: 0 0 auto;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
   border: 1px solid rgba(118, 126, 151, 0.16);
   border-radius: 50%;
   color: var(--muted-strong);
@@ -930,21 +914,26 @@ onBeforeUnmount(() => {
 .control-quote {
   padding: 10px 11px;
   align-items: flex-start;
-  border: 1px solid rgba(118, 126, 151, 0.1);
   border-radius: 13px;
-  color: var(--purple-deep);
-  background: rgba(255, 255, 255, 0.5);
+  background:
+    linear-gradient(
+      108deg,
+      rgba(255, 255, 255, 0.92),
+      rgba(252, 249, 255, 0.78) 58%,
+      rgba(255, 247, 237, 0.74)
+    ),
+    rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 6px 15px rgba(72, 83, 126, 0.06);
 }
 
 .control-quote > div {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  flex: 1;
   gap: 4px;
-}
-
-.control-quote > svg {
-  flex: 0 0 auto;
-  margin-top: 1px;
 }
 
 .control-quote span,
@@ -961,6 +950,7 @@ onBeforeUnmount(() => {
   margin: 0;
   color: var(--ink-soft);
   font-size: 0.66rem;
+  font-weight: bold;
   line-height: 1.55;
 }
 
@@ -970,13 +960,13 @@ onBeforeUnmount(() => {
   font-size: 0.49rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+  text-align: end;
 }
 
 .control-weather {
-  display: grid;
+  display: flex;
   min-height: 84px;
   padding: 10px 12px;
-  grid-template-columns: 45px minmax(0, 1fr) 42px;
   align-items: center;
   gap: 10px;
   border: 1px solid rgba(132, 151, 186, 0.2);
@@ -995,20 +985,23 @@ onBeforeUnmount(() => {
 }
 
 .control-music-cover {
-  display: grid;
+  display: flex;
   width: 48px;
   height: 48px;
   flex: 0 0 auto;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
   border-radius: 12px;
   color: var(--blue);
 }
 
 .control-weather-icon {
-  display: grid;
+  display: flex;
   width: 45px;
   height: 45px;
-  place-items: center;
+  flex: 0 0 45px;
+  align-items: center;
+  justify-content: center;
   color: #7097bd;
 }
 
@@ -1020,8 +1013,10 @@ onBeforeUnmount(() => {
 }
 
 .control-weather-copy {
-  display: grid;
+  display: flex;
   min-width: 0;
+  flex: 1 1 auto;
+  flex-direction: column;
   gap: 6px;
 }
 
@@ -1092,10 +1087,12 @@ onBeforeUnmount(() => {
 }
 
 .control-weather-forecast {
-  display: grid;
+  display: flex;
   min-width: 0;
-  justify-items: end;
-  align-content: center;
+  flex: 0 0 42px;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: center;
   gap: 3px;
   color: #778196;
   font-size: 0.52rem;
@@ -1142,10 +1139,6 @@ onBeforeUnmount(() => {
   font-size: 0.54rem;
 }
 
-.control-weather.is-unavailable {
-  grid-template-columns: 45px minmax(0, 1fr);
-}
-
 .control-weather.is-unavailable .control-weather-icon svg {
   animation: weather-pulse 1.8s ease-in-out infinite;
 }
@@ -1164,9 +1157,10 @@ onBeforeUnmount(() => {
 }
 
 .control-section-copy {
-  display: grid;
+  display: flex;
   min-width: 0;
   flex: 1;
+  flex-direction: column;
   gap: 2px;
 }
 
@@ -1193,7 +1187,9 @@ onBeforeUnmount(() => {
 }
 
 .control-music {
-  display: grid;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   padding: 16px 16px 12px;
   gap: 6px;
   border: 1px solid rgba(104, 151, 196, 0.34);
@@ -1212,17 +1208,26 @@ onBeforeUnmount(() => {
 }
 
 .control-music-player {
-  display: grid;
+  display: flex;
   min-width: 0;
+  flex-direction: column;
   gap: 6px;
 }
 
 .control-music-top {
-  display: grid;
+  display: flex;
   min-width: 0;
-  grid-template-columns: 62px minmax(0, 1fr) 22px;
   align-items: center;
   gap: 12px;
+}
+
+.control-music-top .control-music-copy {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.control-music-equalizer {
+  flex: 0 0 22px;
 }
 
 .control-music-cover-wrap {
@@ -1315,13 +1320,26 @@ onBeforeUnmount(() => {
 }
 
 .control-music-progress {
-  display: grid;
-  grid-template-columns: 64px 34px minmax(0, 1fr) 34px;
+  display: flex;
   align-items: center;
   gap: 8px;
   color: var(--muted);
   font-size: 0.48rem;
   transform: translateY(-14px);
+}
+
+.control-music-progress-spacer {
+  flex: 0 0 64px;
+}
+
+.control-music-progress > span:nth-child(2),
+.control-music-progress > span:last-child {
+  flex: 0 0 34px;
+}
+
+.control-music-progress-input {
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .control-music-progress > span:nth-child(2) {
@@ -1333,7 +1351,7 @@ onBeforeUnmount(() => {
 }
 
 .control-music-progress-input {
-  width: 100%;
+  width: auto;
   height: 14px;
   margin: 0;
   appearance: none;
@@ -1388,20 +1406,21 @@ onBeforeUnmount(() => {
 }
 
 .control-music-toolbar {
-  display: grid;
+  display: flex;
   min-width: 0;
-  grid-template-columns: repeat(7, minmax(28px, 1fr));
   align-items: center;
-  justify-items: center;
+  justify-content: space-between;
   gap: 0;
 }
 
 .control-music-action {
-  display: grid;
+  display: flex;
   width: 28px;
   height: 28px;
   padding: 0;
-  place-items: center;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 50%;
   color: var(--muted-strong);
@@ -1489,11 +1508,12 @@ onBeforeUnmount(() => {
 }
 
 .control-music :deep(.music-picker-trigger) {
-  display: grid;
+  display: flex;
   width: 28px;
   height: 28px;
   padding: 0;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 50%;
   color: var(--muted-strong);
@@ -1571,14 +1591,14 @@ onBeforeUnmount(() => {
 
 .control-panel-swap-enter-from {
   opacity: 0;
-  transform: translateY(-10px) scale(0.94);
+  transform: translateY(-10px);
   filter: blur(4px);
   clip-path: inset(0 0 8% 0 round 18px);
 }
 
 .control-panel-swap-leave-to {
   opacity: 0;
-  transform: translateY(7px) scale(0.98);
+  transform: translateY(7px);
   filter: blur(3px);
   clip-path: inset(0 0 8% 0 round 18px);
 }
@@ -1608,11 +1628,11 @@ onBeforeUnmount(() => {
   }
 
   .control-panel.is-expanded {
-    height: min(390px, calc(100svh - 24px));
+    height: min(377px, calc(100svh - 24px));
   }
 
   .control-panel.is-expanded.is-playlist-open {
-    height: min(500px, calc(100svh - 24px));
+    height: min(480px, calc(100svh - 24px));
   }
 
   .control-panel:not(.is-expanded) {

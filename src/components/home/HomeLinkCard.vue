@@ -73,8 +73,6 @@ const isBrandPlatform = computed(() => brandPlatforms.includes(props.settings.pl
   color: var(--ink);
   background: rgba(255, 255, 255, 0.66);
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
-  animation: link-card-in 0.48s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: calc(var(--widget-index, 0) * 35ms);
 }
 
 .home-link-card:hover {
@@ -175,20 +173,4 @@ const isBrandPlatform = computed(() => brandPlatforms.includes(props.settings.pl
   }
 }
 
-@keyframes link-card-in {
-  from {
-    opacity: 0;
-    transform: translateY(8px) scale(0.98);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .home-link-card {
-    animation: none;
-  }
-}
 </style>

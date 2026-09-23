@@ -186,7 +186,7 @@ onBeforeUnmount(() => {
           <span class="momona-page-loader__spinner" aria-hidden="true"></span>
         </div>
 
-        <div v-else-if="props.error" class="blog-empty" aria-live="polite">
+        <div v-else-if="props.error" class="blog-error-state" role="alert">
           <IconGlyph name="refresh" :size="23" />
           <strong>文章列表暂时无法读取</strong>
           <span>请稍后重试。</span>
@@ -844,6 +844,29 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
+.blog-error-state {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
+  color: var(--muted);
+  text-align: center;
+  pointer-events: none;
+}
+
+.blog-error-state strong {
+  color: var(--ink);
+  font-size: 0.9rem;
+}
+
+.blog-error-state span {
+  font-size: 0.7rem;
+}
+
 .blog-empty strong {
   color: var(--ink);
   font-size: 0.9rem;
@@ -865,6 +888,7 @@ onBeforeUnmount(() => {
   background: var(--purple-deep);
   font-size: 0.68rem;
   font-weight: 700;
+  pointer-events: auto;
 }
 
 @keyframes blog-card-in {
