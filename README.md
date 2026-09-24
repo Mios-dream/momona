@@ -1,87 +1,131 @@
 <div align="center">
-  <img src="./docs/assets/cover.png" alt="Momona背景" width="30%" />
-</div>
-
-<div align="center">
+  <img src="./docs/assets/cover.png" alt="Momona" width="180" />
   <h1>Momona</h1>
   <p>本地生成、静态部署的个人数字生活展示博客</p>
+  <p>
+    <a href="https://github.com/Mios-dream/momona">项目仓库</a>
+    · <a href="#博客预览">页面预览</a>
+    · <a href="#快速开始">快速开始</a>
+    · <a href="#配置说明">配置说明</a>
+  </p>
 </div>
 
 <div align="center">
 
+[![CI](https://github.com/Mios-dream/momona/actions/workflows/ci.yml/badge.svg)](https://github.com/Mios-dream/momona/actions/workflows/ci.yml)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.12.0-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
+[![pnpm](https://img.shields.io/badge/pnpm-11-F69220?style=for-the-badge&logo=pnpm&logoColor=white)](https://pnpm.io/)
 [![Astro](https://img.shields.io/badge/Astro-7-ff5d01?style=for-the-badge&logo=astro&logoColor=white)](https://astro.build/)
 [![Vue](https://img.shields.io/badge/Vue-3-42b883?style=for-the-badge&logo=vue.js&logoColor=white)](https://vuejs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-6-3178c6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![License: AGPL-3.0-only](https://img.shields.io/badge/License-AGPL--3.0--only-1f6feb?style=for-the-badge)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-0.0.1-6d5dfc?style=for-the-badge)](./package.json)
 
 </div>
 
-Momona 将个人资料、公开动态、收藏、友联、音乐和数据摘要整理到一个响应式站点中。它面向单用户本地编辑：开发阶段通过设置页同步数据并保存快照，发布阶段只输出纯静态文件，不需要在线数据库或运行中的后端服务。
+Momona 把个人资料、公开动态、收藏、友联、音乐和数据摘要整理到一个响应式站点中。它面向单用户本地编辑：开发阶段通过设置页配置与同步数据，发布阶段只输出纯静态文件，不需要在线数据库或运行中的后端服务。
 
-项目的视觉和交互模式参考了 [Myriad](https://github.com/Myriad-You/Myriad)，具体实现由本仓库中的 Astro、Vue 和 TypeScript 代码完成。
+> [!NOTE]
+> Momona 的设置页和 `/__momona/*` 本地接口只在 Astro 开发服务器中提供。生产构建只读取项目文件和公开页面快照，不会把本地设置接口输出到 `dist/`。
 
-## ✨ 特性
+⚡ **静态站点**：Astro 生成独立 HTML 页面，可部署到 GitHub Pages、Cloudflare Pages、Netlify、Nginx 或其他静态文件服务器。
 
-- **静态优先**：使用 Astro 构建独立 HTML 页面，生成物可部署到任意静态文件服务器。
-- **个人控制面板**：集中展示个人资料、社交链接、活动、天气、音乐和游戏信息。
-- **可编辑首页**：在本地设置页中调整首页组件的显示、顺序和网格尺寸。
-- **多来源同步**：支持 Bangumi、Bilibili、GitHub、Steam、SFACG、网易云音乐和 QQ 音乐的公开内容。
-- **资料库画布**：支持筛选、拖拽、缩放和重置，用于整理收藏内容。
-- **阅读与报告**：提供订阅源阅读空间、文章详情弹层和个人数字生活数据报告。
-- **本地凭据隔离**：访问令牌写入被 Git 忽略的本地凭据文件，不进入公开页面快照。
-- **响应式界面**：桌面端与移动端共用应用外壳，支持站内无刷新切换和音乐播放控制。
+🎛️ **本地编辑**：在 `/settings` 中管理站点身份、首页组件、友联、数据来源和同步状态。
 
-## 📄 页面
+🔗 **数据聚合**：将 Bangumi、Bilibili、GitHub、Steam、SFACG、网易云音乐和 QQ 音乐的公开内容投影到统一页面。
 
-| 路径        | 内容                                     | 环境       |
-| ----------- | ---------------------------------------- | ---------- |
-| `/`         | 个人控制面板、活动、天气、音乐和游戏信息 | 开发与生产 |
-| `/library`  | 可筛选、拖拽、缩放和重置的资料库画布     | 开发与生产 |
-| `/friends`  | 友联列表和订阅源内容                     | 开发与生产 |
-| `/brew`     | 订阅源筛选、搜索、排序和文章详情         | 开发与生产 |
-| `/reports`  | 数据指标、来源摘要和报告卡片             | 开发与生产 |
-| `/settings` | 基础设置、数据管理和同步状态             | 仅本地开发 |
-| `/404`      | 未找到页面                               | 生产构建   |
+🔒 **隐私优先**：凭据和原始响应留在被 Git 忽略的 `.momona/` 中，公开快照只写入当前选择展示的内容。
 
-`/settings` 和 `/__momona/*` 本地接口由 Astro 开发期插件注入，生产构建不会将它们输出到 `dist/`。
+## 🖼️ 博客预览
 
-## 🧩 数据来源
+<table width="100%" align="center">
+  <tr>
+    <td align="center" width="50%">
+      <img src="./docs/assets/首页.png" alt="首页预览" width="100%" />
+      <br />首页控制面板
+    </td>
+    <td align="center" width="50%">
+      <img src="./docs/assets/我的文章.png" alt="我的文章预览" width="100%" />
+      <br />我的文章
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="50%">
+      <img src="./docs/assets/文章详情.png" alt="文章详情预览" width="100%" />
+      <br />文章详情与阅读工具
+    </td>
+    <td align="center" width="50%">
+      <img src="./docs/assets/数据报告.png" alt="数据报告预览" width="100%" />
+      <br />个人数字生活数据报告
+    </td>
+  </tr>
+</table>
 
-设置页支持按来源启用同步，并单独选择需要写入页面快照的内容类型。
+## ✨ 功能特性
 
-| 来源                                  | 配置标识   | 支持内容                                                      |
-| ------------------------------------- | ---------- | ------------------------------------------------------------- |
-| [Bangumi](https://bgm.tv/)            | `bangumi`  | 追番、游戏、书籍、音乐收藏                                    |
-| [Bilibili](https://www.bilibili.com/) | `bilibili` | 投稿视频、公开收藏夹、追番 / 追剧                             |
-| [GitHub](https://github.com/)         | `github`   | 公开仓库或 Pinned 仓库，可按更新时间、Stars、Forks 或名称排序 |
-| [Steam](https://steamcommunity.com/)  | `steam`    | 最近游玩、近两周时长；填写 Web API Key 后同步游戏库           |
-| [SFACG](https://p.sfacg.com/)         | `sfacg`    | 输入公开书架地址，同步书架中的小说                            |
-| 网易云音乐                            | `netease`  | 喜欢的音乐、创建的歌单、收藏的歌单                            |
-| QQ 音乐                               | `qqmusic`  | 喜欢的音乐、创建的歌单、收藏的歌单                            |
+### 核心体验
+
+- [x] **个人首页控制面板**：展示资料、社交链接、动态、天气、音乐、游戏和项目活动。
+- [x] **可编辑首页布局**：调整组件显示状态、顺序和网格尺寸，桌面端与移动端分别适配。
+- [x] **资料库画布**：按类型筛选收藏内容，支持拖拽、缩放和重置视图。
+- [x] **Brew 阅读空间**：聚合友联 RSS / Atom 订阅源与本地文章，支持搜索、筛选、排序和文章阅读。
+- [x] **阅读体验**：文章详情页提供目录、阅读进度、字号、行高和主题切换等工具。
+- [x] **数据报告**：按来源展示同步状态、指标摘要和平台数据卡片。
+
+### 数据与编辑
+
+- [x] **多来源同步**：按来源和内容类型单独启用同步，失败来源不会清空已有快照。
+- [x] **本地设置页**：集中管理站点资料、友联、音乐、来源凭据和公开内容范围。
+- [x] **Markdown 文章集合**：使用 Astro 内容集合管理文章、标签、分类、封面和草稿状态。
+- [x] **静态发布**：构建后不依赖在线数据库或运行中的 Node 服务，适合部署到任意静态托管平台。
+- [x] **凭据隔离**：来源 Token 单独写入 `.momona/credentials.json`，不会进入公开页面快照。
+
+## 📄 页面与路由
+
+| 页面       | 路径           | 内容                                       | 运行范围    |
+| :--------- | :------------- | :----------------------------------------- | :---------- |
+| 首页       | `/`            | 个人资料、活动、天气、音乐、游戏和项目活动 | 开发 / 生产 |
+| 资料库     | `/library`     | 可筛选、拖拽、缩放和重置的收藏画布         | 开发 / 生产 |
+| 友联       | `/friends`     | 友联列表和订阅源配置结果                   | 开发 / 生产 |
+| Brew 阅读  | `/brew`        | RSS / Atom 订阅源、本地文章、筛选和搜索    | 开发 / 生产 |
+| 文章详情   | `/blog/<slug>` | Markdown 文章正文、目录和阅读工具          | 开发 / 生产 |
+| 数据报告   | `/reports`     | 数据指标、来源摘要和报告卡片               | 开发 / 生产 |
+| 本地设置   | `/settings`    | 基础设置、数据管理和同步状态               | 仅开发      |
+| 未找到页面 | `/404`         | 静态构建中的 404 页面                      | 生产构建    |
+
+`/settings` 和 `/__momona/*` 由开发期集成注入，生产构建不会生成这些页面或接口。
 
 ## 🚀 快速开始
 
 ### 环境要求
 
 - Node.js `>= 22.12.0`
-- pnpm
-- 能够访问所配置数据源的网络环境
+- pnpm `>= 11`
+- 同步数据来源时，需要能够访问对应公开服务的网络环境
 
-### 安装与启动
+### 本地开发
 
 ```powershell
+git clone https://github.com/Mios-dream/momona.git
+cd momona
 pnpm install
-pnpm astro dev --background
+pnpm dev
 ```
 
-### 环境变量配置
+### 同步数据
 
-也可以通过 `MOMONA_CONFIG_JSON` 提供按 `LocalConfig` 结构组织的 JSON 配置。环境
-变量配置整体优先于 `.momona/localConfig.json`，缺失字段使用默认值，适合在
-GitHub Actions 等环境中由用户自行注入仓库 Secret；各数据源的凭据放在对应来源
-的 `token` 字段中：
+本地开发时可以在设置页保存配置并单独同步来源，也可以在命令行执行完整同步：
+
+```powershell
+pnpm momona:sync
+```
+
+同步流程会读取 `.momona/localConfig.json`，更新友联订阅缓存和各数据来源快照，最后写入 `.momona/generated.json`。构建前执行一次同步即可把最新的公开投影带入静态页面。
+
+## ⚙️ 配置说明
+
+### 本地配置与环境变量
+
+在 CI 或其他无本地文件的环境中，也可以通过 `MOMONA_CONFIG_JSON` 提供同样结构的 JSON。环境变量配置优先于 `.momona/localConfig.json`，缺失字段会使用默认值：
 
 ```json
 {
@@ -99,52 +143,83 @@ GitHub Actions 等环境中由用户自行注入仓库 Secret；各数据源的�
 }
 ```
 
-### 编写与发布文章
+### 数据来源
 
-文章使用 Astro 内容集合管理，文件放在 `src/content/articles/`。推荐为每篇文章建立一个
-独立目录，目录中的 `index.md` 会成为文章正文；`draft: true` 的文章不会生成页面。
+设置页可以按来源启用同步，并进一步选择需要写入公开快照的内容类型。
+
+| 来源                                  | 配置标识   | 可同步内容与备注                                                              |
+| :------------------------------------ | :--------- | :---------------------------------------------------------------------------- |
+| [Bangumi](https://bgm.tv/)            | `bangumi`  | 追番、游戏、书籍和音乐收藏                                                    |
+| [Bilibili](https://www.bilibili.com/) | `bilibili` | 投稿视频、公开收藏夹、追番 / 追剧                                             |
+| [GitHub](https://github.com/)         | `github`   | 全部公开仓库或 Pinned 仓库，可按更新时间、Stars、Forks 或名称排序；Token 可选 |
+| [Steam](https://steamcommunity.com/)  | `steam`    | 最近游玩和近两周时长；填写 Web API Key 后可同步游戏库                         |
+| [SFACG](https://p.sfacg.com/)         | `sfacg`    | 输入公开书架地址，同步书架中的小说                                            |
+| 网易云音乐                            | `netease`  | 喜欢的音乐、创建的歌单和收藏的歌单                                            |
+| QQ 音乐                               | `qqmusic`  | 喜欢的音乐、创建的歌单和收藏的歌单                                            |
+
+### 文章 Frontmatter
+
+文章放在 `src/content/articles/` 下，支持 `.md` 和 `.mdx` 文件。每篇文章的 Frontmatter 至少需要标题和发布日期：
+
+```yaml
+---
+title: "我的第一篇文章"
+description: "文章摘要"
+pubDate: 2026-09-24
+updatedDate: 2026-09-24
+category: "随笔"
+tags:
+  - 示例
+  - Momona
+cover: "./cover.png"
+draft: false
+---
+```
+
+目录中的图片可以通过相对路径引用；`draft: true` 的文章不会生成列表和详情页。例如：
+
+```text
+src/content/articles/
+├── example.md
+└── my-article/
+    ├── article.md
+    └── cover.png
+```
 
 ## 📦 构建与部署
 
-检查类型并生成静态文件：
+### 检查与构建
 
 ```powershell
 pnpm astro check
 pnpm build
-```
-
-构建产物位于 `dist/`，可以部署到 GitHub Pages、Cloudflare Pages、Netlify、Nginx 或其他静态文件服务器。构建后可用以下命令在本地预览：
-
-```powershell
 pnpm preview
 ```
 
-生产构建不会运行本地设置接口；如果没有 `.momona/` 快照，页面会使用空数据结构和默认首页布局。部署到非根路径时，请通过 `ASTRO_SITE` 和 `ASTRO_BASE` 配置 `site` 与 `base`。
+如果需要更新来源数据，请先执行 `pnpm momona:sync` 再构建。构建产物位于 `dist/`，`pnpm preview` 会在本地启动静态构建预览。
 
-### 公开仓库的使用方式
+### 静态托管
 
-本仓库提供可复用的 Astro、Vue 和数据源实现。个人配置、文章和站点资源建议放在单独的私有实例仓库中，由私有仓库的工作流检出指定版本后再覆盖 `.momona/localConfig.json` 和个人资源。
-
-公开仓库只包含构建检查工作流，不会发布任何个人站点。构建默认配置预览可以直接执行：
+可以将 `dist/` 部署到 GitHub Pages、Cloudflare Pages、Netlify、Nginx 或其他静态文件服务器。部署到非根路径时，在构建前设置站点地址和基础路径：
 
 ```powershell
-pnpm install
-pnpm astro check
+$env:ASTRO_SITE = "https://example.com"
+$env:ASTRO_BASE = "/momona"
 pnpm build
 ```
 
 ## 🔐 本地数据与隐私
 
-`.momona/` 只用于本机开发和构建，典型内容如下：
+`.momona/` 用于本机开发和构建。
 
 ```text
 .momona/
-├── localConfig.example.json # 可复制的默认配置示例
+├── localConfig.example.json # 可复制的公开配置示例
 ├── localConfig.json         # 本地配置，不提交
-├── credentials.json         # 本地凭据，不提交
-├── generated.json         # 公开页面快照
-├── brew-feeds.json        # RSS / Atom 文章缓存
-└── sources/               # 原始响应与派生缓存
+├── credentials.json         # 来源凭据，不提交
+├── generated.json           # 公开页面快照，不提交
+├── brew-feeds.json          # RSS / Atom 文章缓存，不提交
+└── sources/                 # 来源原始响应与派生缓存，不提交
 ```
 
 ## 🗂️ 项目结构
@@ -152,22 +227,23 @@ pnpm build
 ```text
 .
 ├── src/
-│   ├── components/                 # Vue 页面和可复用组件
+│   ├── components/                 # Vue 页面与可复用组件
 │   ├── composables/                # 画布、拖拽、缩放等交互逻辑
+│   ├── content/articles/            # Markdown 文章集合
 │   ├── data/                       # 类型、默认数据和页面配置
 │   ├── layouts/                    # Astro 页面布局
 │   ├── lib/dataCenter/             # 构建期统一数据入口
 │   ├── lib/dataSources/            # 数据源适配器和快照转换
-│   ├── integrations/               # 本地设置开发插件
 │   ├── pages/                      # 生产静态路由
 │   └── routes/settings.astro       # 仅开发期注入的设置页
-├── public/assets/            # 图片、字体和游戏资源
-├── scripts/                        # 构建辅助脚本
+├── public/assets/                  # 图片、字体和游戏资源
+├── docs/assets/                    # README 预览截图
+├── scripts/sync-data.ts            # 命令行同步入口
+├── .github/workflows/ci.yml        # 类型检查与构建检查
 ├── astro.config.mjs                # Astro 与 Vue 集成配置
 ├── package.json                    # 脚本和依赖
-├── LICENSE                         # 原创源代码的 AGPL-3.0-only 许可证
-├── .momona/                        # 示例配置和本地快照，不提交
-└── dist/                           # 静态构建产物，不提交
+├── LICENSE                         # AGPL-3.0-only 许可证
+└── .momona/                        # 本地配置和页面快照
 ```
 
 ## 🤝 参与贡献
@@ -183,8 +259,7 @@ pnpm build
 
 除另有说明外，本仓库的原创源代码采用 [GNU Affero General Public License v3.0 only](LICENSE)。
 
-字体、图片、游戏 Logo、Live2D 运行时不适用 AGPL。
-发布项目或构建产物前，应确认这些资源的来源、许可证和分发权限。
+字体、图片、游戏 Logo、Live2D 运行时和其他第三方资源不适用 AGPL。发布项目或构建产物前，请确认这些资源的来源、许可证和分发权限；相关许可信息见 [`licenses/`](./licenses)。
 
 ## 🙏 致谢
 
