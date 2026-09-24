@@ -1,0 +1,71 @@
+name: Deploy Momona to GitHub Pages
+
+on:
+  push:
+    tags:
+      - "v*"
+  schedule:
+    # GitHub Actions 使用 UTC；这里对应北京时间每天 01:00。
+    - cron: "00 17 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 11
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync configured data sources
+        env:
+          MOMONA_CONFIG_JSON: ${{ secrets.MOMONA_CONFIG_JSON }}
+        shell: bash
+        run: |
+          if [ -n "$MOMONA_CONFIG_JSON" ] || [ -f ".momona/localConfig.json" ]; then
+            pnpm momona:sync
+          else
+            echo "No personal Momona config found; skipping data sync."
+          fi
+
+      - name: Build static site
+        env:
+          ASTRO_SITE: https://${{ github.repository_owner }}.github.io
+          # Project Pages uses /<repository>; change this to / for a user site.
+          ASTRO_BASE: /${{ github.event.repository.name }}
+        run: pnpm build
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

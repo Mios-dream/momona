@@ -1,0 +1,8 @@
+{
+  "name": "Deploy Momona to GitHub Pages",
+  "description": "Build Momona, optionally sync configured data, and deploy dist to GitHub Pages.",
+  "iconName": "octicon-globe",
+  "categories": [
+    "Deployment"
+  ]
+}

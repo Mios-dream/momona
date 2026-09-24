@@ -208,6 +208,14 @@ $env:ASTRO_BASE = "/momona"
 pnpm build
 ```
 
+需要 GitHub Pages 时，可以在 GitHub Actions 的 “New workflow” 中选择 `Deploy Momona to GitHub Pages`，或者复制 `.github/workflow-templates/deploy-pages.yml` 到 `.github/workflows/` 后按需调整。
+
+使用模板前：
+
+1. 在仓库 Settings → Pages → Build and deployment 中选择 GitHub Actions。
+2. 个性化数据可以在自己的私有实例仓库中提供不含 Token 的 `.momona/localConfig.json`，或配置 `MOMONA_CONFIG_JSON` 仓库 Secret。
+3. 项目 Pages 默认使用 `https://<owner>.github.io/<repository>/`；用户主页仓库需要将模板中的 `ASTRO_BASE` 改为 `/`。
+
 ## 🔐 本地数据与隐私
 
 `.momona/` 用于本机开发和构建。
