@@ -423,6 +423,7 @@ export type IconName =
   | "messageCircle"
   | "messagesSquare"
   | "mic"
+  | "minus"
   | "monitor"
   | "music"
   | "palette"

@@ -1,26 +1,35 @@
 ---
-import { getCollection, render, type CollectionEntry } from "astro:content";
+import { render, type CollectionEntry } from "astro:content";
 import StaticLayout from "../../layouts/StaticLayout.astro";
 import { getDataCenter } from "../../lib/dataCenter";
-import { formatBlogDate, getBlogCoverSource } from "../../lib/blog";
+import { blogArticlePath } from "../../data/blog";
+import {
+  formatBlogDate,
+  getBlogCoverSource,
+  getPublishedBlogArticles,
+} from "../../lib/blog";
+import IconGlyph from "../../components/app/IconGlyph.vue";
 
 export async function getStaticPaths() {
-  const articles = await getCollection(
-    "articles",
-    ({ data }) => !data.draft,
-  );
+  const articles = await getPublishedBlogArticles();
 
-  return articles.map((article) => ({
+  return articles.map((article, index) => ({
     params: { slug: article.id },
-    props: { article },
+    props: {
+      article,
+      previousArticle: articles[index - 1],
+      nextArticle: articles[index + 1],
+    },
   }));
 }
 
 interface Props {
   article: CollectionEntry<"articles">;
+  previousArticle?: CollectionEntry<"articles">;
+  nextArticle?: CollectionEntry<"articles">;
 }
 
-const { article } = Astro.props as Props;
+const { article, previousArticle, nextArticle } = Astro.props as Props;
 const { Content } = await render(article);
 const { localConfig } = await getDataCenter();
 const publishedDate = formatBlogDate(article.data.pubDate);
@@ -39,11 +48,190 @@ const description =
   siteDescription={localConfig.site.description}
   favicon={localConfig.site.favicon}
 >
-  <main class="blog-post-shell">
-    <div class="blog-post-frame">
-      <a class="blog-post-back" href="/brew/">&larr; 返回 Brew 阅读</a>
+  <main class="blog-post-shell" data-reading-page data-reader-theme="paper">
+    <div
+      class="blog-reading-progress"
+      data-reading-progress
+      role="progressbar"
+      aria-label="文章阅读进度"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      aria-valuenow="0"
+    >
+      <span data-reading-progress-bar></span>
+    </div>
 
-      <article class="blog-post">
+    <aside class="blog-reading-rail" aria-label="阅读工具">
+      <a
+        class="blog-reading-rail-button blog-reading-back"
+        href="/brew/"
+        aria-label="返回 Brew 阅读"
+        title="返回 Brew 阅读"
+      >
+        <IconGlyph name="arrowLeft" size={17} />
+      </a>
+      <span class="blog-reading-rail-divider" aria-hidden="true"></span>
+      <div
+        class="blog-reading-progress-ring"
+        data-progress-ring
+        role="progressbar"
+        aria-label="文章阅读进度"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <span data-progress-label>0%</span>
+      </div>
+      <span class="blog-reading-rail-divider" aria-hidden="true"></span>
+      <button
+        class="blog-toc-toggle"
+        data-toc-toggle
+        type="button"
+        aria-label="打开文章目录"
+        aria-controls="blog-post-toc"
+        aria-expanded="false"
+        title="文章目录"
+      >
+        <IconGlyph name="listOrdered" size={17} />
+      </button>
+    </aside>
+
+    <aside
+      class="blog-post-toc"
+      id="blog-post-toc"
+      data-toc-panel
+      aria-label="文章目录"
+      aria-hidden="true"
+    >
+      <div class="blog-post-toc-heading">
+        <span class="blog-post-toc-title">
+          <IconGlyph name="listOrdered" size={16} />
+          <span class="blog-post-toc-label">文章目录</span>
+        </span>
+        <span class="blog-post-toc-count" data-toc-count>0</span>
+      </div>
+      <nav class="blog-post-toc-nav" aria-label="文章目录">
+        <ol class="blog-post-toc-list" data-toc></ol>
+      </nav>
+      <div class="blog-post-progress-copy">
+        <span>阅读进度</span>
+        <strong data-progress-label>0%</strong>
+      </div>
+      <div class="blog-post-progress-track" aria-hidden="true">
+        <span data-progress-bar></span>
+      </div>
+    </aside>
+
+    <aside class="blog-reader-controls" data-reader-controls aria-label="阅读设置">
+      <button
+        class="blog-reader-control-button blog-mobile-toc-toggle"
+        data-toc-toggle
+        type="button"
+        aria-label="打开文章目录"
+        aria-controls="blog-post-toc"
+        aria-expanded="false"
+        title="文章目录"
+      >
+        <IconGlyph name="listOrdered" size={17} />
+      </button>
+      <span
+        class="blog-reader-control-divider blog-mobile-toc-divider"
+        aria-hidden="true"
+      ></span>
+
+      <div class="blog-reader-control-group blog-reader-control-group--theme">
+        <button
+          class="blog-reader-control-button blog-reader-theme-toggle"
+          data-reader-theme-toggle
+          type="button"
+          aria-label="切换背景颜色"
+          title="切换背景颜色"
+        >
+          <IconGlyph name="palette" size={18} />
+          <span
+            class="blog-reader-theme-swatch"
+            data-reader-theme-swatch
+            aria-hidden="true"
+          ></span>
+        </button>
+      </div>
+
+      <span class="blog-reader-control-divider" aria-hidden="true"></span>
+
+      <div class="blog-reader-control-group" role="group" aria-label="字号">
+        <span class="blog-reader-control-mark" aria-hidden="true">字</span>
+        <div class="blog-reader-stepper">
+          <button
+            class="blog-reader-step-button"
+            data-reader-font-increase
+            type="button"
+            aria-label="增大字号"
+            title="增大字号"
+          >
+            <IconGlyph name="plus" size={14} />
+          </button>
+          <output class="blog-reader-control-value" data-reader-font-value>100%</output>
+          <button
+            class="blog-reader-step-button"
+            data-reader-font-decrease
+            type="button"
+            aria-label="减小字号"
+            title="减小字号"
+          >
+            <IconGlyph name="minus" size={14} />
+          </button>
+        </div>
+      </div>
+
+      <span class="blog-reader-control-divider" aria-hidden="true"></span>
+
+      <div class="blog-reader-control-group" role="group" aria-label="行间距">
+        <div class="blog-reader-stepper">
+          <button
+            class="blog-reader-step-button blog-reader-step-button--line"
+            data-reader-line-increase
+            type="button"
+            aria-label="增大行间距"
+            title="增大行间距"
+          >
+            <IconGlyph name="menu" size={16} />
+          </button>
+          <output class="blog-reader-control-value" data-reader-line-value>1.95</output>
+          <button
+            class="blog-reader-step-button blog-reader-step-button--line"
+            data-reader-line-decrease
+            type="button"
+            aria-label="减小行间距"
+            title="减小行间距"
+          >
+            <IconGlyph name="menu" size={16} />
+          </button>
+        </div>
+      </div>
+
+      <span class="blog-reader-reset-divider" aria-hidden="true"></span>
+      <button
+        class="blog-reader-control-button blog-reader-reset"
+        data-reader-reset
+        type="button"
+        aria-label="恢复默认阅读设置"
+        title="恢复默认"
+      >
+        <IconGlyph name="refresh" size={14} />
+      </button>
+    </aside>
+
+    <div class="blog-post-frame">
+      <a
+        class="blog-post-back"
+        href="/brew/"
+        aria-label="返回 Brew 阅读"
+        title="返回 Brew 阅读"
+      >
+        <IconGlyph name="arrowLeft" size={18} />
+      </a>
+
+      <article class="blog-post" data-reader-article>
         <header class="blog-post-header">
           <div class="blog-post-meta">
             <time datetime={article.data.pubDate.toISOString()}>{publishedDate}</time>
@@ -67,12 +255,85 @@ const description =
         </div>
 
         <footer class="blog-post-footer">
-          <a href="/brew/">返回我的文章</a>
+          <nav class="blog-post-nav" aria-label="文章导航">
+            {previousArticle ? (
+              <a
+                class="blog-post-nav-link blog-post-nav-link--previous"
+                href={blogArticlePath(previousArticle.id)}
+                aria-label={`上一篇：${previousArticle.data.title}`}
+                title={previousArticle.data.title}
+              >
+                <IconGlyph name="arrowLeft" size={16} />
+                <span class="blog-post-nav-copy">
+                  <span class="blog-post-nav-label">上一篇</span>
+                  <strong>{previousArticle.data.title}</strong>
+                </span>
+              </a>
+            ) : (
+              <button
+                class="blog-post-nav-link blog-post-nav-link--previous is-disabled"
+                type="button"
+                disabled
+                aria-label="没有上一篇"
+              >
+                <IconGlyph name="arrowLeft" size={16} />
+                <span class="blog-post-nav-copy">
+                  <span class="blog-post-nav-label">上一篇</span>
+                  <strong>没有上一篇</strong>
+                </span>
+              </button>
+            )}
+
+            {nextArticle ? (
+              <a
+                class="blog-post-nav-link blog-post-nav-link--next"
+                href={blogArticlePath(nextArticle.id)}
+                aria-label={`下一篇：${nextArticle.data.title}`}
+                title={nextArticle.data.title}
+              >
+                <span class="blog-post-nav-copy">
+                  <span class="blog-post-nav-label">下一篇</span>
+                  <strong>{nextArticle.data.title}</strong>
+                </span>
+                <IconGlyph name="arrowRight" size={16} />
+              </a>
+            ) : previousArticle ? (
+              <button
+                class="blog-post-nav-link blog-post-nav-link--next is-disabled"
+                type="button"
+                disabled
+                aria-label="没有下一篇"
+              >
+                <span class="blog-post-nav-copy">
+                  <span class="blog-post-nav-label">下一篇</span>
+                  <strong>没有下一篇</strong>
+                </span>
+                <IconGlyph name="arrowRight" size={16} />
+              </button>
+            ) : (
+              <button
+                class="blog-post-nav-link blog-post-nav-link--next is-disabled"
+                type="button"
+                disabled
+                aria-label="没有下一篇"
+              >
+                <span class="blog-post-nav-copy">
+                  <span class="blog-post-nav-label">下一篇</span>
+                  <strong>没有下一篇</strong>
+                </span>
+                <IconGlyph name="arrowRight" size={16} />
+              </button>
+            )}
+          </nav>
         </footer>
       </article>
     </div>
   </main>
 </StaticLayout>
+
+<script>
+  import "../../scripts/articleReader";
+</script>
 
 <style is:global>
   .blog-post-shell {
@@ -250,6 +511,7 @@ const description =
 
   .blog-markdown img {
     display: block;
+    height: auto;
     max-width: 100%;
     margin: 1.5em auto;
     border-radius: 9px;
@@ -273,18 +535,1305 @@ const description =
     font-weight: 700;
   }
 
+  .blog-post-shell {
+    position: relative;
+    isolation: isolate;
+    --reader-shell: #f4f6fb;
+    --reader-surface: #fbfcff;
+    --reader-toc-surface: rgba(255, 255, 255, 0.7);
+    --reader-ink: #172133;
+    --reader-ink-soft: #303b4f;
+    --reader-muted: #758096;
+    --reader-muted-strong: #5d6980;
+    --reader-accent: #5541b5;
+    --reader-accent-soft: rgba(117, 100, 222, 0.13);
+    --reader-divider: rgba(117, 100, 222, 0.16);
+    --reader-code: #20263b;
+    --article-font-scale: 1;
+    --article-line-height: 1.95;
+    color: var(--reader-ink);
+    background: var(--reader-shell);
+    transition:
+      color 0.25s ease,
+      background-color 0.25s ease;
+  }
+
+  .blog-post-shell[data-reader-theme="warm"] {
+    --reader-shell: #f1eadf;
+    --reader-surface: #fffaf1;
+    --reader-toc-surface: rgba(255, 251, 242, 0.82);
+    --reader-ink: #3f3429;
+    --reader-ink-soft: #5a4939;
+    --reader-muted: #8b7765;
+    --reader-muted-strong: #715d4a;
+    --reader-accent: #946b3f;
+    --reader-accent-soft: rgba(148, 107, 63, 0.13);
+    --reader-divider: rgba(148, 107, 63, 0.2);
+  }
+
+  .blog-post-shell[data-reader-theme="mist"] {
+    --reader-shell: #e8f1f4;
+    --reader-surface: #fbfdfe;
+    --reader-toc-surface: rgba(249, 253, 255, 0.78);
+    --reader-ink: #203642;
+    --reader-ink-soft: #36515e;
+    --reader-muted: #748d98;
+    --reader-muted-strong: #55717d;
+    --reader-accent: #287a93;
+    --reader-accent-soft: rgba(40, 122, 147, 0.13);
+    --reader-divider: rgba(40, 122, 147, 0.18);
+  }
+
+  .blog-post-shell[data-reader-theme="night"] {
+    --reader-shell: #20242e;
+    --reader-surface: #2b313e;
+    --reader-toc-surface: rgba(43, 49, 62, 0.94);
+    --reader-ink: #edf0f7;
+    --reader-ink-soft: #d3d9e6;
+    --reader-muted: #9da8bb;
+    --reader-muted-strong: #b6c0d1;
+    --reader-accent: #b8aaff;
+    --reader-accent-soft: rgba(184, 170, 255, 0.16);
+    --reader-divider: rgba(184, 170, 255, 0.2);
+    --reader-code: #171b24;
+  }
+
+  .blog-reading-progress {
+    position: fixed;
+    z-index: 80;
+    top: 0;
+    right: 0;
+    left: 0;
+    height: 3px;
+    overflow: hidden;
+    pointer-events: none;
+    background: rgba(117, 100, 222, 0.12);
+  }
+
+  .blog-reading-progress span {
+    display: block;
+    width: 0;
+    height: 100%;
+    background: var(--reader-accent);
+    box-shadow: 0 0 10px color-mix(in srgb, var(--reader-accent) 42%, transparent);
+    transition: width 0.16s ease;
+  }
+
+  .blog-post-frame {
+    position: relative;
+    z-index: 1;
+    width: min(820px, 100%);
+  }
+
+  .blog-post-toc {
+    position: fixed;
+    z-index: 30;
+    top: clamp(92px, 14vh, 154px);
+    left: max(16px, calc((100vw - 1270px) / 2));
+    display: flex;
+    width: 198px;
+    max-height: calc(100vh - 194px);
+    padding: 15px 13px 13px;
+    flex-direction: column;
+    border: 1px solid rgba(255, 255, 255, 0.78);
+    border-radius: 14px;
+    background: var(--reader-toc-surface);
+    box-shadow: 0 16px 36px rgba(54, 45, 106, 0.11);
+    backdrop-filter: blur(18px) saturate(130%);
+    transition:
+      background-color 0.25s ease,
+      box-shadow 0.25s ease,
+      opacity 0.22s ease,
+      transform 0.22s ease,
+      visibility 0.22s ease;
+  }
+
+  .blog-post-toc-heading,
+  .blog-post-progress-copy {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .blog-post-toc-heading {
+    padding: 0 2px 11px;
+    border-bottom: 1px solid var(--reader-divider);
+  }
+
+  .blog-post-toc-title {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: 7px;
+    color: var(--reader-ink);
+    font-size: 0.7rem;
+    font-weight: 780;
+  }
+
+  .blog-post-toc-title svg {
+    flex: 0 0 auto;
+    color: var(--reader-accent);
+  }
+
+  .blog-post-toc-count {
+    display: inline-grid;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 5px;
+    place-items: center;
+    border-radius: 6px;
+    color: var(--reader-accent);
+    background: var(--reader-accent-soft);
+    font-size: 0.58rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .blog-post-toc-nav {
+    min-height: 0;
+    margin: 10px -5px 12px 0;
+    overflow: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--reader-accent-soft) transparent;
+  }
+
+  .blog-post-toc-list {
+    margin: 0;
+    padding: 0 5px 0 0;
+    list-style: none;
+  }
+
+  .blog-post-toc-item + .blog-post-toc-item {
+    margin-top: 2px;
+  }
+
+  .blog-post-toc-item a {
+    display: block;
+    padding: 7px 8px;
+    overflow: hidden;
+    border-left: 2px solid transparent;
+    border-radius: 4px;
+    color: var(--reader-muted-strong);
+    font-size: 0.64rem;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition:
+      color 0.16s ease,
+      background-color 0.16s ease,
+      border-color 0.16s ease;
+  }
+
+  .blog-post-toc-item--h3 a {
+    padding-left: 18px;
+    font-size: 0.61rem;
+  }
+
+  .blog-post-toc-item--h4 a {
+    padding-left: 28px;
+    font-size: 0.59rem;
+  }
+
+  .blog-post-toc-item a:hover,
+  .blog-post-toc-item a:focus-visible,
+  .blog-post-toc-item a.is-active {
+    border-left-color: var(--reader-accent);
+    color: var(--reader-accent);
+    background: var(--reader-accent-soft);
+    outline: none;
+  }
+
+  .blog-post-toc-empty {
+    margin: 7px 8px;
+    color: var(--reader-muted);
+    font-size: 0.62rem;
+  }
+
+  .blog-post-progress-copy {
+    padding: 11px 2px 7px;
+    border-top: 1px solid var(--reader-divider);
+    color: var(--reader-muted);
+    font-size: 0.59rem;
+  }
+
+  .blog-post-progress-copy strong {
+    color: var(--reader-accent);
+    font-size: 0.65rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .blog-post-progress-track {
+    height: 4px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: var(--reader-accent-soft);
+  }
+
+  .blog-post-progress-track span {
+    display: block;
+    width: 0;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--reader-accent);
+    transition: width 0.16s ease;
+  }
+
+  .blog-toc-toggle {
+    display: none;
+    position: fixed;
+    z-index: 31;
+    top: 50%;
+    left: 14px;
+    width: 45px;
+    height: 45px;
+    padding: 0;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    border-radius: 13px;
+    color: var(--reader-accent);
+    background: var(--reader-toc-surface);
+    box-shadow: 0 12px 26px rgba(54, 45, 106, 0.14);
+    transform: translateY(-50%);
+    backdrop-filter: blur(18px) saturate(130%);
+  }
+
+  .blog-toc-toggle span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .blog-toc-toggle:hover,
+  .blog-toc-toggle:focus-visible,
+  .blog-toc-toggle[aria-expanded="true"] {
+    color: var(--reader-ink);
+    background: var(--reader-accent-soft);
+    outline: none;
+  }
+
+  .blog-reader-controls {
+    position: fixed;
+    z-index: 35;
+    top: 50%;
+    right: max(16px, calc((100vw - 1270px) / 2));
+    display: flex;
+    align-items: flex-start;
+    transform: translateY(-50%);
+  }
+
+  .blog-reader-toggle,
+  .blog-reader-close {
+    display: grid;
+    padding: 0;
+    place-items: center;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    color: var(--reader-accent);
+    background: var(--reader-toc-surface);
+    box-shadow: 0 12px 26px rgba(54, 45, 106, 0.13);
+    backdrop-filter: blur(18px) saturate(130%);
+  }
+
+  .blog-reader-toggle {
+    width: 45px;
+    height: 45px;
+    border-radius: 13px;
+    transition:
+      color 0.16s ease,
+      background-color 0.16s ease,
+      transform 0.16s ease;
+  }
+
+  .blog-reader-toggle:hover,
+  .blog-reader-toggle:focus-visible,
+  .blog-reader-controls.is-open .blog-reader-toggle {
+    color: var(--reader-ink);
+    background: var(--reader-accent-soft);
+    outline: none;
+    transform: translateY(-2px);
+  }
+
+  .blog-reader-panel {
+    position: absolute;
+    top: 0;
+    right: calc(100% + 12px);
+    width: 238px;
+    padding: 15px;
+    border: 1px solid rgba(255, 255, 255, 0.82);
+    border-radius: 14px;
+    color: var(--reader-ink-soft);
+    background: var(--reader-toc-surface);
+    box-shadow: 0 18px 42px rgba(54, 45, 106, 0.17);
+    backdrop-filter: blur(20px) saturate(135%);
+  }
+
+  .blog-reader-panel[hidden] {
+    display: none;
+  }
+
+  .blog-reader-panel-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--reader-divider);
+  }
+
+  .blog-reader-panel-heading strong {
+    color: var(--reader-ink);
+    font-size: 0.76rem;
+    font-weight: 780;
+  }
+
+  .blog-reader-close {
+    width: 27px;
+    height: 27px;
+    border-radius: 8px;
+    box-shadow: none;
+  }
+
+  .blog-reader-close:hover,
+  .blog-reader-close:focus-visible {
+    color: var(--reader-ink);
+    background: var(--reader-accent-soft);
+    outline: none;
+  }
+
+  .blog-reader-fieldset {
+    min-width: 0;
+    margin: 14px 0 0;
+    padding: 0;
+    border: 0;
+  }
+
+  .blog-reader-fieldset legend {
+    margin-bottom: 7px;
+    color: var(--reader-muted);
+    font-size: 0.62rem;
+  }
+
+  .blog-reader-segmented {
+    display: flex;
+    gap: 5px;
+  }
+
+  .blog-reader-segmented button,
+  .blog-reader-swatches button {
+    min-width: 0;
+    min-height: 37px;
+    padding: 5px 6px;
+    border: 1px solid var(--reader-divider);
+    border-radius: 7px;
+    color: var(--reader-muted-strong);
+    background: rgba(255, 255, 255, 0.34);
+    transition:
+      color 0.16s ease,
+      border-color 0.16s ease,
+      background-color 0.16s ease;
+  }
+
+  .blog-reader-segmented button {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex-direction: column;
+  }
+
+  .blog-reader-segmented--line button {
+    min-height: 32px;
+    font-size: 0.6rem;
+  }
+
+  .blog-reader-segmented button:hover,
+  .blog-reader-segmented button:focus-visible,
+  .blog-reader-swatches button:hover,
+  .blog-reader-swatches button:focus-visible,
+  .blog-reader-segmented button.is-active,
+  .blog-reader-swatches button.is-active {
+    border-color: var(--reader-accent);
+    color: var(--reader-accent);
+    background: var(--reader-accent-soft);
+    outline: none;
+  }
+
+  .reader-font-preview {
+    display: block;
+    color: var(--reader-ink);
+    font-family: Georgia, "Times New Roman", serif;
+    line-height: 1;
+  }
+
+  .reader-font-preview--small {
+    font-size: 0.77rem;
+  }
+
+  .reader-font-preview--medium {
+    font-size: 0.92rem;
+  }
+
+  .reader-font-preview--large {
+    font-size: 1.06rem;
+  }
+
+  .reader-font-preview--xlarge {
+    font-size: 1.2rem;
+  }
+
+  .blog-reader-segmented small {
+    color: inherit;
+    font-size: 0.56rem;
+  }
+
+  .blog-reader-swatches {
+    display: flex;
+    gap: 8px;
+  }
+
+  .blog-reader-swatches button {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    padding: 4px;
+    place-items: center;
+  }
+
+  .reader-swatch {
+    display: block;
+    width: 22px;
+    height: 22px;
+    border: 1px solid rgba(23, 33, 51, 0.14);
+    border-radius: 50%;
+  }
+
+  .reader-swatch--paper {
+    background: #f4f6fb;
+  }
+
+  .reader-swatch--warm {
+    background: #f1eadf;
+  }
+
+  .reader-swatch--mist {
+    background: #e8f1f4;
+  }
+
+  .reader-swatch--night {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: #20242e;
+  }
+
+  .blog-reader-reset {
+    display: inline-flex;
+    width: 100%;
+    margin-top: 15px;
+    padding: 8px 0 0;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    border: 0;
+    border-top: 1px solid var(--reader-divider);
+    color: var(--reader-muted);
+    background: transparent;
+    font-size: 0.61rem;
+  }
+
+  .blog-reader-reset:hover,
+  .blog-reader-reset:focus-visible {
+    color: var(--reader-accent);
+    outline: none;
+  }
+
+  .blog-post {
+    border-color: var(--reader-divider);
+    color: var(--reader-ink-soft);
+    background: var(--reader-surface);
+    box-shadow: 0 22px 58px rgba(54, 45, 106, 0.14);
+    transition:
+      color 0.25s ease,
+      background-color 0.25s ease,
+      border-color 0.25s ease,
+      box-shadow 0.25s ease;
+  }
+
+  .blog-post-shell[data-reader-theme="night"] .blog-post {
+    box-shadow: 0 22px 58px rgba(8, 11, 18, 0.28);
+  }
+
+  .blog-post-back,
+  .blog-post-footer a {
+    color: var(--reader-accent);
+  }
+
+  .blog-post-back:hover,
+  .blog-post-back:focus-visible,
+  .blog-post-footer a:hover,
+  .blog-post-footer a:focus-visible {
+    color: var(--reader-ink);
+    outline: none;
+  }
+
+  .blog-post-header {
+    border-bottom-color: var(--reader-divider);
+  }
+
+  .blog-post-meta {
+    color: var(--reader-muted);
+  }
+
+  .blog-post-tags span {
+    color: var(--reader-accent);
+    background: var(--reader-accent-soft);
+  }
+
+  .blog-post-header h1,
+  .blog-markdown h2,
+  .blog-markdown h3,
+  .blog-markdown h4,
+  .blog-markdown strong {
+    color: var(--reader-ink);
+  }
+
+  .blog-post-header p,
+  .blog-markdown,
+  .blog-markdown blockquote {
+    color: var(--reader-ink-soft);
+  }
+
+  .blog-markdown {
+    font-size: calc(1rem * var(--article-font-scale));
+    line-height: var(--article-line-height);
+  }
+
+  .blog-markdown h2,
+  .blog-markdown h3,
+  .blog-markdown h4 {
+    scroll-margin-top: 84px;
+  }
+
+  .blog-markdown h2 {
+    font-size: calc(1.45rem * var(--article-font-scale));
+  }
+
+  .blog-markdown h3 {
+    font-size: calc(1.2rem * var(--article-font-scale));
+  }
+
+  .blog-markdown h4 {
+    font-size: calc(1.05rem * var(--article-font-scale));
+  }
+
+  .blog-markdown a {
+    color: var(--reader-accent);
+    text-decoration-color: var(--reader-accent-soft);
+  }
+
+  .blog-markdown blockquote {
+    border-left-color: var(--reader-accent);
+  }
+
+  .blog-markdown code {
+    color: var(--reader-accent);
+    background: var(--reader-accent-soft);
+  }
+
+  .blog-markdown pre {
+    border-color: var(--reader-divider);
+    background: var(--reader-code);
+  }
+
+  .blog-markdown hr,
+  .blog-post-footer {
+    border-top-color: var(--reader-divider);
+  }
+
+  .blog-post-footer {
+    margin-top: 52px;
+    padding-top: 24px;
+  }
+
+  .blog-post-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .blog-post-nav-link {
+    display: flex;
+    min-width: 0;
+    min-height: 66px;
+    padding: 12px 14px;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--reader-divider);
+    border-radius: 12px;
+    color: var(--reader-accent);
+    background: var(--reader-toc-surface);
+    box-shadow: 0 8px 20px rgba(74, 65, 52, 0.06);
+    text-align: left;
+    transition:
+      color 0.16s ease,
+      background-color 0.16s ease,
+      border-color 0.16s ease,
+      transform 0.16s ease;
+  }
+
+  .blog-post-nav-link--next {
+    justify-content: flex-end;
+    text-align: right;
+  }
+
+  .blog-post-nav-link svg {
+    flex: 0 0 auto;
+  }
+
+  .blog-post-nav-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .blog-post-nav-label {
+    color: var(--reader-muted);
+    font-size: 0.58rem;
+    line-height: 1.2;
+  }
+
+  .blog-post-nav-copy strong {
+    overflow: hidden;
+    color: var(--reader-ink);
+    font-size: 0.72rem;
+    font-weight: 700;
+    line-height: 1.35;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .blog-post-nav-link:hover,
+  .blog-post-nav-link:focus-visible {
+    border-color: var(--reader-accent);
+    color: var(--reader-ink);
+    background: var(--reader-accent-soft);
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  .blog-post-nav-link:hover .blog-post-nav-copy strong,
+  .blog-post-nav-link:focus-visible .blog-post-nav-copy strong {
+    color: var(--reader-ink);
+  }
+
+  .blog-post-nav-link.is-disabled,
+  .blog-post-nav-link:disabled,
+  .blog-post-nav-link.is-disabled:hover,
+  .blog-post-nav-link:disabled:hover {
+    cursor: not-allowed;
+    border-color: var(--reader-divider);
+    color: var(--reader-muted);
+    background: rgba(255, 253, 247, 0.46);
+    box-shadow: none;
+    opacity: 0.58;
+    transform: none;
+  }
+
+  .blog-post-nav-link.is-disabled .blog-post-nav-copy strong,
+  .blog-post-nav-link:disabled .blog-post-nav-copy strong {
+    color: var(--reader-muted);
+  }
+
+  /* Reader layout: keep the article open on the page and reserve cards for controls. */
+  .blog-post-shell {
+    --reader-frame-width: min(848px, calc(100vw - 240px));
+    --reader-shell: #f8f5ec;
+    --reader-surface: transparent;
+    --reader-toc-surface: rgba(255, 253, 247, 0.9);
+    --reader-ink: #292725;
+    --reader-ink-soft: #4e4a45;
+    --reader-muted: #7d7870;
+    --reader-muted-strong: #625e57;
+    --reader-accent: #6c665d;
+    --reader-accent-soft: rgba(108, 102, 93, 0.11);
+    --reader-divider: rgba(108, 102, 93, 0.18);
+    --reader-code: #292725;
+    padding: 94px 24px 100px;
+    background: var(--reader-shell);
+  }
+
+  .blog-post-shell[data-reader-theme="paper"] {
+    --reader-shell: #f8f5ec;
+    --reader-surface: transparent;
+    --reader-toc-surface: rgba(255, 253, 247, 0.9);
+    --reader-ink: #292725;
+    --reader-ink-soft: #4e4a45;
+    --reader-muted: #7d7870;
+    --reader-muted-strong: #625e57;
+    --reader-accent: #6c665d;
+    --reader-accent-soft: rgba(108, 102, 93, 0.11);
+    --reader-divider: rgba(108, 102, 93, 0.18);
+  }
+
+  .reader-swatch--paper {
+    background: #f8f5ec;
+  }
+
+  .blog-post-shell[data-reader-theme="warm"] {
+    --reader-shell: #f1eadf;
+    --reader-surface: transparent;
+    --reader-toc-surface: rgba(255, 251, 242, 0.92);
+  }
+
+  .blog-post-shell[data-reader-theme="mist"] {
+    --reader-shell: #e8f1f4;
+    --reader-surface: transparent;
+    --reader-toc-surface: rgba(249, 253, 255, 0.92);
+  }
+
+  .blog-post-shell[data-reader-theme="night"] {
+    --reader-shell: #20242e;
+    --reader-surface: transparent;
+    --reader-toc-surface: rgba(43, 49, 62, 0.95);
+  }
+
+  .blog-post-frame {
+    width: var(--reader-frame-width);
+  }
+
+  .blog-post {
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .blog-post-header {
+    padding: 0 0 30px;
+    border-bottom-color: var(--reader-divider);
+  }
+
+  .blog-post-header h1 {
+    font-size: clamp(2.15rem, 5vw, 2.85rem);
+    letter-spacing: 0;
+  }
+
+  .blog-post-cover {
+    max-height: 520px;
+    margin-top: 31px;
+    border-radius: 16px;
+  }
+
+  .blog-markdown {
+    padding-top: 29px;
+  }
+
+  .blog-post-back {
+    display: none;
+    width: 40px;
+    height: 40px;
+    margin-bottom: 22px;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--reader-divider);
+    border-radius: 11px;
+    background: var(--reader-toc-surface);
+    box-shadow: 0 8px 20px rgba(74, 65, 52, 0.07);
+    transition:
+      color 0.16s ease,
+      background-color 0.16s ease,
+      border-color 0.16s ease,
+      transform 0.16s ease;
+  }
+
+  .blog-post-back:hover,
+  .blog-post-back:focus-visible {
+    border-color: var(--reader-accent);
+    background: var(--reader-accent-soft);
+    transform: translateY(-1px);
+  }
+
+  .blog-reading-rail {
+    position: fixed;
+    z-index: 31;
+    top: 50%;
+    left: max(14px, calc((100vw - var(--reader-frame-width)) / 2 - 100px));
+    display: flex;
+    width: 58px;
+    padding: 10px 8px;
+    flex-direction: column;
+    align-items: center;
+    gap: 9px;
+    border: 1px solid rgba(108, 102, 93, 0.16);
+    border-radius: 16px;
+    background: var(--reader-toc-surface);
+    box-shadow: 0 12px 28px rgba(74, 65, 52, 0.09);
+    transform: translateY(-50%);
+    transition:
+      opacity 0.22s ease,
+      visibility 0.22s ease;
+    backdrop-filter: blur(18px) saturate(125%);
+  }
+
+  .blog-reading-rail-button,
+  .blog-reading-rail .blog-toc-toggle {
+    display: grid;
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    border-radius: 11px;
+    color: var(--reader-muted-strong);
+    background: transparent;
+    transition:
+      color 0.16s ease,
+      background-color 0.16s ease,
+      transform 0.16s ease;
+  }
+
+  .blog-reading-rail-button:hover,
+  .blog-reading-rail-button:focus-visible,
+  .blog-reading-rail .blog-toc-toggle:hover,
+  .blog-reading-rail .blog-toc-toggle:focus-visible {
+    color: var(--reader-ink);
+    background: var(--reader-accent-soft);
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  .blog-reading-rail-divider {
+    display: block;
+    width: 27px;
+    height: 1px;
+    background: var(--reader-divider);
+  }
+
+  .blog-reading-progress-ring {
+    position: relative;
+    display: grid;
+    width: 36px;
+    height: 36px;
+    place-items: center;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--reader-accent) var(--reading-progress-angle, 0deg),
+      var(--reader-accent-soft) 0deg
+    );
+  }
+
+  .blog-reading-progress-ring::before {
+    position: absolute;
+    inset: 3px;
+    border-radius: inherit;
+    background: var(--reader-toc-surface);
+    content: "";
+  }
+
+  .blog-reading-progress-ring span {
+    position: relative;
+    z-index: 1;
+    color: var(--reader-accent);
+    font-size: 0.56rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .blog-reading-rail .blog-toc-toggle {
+    position: static;
+    display: grid;
+    width: 40px;
+    height: 40px;
+    transform: none;
+  }
+
+  .blog-post-toc {
+    top: 50%;
+    left: max(14px, calc((100vw - var(--reader-frame-width)) / 2 - 12px));
+    width: 220px;
+    max-height: calc(100vh - 160px);
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(-50%) translateX(-8px);
+    visibility: hidden;
+  }
+
+  .blog-post-toc.is-open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(-50%);
+    visibility: visible;
+  }
+
+  .blog-post-toc-label {
+    display: inline;
+  }
+
+  /* Direct reader controls: the toolbar stays available without a secondary menu. */
+  .blog-reader-controls {
+    position: fixed;
+    z-index: 35;
+    top: 50%;
+    right: max(14px, calc((100vw - var(--reader-frame-width)) / 2 - 108px));
+    display: flex;
+    width: fit-content;
+    min-width: 0;
+    min-height: 350px;
+    padding: 11px 7px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 8px;
+    border: 1px solid rgba(108, 102, 93, 0.16);
+    border-radius: 17px;
+    background: var(--reader-toc-surface);
+    box-shadow: 0 14px 32px rgba(74, 65, 52, 0.11);
+    transform: translateY(-50%);
+    transition:
+      opacity 0.22s ease,
+      visibility 0.22s ease;
+    backdrop-filter: blur(18px) saturate(125%);
+  }
+
+  .blog-post-shell.is-reader-toolbar-hidden .blog-reading-rail,
+  .blog-post-shell.is-reader-toolbar-hidden .blog-reader-controls,
+  .blog-post-shell.is-reader-toolbar-hidden .blog-post-toc {
+    opacity: 0;
+    pointer-events: none;
+    visibility: hidden;
+  }
+
+  .blog-reader-control-group {
+    display: flex;
+    width: auto;
+    min-width: 0;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .blog-reader-control-button,
+  .blog-reader-step-button,
+  .blog-reader-reset {
+    display: grid;
+    padding: 0;
+    place-items: center;
+    border: 0;
+    color: var(--reader-muted-strong);
+    background: transparent;
+    transition:
+      color 0.16s ease,
+      background-color 0.16s ease,
+      opacity 0.16s ease,
+      transform 0.16s ease;
+  }
+
+  .blog-reader-control-button {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+  }
+
+  .blog-mobile-toc-toggle {
+    display: none;
+  }
+
+  .blog-reader-control-button:hover,
+  .blog-reader-control-button:focus-visible,
+  .blog-reader-step-button:hover,
+  .blog-reader-step-button:focus-visible,
+  .blog-reader-reset:hover,
+  .blog-reader-reset:focus-visible {
+    color: var(--reader-ink);
+    background: var(--reader-accent-soft);
+    outline: none;
+    transform: translateY(-1px);
+  }
+
+  .blog-reader-theme-swatch {
+    position: absolute;
+    right: 7px;
+    bottom: 7px;
+    width: 8px;
+    height: 8px;
+    border: 1px solid rgba(108, 102, 93, 0.25);
+    border-radius: 50%;
+    background: #f8f5ec;
+  }
+
+  .blog-reader-theme-swatch[data-reader-theme="paper"] {
+    background: #f8f5ec;
+  }
+
+  .blog-reader-theme-swatch[data-reader-theme="warm"] {
+    background: #f1eadf;
+  }
+
+  .blog-reader-theme-swatch[data-reader-theme="mist"] {
+    background: #e8f1f4;
+  }
+
+  .blog-reader-theme-swatch[data-reader-theme="night"] {
+    border-color: rgba(255, 255, 255, 0.25);
+    background: #20242e;
+  }
+
+  .blog-reader-control-mark {
+    display: grid;
+    width: 40px;
+    height: 23px;
+    place-items: center;
+    color: var(--reader-muted);
+    font-size: 0.88rem;
+    font-weight: 650;
+    line-height: 1;
+  }
+
+  .blog-reader-control-divider {
+    display: block;
+    width: 34px;
+    height: 1px;
+    flex: 0 0 auto;
+    background: var(--reader-divider);
+  }
+
+  .blog-mobile-toc-divider {
+    display: none;
+  }
+
+  .blog-reader-stepper {
+    display: flex;
+    width: 100%;
+    padding: 7px 0;
+    align-items: center;
+    flex-direction: column;
+    gap: 0;
+    border-radius: 13px;
+    background: var(--reader-accent-soft);
+  }
+
+  .blog-reader-step-button {
+    width: 36px;
+    height: 25px;
+    border-radius: 7px;
+  }
+
+  .blog-reader-step-button--line svg {
+    opacity: 0.86;
+  }
+
+  .blog-reader-step-button:disabled {
+    cursor: not-allowed;
+    opacity: 0.28;
+  }
+
+  .blog-reader-step-button:disabled:hover {
+    color: var(--reader-muted-strong);
+    background: transparent;
+    transform: none;
+  }
+
+  .blog-reader-control-value {
+    display: grid;
+    width: 100%;
+    height: 22px;
+    place-items: center;
+    min-width: 0;
+    color: var(--reader-ink);
+    font-size: 0.57rem;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .blog-reader-reset {
+    width: 32px;
+    height: 28px;
+    flex: 0 0 auto;
+    border-top: 1px solid var(--reader-divider);
+    color: var(--reader-muted);
+  }
+
+  .blog-reader-reset svg {
+    margin-top: 7px;
+  }
+
+  .blog-reader-reset-divider {
+    display: none;
+  }
+
+  @media (min-width: 621px) {
+    .blog-reader-stepper {
+      width: 40px;
+      padding: 7px 0;
+      gap: 0;
+      border-radius: 13px;
+      background: var(--reader-accent-soft);
+    }
+
+    .blog-reader-step-button {
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+    }
+
+    .blog-reader-control-value {
+      width: 100%;
+      height: 22px;
+    }
+
+    .blog-reader-reset-divider {
+      display: block;
+      width: 34px;
+      height: 1px;
+      flex: 0 0 auto;
+      background: var(--reader-divider);
+    }
+
+    .blog-reader-reset {
+      width: 32px;
+      height: 32px;
+      margin: 0;
+      padding: 0;
+      border: 1px solid var(--reader-divider);
+      border-radius: 9px;
+      background: var(--reader-toc-surface);
+    }
+
+    .blog-reader-reset svg {
+      margin-top: 0;
+    }
+  }
+
   @media (max-width: 620px) {
     .blog-post-shell {
-      padding: 28px 14px 42px;
+      --reader-frame-width: 100%;
+      padding: 28px 14px 92px;
     }
 
-    .blog-post {
+    .blog-post-header h1 {
+      font-size: clamp(2rem, 9vw, 2.5rem);
+    }
+
+    .blog-post-cover {
       border-radius: 13px;
-      padding: 24px 19px 34px;
     }
 
-    .blog-markdown {
-      font-size: 0.96rem;
+    .blog-post-back {
+      display: inline-flex;
+    }
+
+    .blog-reading-rail {
+      display: none;
+    }
+
+    .blog-post-toc {
+      top: 50%;
+      left: 14px;
+      width: min(258px, calc(100vw - 30px));
+      max-height: calc(100vh - 150px);
+      transform: translate(calc(-100% - 18px), -50%);
+    }
+
+    .blog-post-toc.is-open {
+      transform: translate(0, -50%);
+    }
+
+    .blog-reader-controls {
+      top: auto;
+      right: auto;
+      bottom: 14px;
+      left: 50%;
+      width: max-content;
+      max-width: calc(100vw - 28px);
+      min-height: 0;
+      height: 60px;
+      padding: 7px 9px;
+      flex-direction: row;
+      justify-content: flex-start;
+      gap: 7px;
+      transform: translateX(-50%);
+    }
+
+    .blog-mobile-toc-toggle {
+      display: grid;
+      flex: 0 0 40px;
+    }
+
+    .blog-mobile-toc-divider {
+      display: block;
+    }
+
+    .blog-reader-control-group {
+      width: auto;
+      flex-direction: row;
+      gap: 4px;
+    }
+
+    .blog-reader-control-mark {
+      display: none;
+    }
+
+    .blog-reader-control-button {
+      width: 40px;
+      height: 40px;
+    }
+
+    .blog-reader-stepper {
+      display: grid;
+      width: auto;
+      padding: 0;
+      grid-template-columns: 23px 32px 23px;
+      flex-direction: row;
+      border-radius: 0;
+      gap: 2px;
+      background: transparent;
+    }
+
+    .blog-reader-step-button {
+      width: 23px;
+      height: 35px;
+    }
+
+    .blog-reader-control-value {
+      width: auto;
+      height: auto;
+    }
+
+    .blog-reader-control-divider {
+      width: 1px;
+      height: 32px;
+    }
+
+    .blog-reader-reset {
+      display: none;
+      width: 26px;
+      height: 35px;
+    }
+
+    .blog-post-nav {
+      gap: 8px;
+    }
+
+    .blog-post-nav-link {
+      min-height: 58px;
+      padding: 10px;
+      gap: 7px;
+    }
+
+    .blog-post-nav-copy strong {
+      display: -webkit-box;
+      font-size: 0.65rem;
+      line-height: 1.3;
+      text-overflow: clip;
+      white-space: normal;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 2;
     }
   }
 </style>
