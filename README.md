@@ -12,7 +12,6 @@
 
 <div align="center">
 
-[![CI](https://github.com/Mios-dream/momona/actions/workflows/ci.yml/badge.svg)](https://github.com/Mios-dream/momona/actions/workflows/ci.yml)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.12.0-339933?style=for-the-badge&logo=node.js&logoColor=white)](https://nodejs.org/)
 [![pnpm](https://img.shields.io/badge/pnpm-11-F69220?style=for-the-badge&logo=pnpm&logoColor=white)](https://pnpm.io/)
 [![Astro](https://img.shields.io/badge/Astro-7-ff5d01?style=for-the-badge&logo=astro&logoColor=white)](https://astro.build/)
@@ -23,6 +22,7 @@
 </div>
 
 Momona 把个人资料、公开动态、收藏、友联、音乐和数据摘要整理到一个响应式站点中。它面向单用户本地编辑：开发阶段通过设置页配置与同步数据，发布阶段只输出纯静态文件，不需要在线数据库或运行中的后端服务。
+参考 [Myriad](https://github.com/Myriad-You/Myriad) 进行页面构建。
 
 > [!NOTE]
 > Momona 的设置页和 `/__momona/*` 本地接口只在 Astro 开发服务器中提供。生产构建只读取项目文件和公开页面快照，不会把本地设置接口输出到 `dist/`。
