@@ -27,6 +27,7 @@ import type {
   StarRailAccountData,
 } from "../../data/types";
 import FallbackImage from "../app/FallbackImage.vue";
+import HomeBuildInfo from "../app/HomeBuildInfo.vue";
 import IconGlyph from "../app/IconGlyph.vue";
 import HomeActivities from "./HomeActivities.vue";
 import HomeAgentCard from "./HomeAgentCard.vue";
@@ -615,6 +616,7 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="home-page" :class="{ 'is-editing': isEditing }">
+    <HomeBuildInfo />
     <div class="home-stage">
       <div class="home-content">
         <div class="home-grid-area">
