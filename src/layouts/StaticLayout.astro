@@ -12,9 +12,18 @@ interface Props {
   siteDescription?: string;
   /** 配置中的 favicon 地址。 */
   favicon?: string;
+  /** 可选的 RSS 订阅地址，用于浏览器和订阅工具自动发现。 */
+  rssUrl?: string;
 }
 
-const { title, description, siteTitle, siteDescription, favicon } = Astro.props;
+const {
+  title,
+  description,
+  siteTitle,
+  siteDescription,
+  favicon,
+  rssUrl,
+} = Astro.props;
 const normalizedSiteTitle = siteTitle?.trim();
 const browserTitle =
   normalizedSiteTitle && !title.includes(normalizedSiteTitle)
@@ -22,6 +31,7 @@ const browserTitle =
     : title;
 const browserDescription = siteDescription?.trim() || description;
 const faviconUrl = favicon?.trim() || "/favicon.svg";
+const normalizedRssUrl = rssUrl?.trim();
 ---
 
 <!doctype html>
@@ -43,6 +53,14 @@ const faviconUrl = favicon?.trim() || "/favicon.svg";
       fetchpriority="high"
     />
     <link rel="icon" data-momona-favicon href={faviconUrl} />
+    {normalizedRssUrl && (
+      <link
+        rel="alternate"
+        type="application/rss+xml"
+        title={`${normalizedSiteTitle || "Momona"} RSS`}
+        href={normalizedRssUrl}
+      />
+    )}
     <title>{browserTitle}</title>
     <style is:inline>
       .momona-page-loader {

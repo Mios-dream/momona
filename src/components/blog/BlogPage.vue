@@ -43,6 +43,7 @@ const activeCategory = ref("all");
 const sortMode = ref<BlogSortMode>("latest");
 const openPanel = ref<BlogPanel>(null);
 const searchInput = ref<HTMLInputElement | null>(null);
+const blogFeedPath = `${import.meta.env.BASE_URL}rss.xml`;
 
 const categoryOptions = computed<BlogCategoryOption[]>(() => {
   const counts = new Map<string, number>();
@@ -322,6 +323,17 @@ onBeforeUnmount(() => {
         <IconGlyph name="arrowUpDown" :size="15" />
         <span>排序</span>
       </button>
+      <a
+        class="blog-toolbar-action"
+        :href="blogFeedPath"
+        target="_blank"
+        rel="alternate noreferrer"
+        aria-label="订阅博客文章"
+        title="订阅博客文章"
+      >
+        <IconGlyph name="rss" :size="15" />
+        <span>订阅</span>
+      </a>
     </nav>
 
     <Transition name="blog-panel">

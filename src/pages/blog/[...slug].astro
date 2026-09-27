@@ -39,6 +39,7 @@ const updatedDate = article.data.updatedDate
 const coverSource = getBlogCoverSource(article.data.cover);
 const description =
   article.data.description || `${article.data.title} · ${localConfig.site.title}`;
+const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
 ---
 
 <StaticLayout
@@ -47,6 +48,7 @@ const description =
   siteTitle={localConfig.site.title}
   siteDescription={localConfig.site.description}
   favicon={localConfig.site.favicon}
+  rssUrl={rssUrl}
 >
   <main class="blog-post-shell" data-reading-page data-reader-theme="paper">
     <div

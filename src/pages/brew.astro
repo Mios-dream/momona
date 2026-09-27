@@ -4,8 +4,9 @@ import AppShell from '../components/app/AppShell.vue';
 import { getDataCenter } from '../lib/dataCenter';
 
 const { siteData, localConfig } = await getDataCenter();
+const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
 ---
 
-<StaticLayout title="Brew 阅读" description="静态订阅源和文章阅读空间。" siteTitle={localConfig.site.title} siteDescription={localConfig.site.description} favicon={localConfig.site.favicon}>
+<StaticLayout title="Brew 阅读" description="静态订阅源和文章阅读空间。" siteTitle={localConfig.site.title} siteDescription={localConfig.site.description} favicon={localConfig.site.favicon} rssUrl={rssUrl}>
   <AppShell page="brew" siteData={siteData} localConfig={localConfig} editable={import.meta.env.DEV} client:load />
 </StaticLayout>
