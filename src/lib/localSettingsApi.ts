@@ -256,8 +256,11 @@ export function createLocalSettingsApi() {
       const sourceId = sourceIdFromPayload(payload);
       const syncConfig = await withLocalCredentials(config);
       const result = await syncDataSource(syncConfig, sourceId);
-      const { siteData, config: storedConfig, sourceInfo } =
-        await writeSourceResult(config, result);
+      const {
+        siteData,
+        config: storedConfig,
+        sourceInfo,
+      } = await writeSourceResult(config, result);
       return {
         siteData,
         config: storedConfig,
@@ -269,7 +272,7 @@ export function createLocalSettingsApi() {
     },
 
     /**
-     * 抓取全部友联文章并保存 Brew 公开缓存。
+     * 抓取全部友链文章并保存 Brew 公开缓存。
      *
      * @returns 保存后的页面快照和本轮订阅源同步摘要。
      */
@@ -353,22 +356,22 @@ export function createLocalSettingsApi() {
     },
 
     /**
-     * 校验、规范化并保存友联配置。
+     * 校验、规范化并保存友链配置。
      *
-     * @param payload - 包含友联数组的未知请求载荷。
-     * @returns 保存后的配置、友联列表和页面快照。
+     * @param payload - 包含友链数组的未知请求载荷。
+     * @returns 保存后的配置、友链列表和页面快照。
      */
     async saveFriends(payload: unknown) {
       if (!isRecord(payload) || !Array.isArray(payload.friends)) {
-        throw new LocalSettingsRequestError("缺少友联数据");
+        throw new LocalSettingsRequestError("缺少友链数据");
       }
-      // 先完整规范化并校验数组，再进入统一写队列，避免只写入部分合法友联。
+      // 先完整规范化并校验数组，再进入统一写队列，避免只写入部分合法友链。
       const friends = payload.friends.flatMap((entry, index) => {
         const friend = normalizeFriendLink(entry, index);
         return friend ? [friend] : [];
       });
       if (friends.length !== payload.friends.length) {
-        throw new LocalSettingsRequestError("友联数据格式不正确");
+        throw new LocalSettingsRequestError("友链数据格式不正确");
       }
       const currentConfig = await readLocalConfigFile();
       const config = normalizeLocalConfig({ ...currentConfig, friends });

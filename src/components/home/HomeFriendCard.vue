@@ -12,9 +12,9 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   /**
-   * 为没有友联配置的首页组件提供空列表默认值。
+   * 为没有友链配置的首页组件提供空列表默认值。
    *
-   * @returns 空友联数组。
+   * @returns 空友链数组。
    */
   friends: () => [],
   interval: FRIEND_ROTATION_INTERVAL,
@@ -28,7 +28,7 @@ let rotationTimer: number | null = null;
 const currentFriend = computed(() => friends.value[activeIndex.value] ?? null);
 
 /**
- * 清理友联轮播定时器。
+ * 清理友链轮播定时器。
  *
  * @returns 无返回值；重复调用不会产生副作用。
  */
@@ -40,9 +40,9 @@ function clearRotation(): void {
 }
 
 /**
- * 按指定偏移量切换当前友联。
+ * 按指定偏移量切换当前友链。
  *
- * @param offset - 要移动的友联索引步长。
+ * @param offset - 要移动的友链索引步长。
  * @returns 无返回值。
  */
 function advance(offset = 1): void {
@@ -52,9 +52,9 @@ function advance(offset = 1): void {
 }
 
 /**
- * 根据友联数量启动自动轮播。
+ * 根据友链数量启动自动轮播。
  *
- * @returns 无返回值；不足两条友联时保持静态展示。
+ * @returns 无返回值；不足两条友链时保持静态展示。
  */
 function startRotation(): void {
   clearRotation();
@@ -90,7 +90,7 @@ onBeforeUnmount(clearRotation);
 <template>
   <section
     class="home-friend-card-shell"
-    aria-label="友联轮播"
+    aria-label="友链轮播"
     @mouseenter="isPaused = true"
     @mouseleave="isPaused = false"
     @focusin="isPaused = true"
@@ -124,7 +124,7 @@ onBeforeUnmount(clearRotation);
         </a>
       </article>
       <div v-else class="home-friend-empty">
-        <span>暂无友联</span>
+        <span>暂无友链</span>
       </div>
     </Transition>
   </section>

@@ -84,7 +84,7 @@ function errorMessage(error) {
 }
 
 /**
- * 请求外部 RSS/Atom 地址，供本地友联预览使用。
+ * 请求外部 RSS/Atom 地址，供本地友链预览使用。
  *
  * @param {import('node:http').IncomingMessage} request - 携带订阅源地址的请求。
  * @returns {Promise<{feedUrl: string, xml: string}>} 规范化地址和 XML 文本。
@@ -112,7 +112,8 @@ async function readFriendFeed(request) {
     const response = await fetch(feedUrl, {
       signal: controller.signal,
       headers: {
-        Accept: "application/rss+xml, application/atom+xml, application/xml, text/xml",
+        Accept:
+          "application/rss+xml, application/atom+xml, application/xml, text/xml",
         "User-Agent": "Momona Friend RSS Reader/1.0",
       },
     });
@@ -145,8 +146,12 @@ async function fetchRemoteJson(url, options = {}, label = "远程服务") {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 12_000);
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
-    if (!response.ok) throw requestError(`${label}返回 ${response.status}`, 502);
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    if (!response.ok)
+      throw requestError(`${label}返回 ${response.status}`, 502);
     const text = await response.text();
     if (!text || text.length > maxMusicResponseSize) {
       throw requestError(`${label}响应无效`, 502);
@@ -178,21 +183,27 @@ async function readMusicPlaylist(request) {
   );
   const source = requestUrl.searchParams.get("source") || "";
   const playlistId = requestUrl.searchParams.get("id") || "";
-  if (!['netease', 'qq'].includes(source) || !/^\d+$/.test(playlistId)) {
+  if (!["netease", "qq"].includes(source) || !/^\d+$/.test(playlistId)) {
     throw requestError("歌单平台或 ID 无效");
   }
 
-  const upstreamUrl = source === "qq"
-    ? `https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg?type=1&json=1&utf8=1&onlysong=0&disstid=${encodeURIComponent(playlistId)}&g_tk=5381&loginUin=0&hostUin=0&format=json&inCharset=utf8&outCharset=utf-8&notice=0&platform=yqq.json&needNewCode=0`
-    : `https://music.163.com/api/v6/playlist/detail?id=${encodeURIComponent(playlistId)}`;
-  return fetchRemoteJson(upstreamUrl, {
-    headers: {
-      Accept: "application/json, text/plain, */*",
-      Referer: source === "qq" ? "https://y.qq.com/" : "https://music.163.com/",
-      Origin: source === "qq" ? "https://y.qq.com" : "https://music.163.com",
-      "User-Agent": "Momona Music/1.0",
+  const upstreamUrl =
+    source === "qq"
+      ? `https://c.y.qq.com/qzone/fcg-bin/fcg_ucc_getcdinfo_byids_cp.fcg?type=1&json=1&utf8=1&onlysong=0&disstid=${encodeURIComponent(playlistId)}&g_tk=5381&loginUin=0&hostUin=0&format=json&inCharset=utf8&outCharset=utf-8&notice=0&platform=yqq.json&needNewCode=0`
+      : `https://music.163.com/api/v6/playlist/detail?id=${encodeURIComponent(playlistId)}`;
+  return fetchRemoteJson(
+    upstreamUrl,
+    {
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        Referer:
+          source === "qq" ? "https://y.qq.com/" : "https://music.163.com/",
+        Origin: source === "qq" ? "https://y.qq.com" : "https://music.163.com",
+        "User-Agent": "Momona Music/1.0",
+      },
     },
-  }, `${source === "qq" ? "QQ 音乐" : "网易云音乐"}歌单服务`);
+    `${source === "qq" ? "QQ 音乐" : "网易云音乐"}歌单服务`,
+  );
 }
 
 /**
@@ -256,7 +267,8 @@ export const localSettingsServerPlugin = {
             return;
           }
           try {
-            const payload = method === "GET" ? undefined : await readJsonBody(request);
+            const payload =
+              method === "GET" ? undefined : await readJsonBody(request);
             const result = await handler(payload, request);
             respondJson(response, 200, result);
           } catch (error) {
@@ -279,7 +291,9 @@ export const localSettingsServerPlugin = {
       register("/__momona/save-friends", "POST", (payload) =>
         api.saveFriends(payload),
       );
-      register("/__momona/sync-game", "POST", (payload) => api.syncGame(payload));
+      register("/__momona/sync-game", "POST", (payload) =>
+        api.syncGame(payload),
+      );
       register("/__momona/friend-rss", "GET", (_payload, request) =>
         readFriendFeed(request),
       );

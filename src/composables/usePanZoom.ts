@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 
 interface PanPoint {
   /** 指针按下时的横坐标。 */
@@ -14,7 +14,7 @@ const WHEEL_SENSITIVITY = 1.7;
 const PAN_EASE = 0.22;
 
 /**
- * 创建友联画布使用的拖拽、滚轮缩放和键盘平移状态。
+ * 创建友链画布使用的拖拽、滚轮缩放和键盘平移状态。
  *
  * 逻辑与页面展示分离，页面只需要绑定返回的事件方法即可，避免在模板中
  * 混合处理指针坐标、缩放限制和 CSS transform。
@@ -51,7 +51,10 @@ export function usePanZoom() {
 
   /** 是否仍处于默认中心位置。 */
   const isCentered = computed(
-    () => offsetX.value === 0 && offsetY.value === 0 && scale.value === getDefaultScale(),
+    () =>
+      offsetX.value === 0 &&
+      offsetY.value === 0 &&
+      scale.value === getDefaultScale(),
   );
 
   /**
@@ -91,7 +94,7 @@ export function usePanZoom() {
    * @returns 无返回值；同时把动画目标同步到当前偏移量。
    */
   function stopPanAnimation(): void {
-    if (panFrame !== null && typeof window !== 'undefined') {
+    if (panFrame !== null && typeof window !== "undefined") {
       window.cancelAnimationFrame(panFrame);
     }
     panFrame = null;
@@ -152,14 +155,12 @@ export function usePanZoom() {
           ? window.innerHeight * 0.82
           : 1;
     const multiplier = baseMultiplier * WHEEL_SENSITIVITY;
-    const horizontalDelta = event.shiftKey && event.deltaX === 0
-      ? event.deltaY
-      : event.deltaX;
+    const horizontalDelta =
+      event.shiftKey && event.deltaX === 0 ? event.deltaY : event.deltaX;
 
     targetOffsetX -= horizontalDelta * multiplier;
-    targetOffsetY -= event.shiftKey && event.deltaX === 0
-      ? 0
-      : event.deltaY * multiplier;
+    targetOffsetY -=
+      event.shiftKey && event.deltaX === 0 ? 0 : event.deltaY * multiplier;
     scheduleWheelPan();
   }
 
@@ -186,27 +187,28 @@ export function usePanZoom() {
    */
   function handleKeydown(event: KeyboardEvent): void {
     const target = event.target as HTMLElement | null;
-    if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
+    if (target?.matches('input, textarea, select, [contenteditable="true"]'))
+      return;
 
-    if (event.key === '+' || event.key === '=') {
+    if (event.key === "+" || event.key === "=") {
       event.preventDefault();
       zoomIn();
-    } else if (event.key === '-' || event.key === '_') {
+    } else if (event.key === "-" || event.key === "_") {
       event.preventDefault();
       zoomOut();
-    } else if (event.key === '0') {
+    } else if (event.key === "0") {
       event.preventDefault();
       resetCanvas();
-    } else if (event.key === 'ArrowLeft') {
+    } else if (event.key === "ArrowLeft") {
       event.preventDefault();
       moveByKeyboard(24, 0);
-    } else if (event.key === 'ArrowRight') {
+    } else if (event.key === "ArrowRight") {
       event.preventDefault();
       moveByKeyboard(-24, 0);
-    } else if (event.key === 'ArrowUp') {
+    } else if (event.key === "ArrowUp") {
       event.preventDefault();
       moveByKeyboard(0, 24);
-    } else if (event.key === 'ArrowDown') {
+    } else if (event.key === "ArrowDown") {
       event.preventDefault();
       moveByKeyboard(0, -24);
     }
@@ -262,17 +264,19 @@ export function usePanZoom() {
    */
   function endPan(event: PointerEvent): void {
     isPanning.value = false;
-    (event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(event.pointerId);
+    (event.currentTarget as HTMLElement | null)?.releasePointerCapture?.(
+      event.pointerId,
+    );
   }
 
   onMounted(() => {
     resetCanvas();
-    window.addEventListener('keydown', handleKeydown);
+    window.addEventListener("keydown", handleKeydown);
   });
 
   onBeforeUnmount(() => {
     stopPanAnimation();
-    window.removeEventListener('keydown', handleKeydown);
+    window.removeEventListener("keydown", handleKeydown);
   });
 
   return {

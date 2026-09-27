@@ -48,9 +48,9 @@ export async function getDataCenter(): Promise<DataCenter> {
   );
 
   /**
-   * 返回当前页面快照中的友联数据。
+   * 返回当前页面快照中的友链数据。
    *
-   * @returns 当前页面的友联列表。
+   * @returns 当前页面的友链列表。
    */
   function selectFriends(): FriendLink[] {
     return siteData.friends;

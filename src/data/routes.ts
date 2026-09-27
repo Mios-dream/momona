@@ -35,7 +35,7 @@ export function getAppPageFromPath(
 export const appPageTitles: Record<AppPage, string> = {
   home: "Love on the page · Momona",
   library: "资料库 · Love on the page",
-  friends: "友联 · Love on the page",
+  friends: "友链 · Love on the page",
   brew: "Brew 阅读 · Love on the page",
   reports: "数据报告 · Love on the page",
   settings: "本地设置 · Momona",

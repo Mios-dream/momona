@@ -1,15 +1,15 @@
-import { resolve } from 'node:path';
-import type { BrewFeedCache, BrewSource, FriendLink } from '../data/types';
-import { createBrewSources } from '../data/brew';
-import { readJsonFile, writeJsonFileAtomically } from './persistence/jsonFile';
-import { applyFriendFeed } from './brewFeedParser';
-import { fetchFriendFeedForSync } from './brewFeedSync';
+import { resolve } from "node:path";
+import type { BrewFeedCache, BrewSource, FriendLink } from "../data/types";
+import { createBrewSources } from "../data/brew";
+import { readJsonFile, writeJsonFileAtomically } from "./persistence/jsonFile";
+import { applyFriendFeed } from "./brewFeedParser";
+import { fetchFriendFeedForSync } from "./brewFeedSync";
 
 /** Brew 文章公开缓存的磁盘位置。 */
 export const brewFeedCachePath = resolve(
   process.cwd(),
-  '.momona',
-  'brew-feeds.json',
+  ".momona",
+  "brew-feeds.json",
 );
 
 /**
@@ -19,7 +19,7 @@ export const brewFeedCachePath = resolve(
  * @returns 值为非数组对象时返回 true。
  */
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 /**
@@ -30,7 +30,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 function isBrewArticle(value: unknown): boolean {
   if (!isRecord(value)) return false;
-  return typeof value.id === 'string' && typeof value.title === 'string';
+  return typeof value.id === "string" && typeof value.title === "string";
 }
 
 /**
@@ -42,9 +42,9 @@ function isBrewArticle(value: unknown): boolean {
 function isBrewSource(value: unknown): value is BrewSource {
   if (!isRecord(value)) return false;
   return (
-    typeof value.id === 'string' &&
-    typeof value.feedUrl === 'string' &&
-    (value.feedStatus === 'available' || value.feedStatus === 'unavailable') &&
+    typeof value.id === "string" &&
+    typeof value.feedUrl === "string" &&
+    (value.feedStatus === "available" || value.feedStatus === "unavailable") &&
     Array.isArray(value.articles) &&
     value.articles.every(isBrewArticle)
   );
@@ -57,7 +57,11 @@ function isBrewSource(value: unknown): value is BrewSource {
  */
 export async function readBrewFeedCache(): Promise<BrewSource[] | null> {
   const value = await readJsonFile(brewFeedCachePath);
-  if (!isRecord(value) || value.version !== 1 || !Array.isArray(value.sources)) {
+  if (
+    !isRecord(value) ||
+    value.version !== 1 ||
+    !Array.isArray(value.sources)
+  ) {
     return null;
   }
   return value.sources.filter(isBrewSource);
@@ -69,9 +73,7 @@ export async function readBrewFeedCache(): Promise<BrewSource[] | null> {
  * @param sources - 需要缓存的 Brew 来源卡片。
  * @returns 文件写入完成后结束的异步任务。
  */
-export async function writeBrewFeedCache(
-  sources: BrewSource[],
-): Promise<void> {
+export async function writeBrewFeedCache(sources: BrewSource[]): Promise<void> {
   const cache: BrewFeedCache = {
     version: 1,
     updatedAt: new Date().toISOString(),
@@ -81,9 +83,9 @@ export async function writeBrewFeedCache(
 }
 
 /**
- * 抓取全部友联订阅源，并在网络失败时保留已有文章缓存。
+ * 抓取全部友链订阅源，并在网络失败时保留已有文章缓存。
  *
- * @param friends - 当前友联配置。
+ * @param friends - 当前友链配置。
  * @param cachedSources - 上一次成功抓取的来源卡片。
  * @returns 更新后的来源和各订阅源本轮抓取结果。
  */
@@ -98,7 +100,7 @@ export async function syncBrewFeeds(
   const results = await Promise.all(friends.map(fetchFriendFeedForSync));
   const nextSources = sources.map((source, index) => {
     const result = results[index];
-    return result?.status === 'available'
+    return result?.status === "available"
       ? applyFriendFeed(source, index, result)
       : source;
   });

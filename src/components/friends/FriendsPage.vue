@@ -33,17 +33,17 @@ interface FriendDraft {
 }
 
 interface Props {
-  /** 构建阶段从本地配置文件注入的友联数据。 */
+  /** 构建阶段从本地配置文件注入的友链数据。 */
   friends?: FriendLink[];
-  /** 仅开发服务器允许修改本地友联文件。 */
+  /** 仅开发服务器允许修改本地友链文件。 */
   editable?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
   /**
-   * 为静态页面提供空友联列表默认值。
+   * 为静态页面提供空友链列表默认值。
    *
-   * @returns 空友联数组。
+   * @returns 空友链数组。
    */
   friends: () => [],
   editable: false,
@@ -78,9 +78,9 @@ const {
 } = usePanZoom();
 
 /**
- * 创建友联编辑表单的空白状态。
+ * 创建友链编辑表单的空白状态。
  *
- * @returns 带默认色调和空字段的友联编辑草稿。
+ * @returns 带默认色调和空字段的友链编辑草稿。
  */
 function createDraft(): FriendDraft {
   return {
@@ -94,32 +94,32 @@ function createDraft(): FriendDraft {
   };
 }
 
-/** 读取当前正在编辑的友联。 */
+/** 读取当前正在编辑的友链。 */
 const currentFriend = computed(() =>
   editingId.value
     ? (friends.value.find((friend) => friend.id === editingId.value) ?? null)
     : null,
 );
 
-/** 生成友联编辑器标题。 */
+/** 生成友链编辑器标题。 */
 const editorTitle = computed(() =>
-  editingId.value ? "编辑这张友联卡" : "添加一位新朋友",
+  editingId.value ? "编辑这张友链卡" : "添加一位新朋友",
 );
 
-/** 生成友联编辑器的辅助标题。 */
+/** 生成友链编辑器的辅助标题。 */
 const editorEyebrow = computed(() =>
   editingId.value ? "EDIT FRIEND" : "NEW FRIEND",
 );
 
-/** 生成友联数量统计文案。 */
+/** 生成友链数量统计文案。 */
 const statsLabel = computed(() =>
-  friends.value.length ? `${friends.value.length} 位朋友在这里` : "暂无友联",
+  friends.value.length ? `${friends.value.length} 位朋友在这里` : "暂无友链",
 );
 
 /**
- * 从友联地址中提取可读的域名。
+ * 从友链地址中提取可读的域名。
  *
- * @param href - 友联站点地址。
+ * @param href - 友链站点地址。
  * @returns 去掉 www 前缀的域名；地址无效时返回原文本。
  */
 function getFriendHost(href: string): string {
@@ -131,9 +131,9 @@ function getFriendHost(href: string): string {
 }
 
 /**
- * 根据昵称和当前时间生成新友联的稳定编辑 ID。
+ * 根据昵称和当前时间生成新友链的稳定编辑 ID。
  *
- * @param nickname - 新友联昵称。
+ * @param nickname - 新友链昵称。
  * @returns 可用于编辑和持久化的唯一 ID。
  */
 function makeId(nickname: string): string {
@@ -146,10 +146,10 @@ function makeId(nickname: string): string {
 }
 
 /**
- * 将友联列表保存到本地开发服务，失败时回滚界面状态。
+ * 将友链列表保存到本地开发服务，失败时回滚界面状态。
  *
- * @param nextFriends - 需要保存的最新友联列表。
- * @param previousFriends - 保存失败时恢复的旧友联列表。
+ * @param nextFriends - 需要保存的最新友链列表。
+ * @param previousFriends - 保存失败时恢复的旧友链列表。
  * @returns 保存成功时返回 true，非编辑模式或保存失败时返回 false。
  */
 async function persistFriends(
@@ -167,7 +167,7 @@ async function persistFriends(
       message?: string;
     } | null;
     if (!response.ok)
-      throw new Error(payload?.message || "本地友联文件写入失败");
+      throw new Error(payload?.message || "本地友链文件写入失败");
     emit("friends-change", cloneFriendLinks(nextFriends));
     return true;
   } catch (error) {
@@ -178,7 +178,7 @@ async function persistFriends(
 }
 
 /**
- * 显示短暂的友联操作提示，并取消上一次定时器。
+ * 显示短暂的友链操作提示，并取消上一次定时器。
  *
  * @param message - 需要显示的提示文本。
  * @returns 无返回值。
@@ -193,7 +193,7 @@ function showToast(message: string): void {
 }
 
 /**
- * 打开新增友联表单。
+ * 打开新增友链表单。
  *
  * @returns 无返回值；表单会重置为默认草稿。
  */
@@ -205,9 +205,9 @@ function openCreate(): void {
 }
 
 /**
- * 将已有友联装载到编辑表单。
+ * 将已有友链装载到编辑表单。
  *
- * @param friend - 需要编辑的友联。
+ * @param friend - 需要编辑的友链。
  * @returns 无返回值。
  */
 function openEdit(friend: FriendLink): void {
@@ -226,7 +226,7 @@ function openEdit(friend: FriendLink): void {
 }
 
 /**
- * 关闭友联编辑器并清理删除确认状态。
+ * 关闭友链编辑器并清理删除确认状态。
  *
  * @returns 无返回值。
  */
@@ -236,7 +236,7 @@ function closeEditor(): void {
 }
 
 /**
- * 校验并保存新增或编辑后的友联。
+ * 校验并保存新增或编辑后的友链。
  *
  * @returns 保存流程完成后结束；字段不完整或非编辑模式时直接结束。
  */
@@ -260,7 +260,7 @@ async function saveFriend(): Promise<void> {
     signature,
     tags: normalizeFriendTags(draft.value.tagsText).length
       ? normalizeFriendTags(draft.value.tagsText)
-      : ["友联"],
+      : ["友链"],
     ...(feedUrl ? { feedUrl } : {}),
     tone: draft.value.tone,
   };
@@ -273,7 +273,7 @@ async function saveFriend(): Promise<void> {
     : [nextFriend, ...friends.value];
   friends.value = nextFriends;
   if (!(await persistFriends(nextFriends, previousFriends))) return;
-  showToast(editingId.value ? "友联卡片已更新" : "新的友联已加入");
+  showToast(editingId.value ? "友链卡片已更新" : "新的友链已加入");
   closeEditor();
 }
 
@@ -287,7 +287,7 @@ function requestDelete(): void {
 }
 
 /**
- * 删除当前友联，并在保存失败时恢复原列表。
+ * 删除当前友链，并在保存失败时恢复原列表。
  *
  * @returns 删除保存流程完成后结束。
  */
@@ -300,10 +300,10 @@ async function confirmDelete(): Promise<void> {
   friends.value = nextFriends;
   if (!(await persistFriends(nextFriends, previousFriends))) return;
   closeEditor();
-  showToast("友联已移除");
+  showToast("友链已移除");
 }
 
-/** 根据友联数据重新计算整面自由画布。 */
+/** 根据友链数据重新计算整面自由画布。 */
 const displayedLayout = computed(() => createFriendWallLayout(friends.value));
 
 /** 组合画布缩放样式和排版后的固定尺寸。 */
@@ -316,7 +316,7 @@ const canvasFrameStyle = computed(() => ({
 /**
  * 将排版卡片转换为绝对定位所需的 CSS 样式。
  *
- * @param item - 已完成排版的友联卡片。
+ * @param item - 已完成排版的友链卡片。
  * @returns 供模板 style 绑定使用的 CSS 属性对象。
  */
 function getFriendStyle(item: PositionedFriend): Record<string, string> {
@@ -333,7 +333,7 @@ function getFriendStyle(item: PositionedFriend): Record<string, string> {
 /**
  * 在可编辑模式下通过点击卡片打开编辑器。
  *
- * @param friend - 用户点击的友联。
+ * @param friend - 用户点击的友链。
  * @returns 无返回值；公开模式下保持卡片浏览行为。
  */
 function openCard(friend: FriendLink): void {
@@ -385,14 +385,14 @@ onBeforeUnmount(() => {
         @click="openCreate"
       >
         <IconGlyph name="plus" :size="16" />
-        <span>添加友联</span>
+        <span>添加友链</span>
       </button>
     </section>
 
     <section
       class="friends-viewport"
       :class="{ 'is-panning': isPanning }"
-      aria-label="友联无限画布"
+      aria-label="友链无限画布"
       tabindex="0"
       @pointerdown="startPan"
       @pointermove="movePan"
@@ -403,8 +403,8 @@ onBeforeUnmount(() => {
     >
       <div v-if="!friends.length" class="friends-empty-state">
         <IconGlyph name="link" :size="22" />
-        <strong>暂无友联</strong>
-        <span>添加友联后，它们会从本地配置文件读取。</span>
+        <strong>暂无友链</strong>
+        <span>添加友链后，它们会从本地配置文件读取。</span>
       </div>
       <div class="friends-canvas" :style="canvasFrameStyle">
         <div
@@ -453,7 +453,7 @@ onBeforeUnmount(() => {
                   <div
                     v-if="item.friend.tags.length"
                     class="friend-tags"
-                    aria-label="友联标签"
+                    aria-label="友链标签"
                   >
                     <span v-for="tag in item.friend.tags" :key="tag"
                       >#{{ tag }}</span
@@ -464,7 +464,7 @@ onBeforeUnmount(() => {
                 <section class="friend-card-feature">
                   <div class="friend-card-feature-line">
                     <span class="friend-dot" aria-hidden="true"></span>
-                    <strong>友联站点</strong>
+                    <strong>友链站点</strong>
                     <span class="friend-card-host">{{
                       getFriendHost(item.friend.href)
                     }}</span>
@@ -483,7 +483,7 @@ onBeforeUnmount(() => {
                 class="friend-card-edit"
                 type="button"
                 :aria-label="`编辑 ${item.friend.nickname}`"
-                title="编辑友联"
+                title="编辑友链"
                 @pointerdown.stop
                 @click.stop="openCard(item.friend)"
               >
@@ -495,7 +495,7 @@ onBeforeUnmount(() => {
       </div>
     </section>
 
-    <div class="friends-toolbar" role="toolbar" aria-label="友联画布控制">
+    <div class="friends-toolbar" role="toolbar" aria-label="友链画布控制">
       <button
         type="button"
         aria-label="缩小画布"
@@ -630,7 +630,7 @@ onBeforeUnmount(() => {
                 <input
                   v-model="draft.avatar"
                   name="avatar"
-                  type="url"
+                  type="text"
                   placeholder="https://.../avatar.jpg"
                 />
               </label>
@@ -674,7 +674,7 @@ onBeforeUnmount(() => {
             <div v-if="deletePending" class="friend-delete-confirm">
               <div>
                 <strong>确定移除这张卡片？</strong>
-                <span>操作会写入本地友联配置文件。</span>
+                <span>操作会写入本地友链配置文件。</span>
               </div>
               <div class="friend-delete-actions">
                 <button type="button" @click="deletePending = false">
@@ -694,7 +694,7 @@ onBeforeUnmount(() => {
                 @click="requestDelete"
               >
                 <IconGlyph name="trash" :size="15" />
-                删除友联
+                删除友链
               </button>
               <span v-else></span>
               <div>
@@ -707,7 +707,7 @@ onBeforeUnmount(() => {
                 </button>
                 <button class="friend-save-button" type="submit">
                   <IconGlyph name="save" :size="15" />
-                  保存友联
+                  保存友链
                 </button>
               </div>
             </footer>

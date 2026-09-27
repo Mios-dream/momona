@@ -37,7 +37,9 @@ const feedsLoading = ref(false);
 let cachedArticles: BlogArticleSummary[] | null = null;
 let articlesRequest: Promise<BlogArticleSummary[]> | null = null;
 
-function normalizeBlogArticleSummary(value: unknown): BlogArticleSummary | null {
+function normalizeBlogArticleSummary(
+  value: unknown,
+): BlogArticleSummary | null {
   if (!value || typeof value !== "object") return null;
 
   const record = value as Record<string, unknown>;
@@ -71,7 +73,7 @@ function normalizeBlogArticleSummary(value: unknown): BlogArticleSummary | null 
   const category =
     typeof record.category === "string" && record.category.trim()
       ? record.category.trim()
-      : tags[0] ?? "未分类";
+      : (tags[0] ?? "未分类");
 
   return {
     slug,
@@ -136,7 +138,7 @@ async function loadArticles(): Promise<void> {
 }
 
 /**
- * 开发环境进入 Brew 页时刷新友联文章，并把结果写入本地公开缓存。
+ * 开发环境进入 Brew 页时刷新友链文章，并把结果写入本地公开缓存。
  *
  * 静态构建产物只使用构建前生成的缓存，不在部署后依赖远程订阅源。
  */
@@ -311,444 +313,464 @@ function clearSearch(): void {
 <template>
   <div class="brew-section-stage">
     <Transition name="brew-section" mode="out-in">
-  <BlogPage
-    v-if="props.section === 'articles'"
-    key="articles"
-    :articles="articles"
-    :loading="articlesLoading"
-    :error="articlesError"
-    @retry="loadArticles"
-  />
-
-  <section
-    v-else-if="props.section === 'favorites'"
-    key="favorites"
-    class="brew-section-empty glass-panel"
-    aria-label="收藏"
-  >
-    <IconGlyph name="star" :size="23" />
-    <strong>还没有收藏文章</strong>
-    <span>收藏的订阅文章会出现在这里。</span>
-  </section>
-
-  <div v-else key="feeds" class="brew-page" @keydown.esc="closeSource">
-    <main class="brew-content" aria-label="Brew 阅读">
-      <header v-if="latestSource" class="brew-mobile-controls">
-        <FriendAvatar
-          class="brew-mobile-avatar"
-          :src="latestSource.image"
-          :alt="`${latestSource.name} 的头像`"
-          :icon-size="20"
-          loading="eager"
-        />
-        <div>
-          <strong>午后时光</strong>
-          <small>适合轻松阅读</small>
-        </div>
-        <button
-          type="button"
-          aria-label="排序方式"
-          title="排序方式"
-          @click="toggleSort"
-        >
-          <IconGlyph name="arrowUpDown" :size="18" />
-        </button>
-      </header>
-
-      <section class="brew-grid" aria-live="polite">
-        <div
-          v-if="
-            !feedsLoading && !sources.length && activeFilter === 'all' && !query
-          "
-          class="brew-feed-empty"
-        >
-          <IconGlyph name="rss" :size="20" />
-          <strong>{{
-            sources.length ? "暂无可用订阅源" : "暂无订阅源"
-          }}</strong>
-          <span>为友联设置有效的 RSS / Atom 地址后，这里会显示文章。</span>
-        </div>
-        <BrewSourceCard
-          v-for="(source, index) in filteredSources"
-          :key="source.id"
-          :source="source"
-          :style="{
-            '--brew-source-card-delay': `${Math.min(index, 8) * 28}ms`,
-          }"
-          @open="openSource"
-        />
-        <div
-          v-if="sources.length > 0 && filteredSources.length === 0"
-          class="brew-empty"
-        >
-          <IconGlyph name="search" :size="23" />
-          <strong>没有找到匹配内容</strong>
-          <span>换个关键词，或者清除筛选条件。</span>
-          <button type="button" @click="clearSearch">清除搜索</button>
-        </div>
-      </section>
-    </main>
-
-    <div v-if="searchOpen" class="brew-search-panel glass-panel">
-      <IconGlyph name="search" :size="15" />
-      <input
-        v-model="query"
-        autofocus
-        type="search"
-        placeholder="搜索订阅源或文章"
-        aria-label="搜索订阅源或文章"
+      <BlogPage
+        v-if="props.section === 'articles'"
+        key="articles"
+        :articles="articles"
+        :loading="articlesLoading"
+        :error="articlesError"
+        @retry="loadArticles"
       />
-      <button
-        v-if="query"
-        type="button"
-        aria-label="清除搜索"
-        title="清除搜索"
-        @click="clearSearch"
-      >
-        <IconGlyph name="x" :size="15" />
-      </button>
-    </div>
 
-    <div
-      v-if="sortOpen"
-      class="brew-sort-menu glass-panel"
-      aria-label="排序和筛选"
-    >
-      <strong>排序方式</strong>
-      <button
-        :class="{ 'is-active': sortMode === 'latest' }"
-        type="button"
-        @click="
-          sortMode = 'latest';
-          sortOpen = false;
-        "
+      <section
+        v-else-if="props.section === 'favorites'"
+        key="favorites"
+        class="brew-section-empty glass-panel"
+        aria-label="收藏"
       >
-        <span>自由排序</span>
-        <IconGlyph v-if="sortMode === 'latest'" name="sparkles" :size="13" />
-      </button>
-      <button
-        :class="{ 'is-active': sortMode === 'name' }"
-        type="button"
-        @click="
-          sortMode = 'name';
-          sortOpen = false;
-        "
-      >
-        <span>按名称</span>
-        <IconGlyph v-if="sortMode === 'name'" name="sparkles" :size="13" />
-      </button>
-      <div class="brew-type-filters">
-        <button
-          :class="{ 'is-active': activeFilter === 'all' }"
-          type="button"
-          @click="activeFilter = 'all'"
-        >
-          全部
-        </button>
-        <button
-          :class="{ 'is-active': activeFilter === 'Brewlia' }"
-          type="button"
-          @click="activeFilter = 'Brewlia'"
-        >
-          Brewlia
-        </button>
-        <button
-          :class="{ 'is-active': activeFilter === 'Atom' }"
-          type="button"
-          @click="activeFilter = 'Atom'"
-        >
-          Atom
-        </button>
-        <button
-          :class="{ 'is-active': activeFilter === 'RSS' }"
-          type="button"
-          @click="activeFilter = 'RSS'"
-        >
-          RSS
-        </button>
-        <button
-          :class="{ 'is-active': activeFilter === '链接' }"
-          type="button"
-          @click="activeFilter = '链接'"
-        >
-          链接
-        </button>
-      </div>
-    </div>
+        <IconGlyph name="star" :size="23" />
+        <strong>还没有收藏文章</strong>
+        <span>收藏的订阅文章会出现在这里。</span>
+      </section>
 
-    <div v-if="shortcutOpen" class="brew-shortcut-panel glass-panel">
-      <strong>快捷键</strong>
-      <span><kbd>/</kbd> 搜索</span>
-      <span><kbd>Esc</kbd> 关闭面板</span>
-    </div>
-
-    <div v-if="latestSource" class="brew-bottom-bar glass-panel">
-      <button
-        class="brew-current-update"
-        type="button"
-        :aria-label="latestSource.name"
-        @click="openSource(latestSource)"
-      >
-        <FriendAvatar
-          class="brew-current-avatar"
-          :src="latestSource.image"
-          :alt="`${latestSource.name} 的头像`"
-          :icon-size="15"
-          loading="eager"
-        />
-        <span>
-          <strong>{{ latestSource.latestTitle || "暂无最新文章" }}</strong>
-          <small>来自 {{ latestSource.name }}</small>
-        </span>
-      </button>
-      <div class="brew-toolbar-actions">
-        <button
-          type="button"
-          aria-label="排序方式"
-          title="排序方式"
-          @click="toggleSort"
-        >
-          <IconGlyph name="arrowUpDown" :size="15" />
-          <span>自由排序</span>
-          <IconGlyph name="chevronDown" :size="12" />
-        </button>
-        <button
-          type="button"
-          aria-label="搜索"
-          title="搜索"
-          @click="toggleSearch"
-        >
-          <IconGlyph name="search" :size="15" />
-          <span>搜索</span>
-        </button>
-        <button
-          type="button"
-          aria-label="快捷键"
-          title="快捷键"
-          @click="toggleShortcuts"
-        >
-          <IconGlyph name="keyboard" :size="15" />
-          <span>快捷键</span>
-        </button>
-      </div>
-    </div>
-
-    <Transition name="brew-detail" appear>
-      <aside
-        v-if="selectedSource"
-        class="brew-detail-backdrop"
-        tabindex="-1"
-        @click.self="closeSource"
-        @keydown.esc="closeSource"
-      >
-        <section
-          class="brew-detail glass-panel"
-          role="dialog"
-          aria-modal="true"
-          :aria-labelledby="`brew-detail-title-${selectedSource.id}`"
-        >
-          <header class="brew-detail-header">
-            <div class="brew-detail-source">
-              <FriendAvatar
-                class="brew-detail-avatar"
-                :src="selectedSource.image"
-                :alt="`${selectedSource.name} 的头像`"
-                :icon-size="29"
-                loading="eager"
-              />
-              <div class="detail-source-copy">
-                <div class="detail-meta">
-                  <span
-                    class="detail-type"
-                    :class="{ 'is-link': selectedSource.type === '链接' }"
-                  >
-                    <IconGlyph
-                      :name="selectedSource.type === '链接' ? 'link' : 'rss'"
-                      :size="12"
-                    />
-                    {{ selectedSource.type }}
-                  </span>
-                  <span
-                    v-if="selectedSource.feedStatus === 'available'"
-                    class="detail-status"
-                    >已更新</span
-                  >
-                  <span v-if="selectedSource.articleCount" class="detail-count">
-                    {{ selectedSource.articleCount }} 篇文章
-                  </span>
-                </div>
-                <h2 :id="`brew-detail-title-${selectedSource.id}`">
-                  {{ selectedSource.name }}
-                </h2>
-                <span class="detail-author">{{ selectedSource.author }}</span>
-              </div>
+      <div v-else key="feeds" class="brew-page" @keydown.esc="closeSource">
+        <main class="brew-content" aria-label="Brew 阅读">
+          <header v-if="latestSource" class="brew-mobile-controls">
+            <FriendAvatar
+              class="brew-mobile-avatar"
+              :src="latestSource.image"
+              :alt="`${latestSource.name} 的头像`"
+              :icon-size="20"
+              loading="eager"
+            />
+            <div>
+              <strong>午后时光</strong>
+              <small>适合轻松阅读</small>
             </div>
             <button
-              class="brew-detail-close"
               type="button"
-              aria-label="关闭详情"
-              title="关闭详情"
-              @click="closeSource"
+              aria-label="排序方式"
+              title="排序方式"
+              @click="toggleSort"
             >
-              <IconGlyph name="x" :size="17" />
+              <IconGlyph name="arrowUpDown" :size="18" />
             </button>
           </header>
 
-          <div class="brew-detail-scroll">
+          <section class="brew-grid" aria-live="polite">
             <div
-              v-if="selectedSource.tags.length"
-              class="detail-tags"
-              aria-label="信息源标签"
+              v-if="
+                !feedsLoading &&
+                !sources.length &&
+                activeFilter === 'all' &&
+                !query
+              "
+              class="brew-feed-empty"
             >
-              <span v-for="tag in selectedSource.tags" :key="tag">{{
-                tag
-              }}</span>
+              <IconGlyph name="rss" :size="20" />
+              <strong>{{
+                sources.length ? "暂无可用订阅源" : "暂无订阅源"
+              }}</strong>
+              <span>为友链设置有效的 RSS / Atom 地址后，这里会显示文章。</span>
             </div>
+            <BrewSourceCard
+              v-for="(source, index) in filteredSources"
+              :key="source.id"
+              :source="source"
+              :style="{
+                '--brew-source-card-delay': `${Math.min(index, 8) * 28}ms`,
+              }"
+              @open="openSource"
+            />
+            <div
+              v-if="sources.length > 0 && filteredSources.length === 0"
+              class="brew-empty"
+            >
+              <IconGlyph name="search" :size="23" />
+              <strong>没有找到匹配内容</strong>
+              <span>换个关键词，或者清除筛选条件。</span>
+              <button type="button" @click="clearSearch">清除搜索</button>
+            </div>
+          </section>
+        </main>
 
-            <template v-if="selectedSource.articles.length">
-              <section
-                class="detail-section detail-latest"
-                aria-labelledby="brew-detail-latest-title"
-              >
-                <div class="detail-section-heading">
-                  <h3 id="brew-detail-latest-title">最新文章</h3>
-                  <time v-if="selectedSource.date">{{
-                    selectedSource.date
-                  }}</time>
+        <div v-if="searchOpen" class="brew-search-panel glass-panel">
+          <IconGlyph name="search" :size="15" />
+          <input
+            v-model="query"
+            autofocus
+            type="search"
+            placeholder="搜索订阅源或文章"
+            aria-label="搜索订阅源或文章"
+          />
+          <button
+            v-if="query"
+            type="button"
+            aria-label="清除搜索"
+            title="清除搜索"
+            @click="clearSearch"
+          >
+            <IconGlyph name="x" :size="15" />
+          </button>
+        </div>
+
+        <div
+          v-if="sortOpen"
+          class="brew-sort-menu glass-panel"
+          aria-label="排序和筛选"
+        >
+          <strong>排序方式</strong>
+          <button
+            :class="{ 'is-active': sortMode === 'latest' }"
+            type="button"
+            @click="
+              sortMode = 'latest';
+              sortOpen = false;
+            "
+          >
+            <span>自由排序</span>
+            <IconGlyph
+              v-if="sortMode === 'latest'"
+              name="sparkles"
+              :size="13"
+            />
+          </button>
+          <button
+            :class="{ 'is-active': sortMode === 'name' }"
+            type="button"
+            @click="
+              sortMode = 'name';
+              sortOpen = false;
+            "
+          >
+            <span>按名称</span>
+            <IconGlyph v-if="sortMode === 'name'" name="sparkles" :size="13" />
+          </button>
+          <div class="brew-type-filters">
+            <button
+              :class="{ 'is-active': activeFilter === 'all' }"
+              type="button"
+              @click="activeFilter = 'all'"
+            >
+              全部
+            </button>
+            <button
+              :class="{ 'is-active': activeFilter === 'Brewlia' }"
+              type="button"
+              @click="activeFilter = 'Brewlia'"
+            >
+              Brewlia
+            </button>
+            <button
+              :class="{ 'is-active': activeFilter === 'Atom' }"
+              type="button"
+              @click="activeFilter = 'Atom'"
+            >
+              Atom
+            </button>
+            <button
+              :class="{ 'is-active': activeFilter === 'RSS' }"
+              type="button"
+              @click="activeFilter = 'RSS'"
+            >
+              RSS
+            </button>
+            <button
+              :class="{ 'is-active': activeFilter === '链接' }"
+              type="button"
+              @click="activeFilter = '链接'"
+            >
+              链接
+            </button>
+          </div>
+        </div>
+
+        <div v-if="shortcutOpen" class="brew-shortcut-panel glass-panel">
+          <strong>快捷键</strong>
+          <span><kbd>/</kbd> 搜索</span>
+          <span><kbd>Esc</kbd> 关闭面板</span>
+        </div>
+
+        <div v-if="latestSource" class="brew-bottom-bar glass-panel">
+          <button
+            class="brew-current-update"
+            type="button"
+            :aria-label="latestSource.name"
+            @click="openSource(latestSource)"
+          >
+            <FriendAvatar
+              class="brew-current-avatar"
+              :src="latestSource.image"
+              :alt="`${latestSource.name} 的头像`"
+              :icon-size="15"
+              loading="eager"
+            />
+            <span>
+              <strong>{{ latestSource.latestTitle || "暂无最新文章" }}</strong>
+              <small>来自 {{ latestSource.name }}</small>
+            </span>
+          </button>
+          <div class="brew-toolbar-actions">
+            <button
+              type="button"
+              aria-label="排序方式"
+              title="排序方式"
+              @click="toggleSort"
+            >
+              <IconGlyph name="arrowUpDown" :size="15" />
+              <span>自由排序</span>
+              <IconGlyph name="chevronDown" :size="12" />
+            </button>
+            <button
+              type="button"
+              aria-label="搜索"
+              title="搜索"
+              @click="toggleSearch"
+            >
+              <IconGlyph name="search" :size="15" />
+              <span>搜索</span>
+            </button>
+            <button
+              type="button"
+              aria-label="快捷键"
+              title="快捷键"
+              @click="toggleShortcuts"
+            >
+              <IconGlyph name="keyboard" :size="15" />
+              <span>快捷键</span>
+            </button>
+          </div>
+        </div>
+
+        <Transition name="brew-detail" appear>
+          <aside
+            v-if="selectedSource"
+            class="brew-detail-backdrop"
+            tabindex="-1"
+            @click.self="closeSource"
+            @keydown.esc="closeSource"
+          >
+            <section
+              class="brew-detail glass-panel"
+              role="dialog"
+              aria-modal="true"
+              :aria-labelledby="`brew-detail-title-${selectedSource.id}`"
+            >
+              <header class="brew-detail-header">
+                <div class="brew-detail-source">
+                  <FriendAvatar
+                    class="brew-detail-avatar"
+                    :src="selectedSource.image"
+                    :alt="`${selectedSource.name} 的头像`"
+                    :icon-size="29"
+                    loading="eager"
+                  />
+                  <div class="detail-source-copy">
+                    <div class="detail-meta">
+                      <span
+                        class="detail-type"
+                        :class="{ 'is-link': selectedSource.type === '链接' }"
+                      >
+                        <IconGlyph
+                          :name="
+                            selectedSource.type === '链接' ? 'link' : 'rss'
+                          "
+                          :size="12"
+                        />
+                        {{ selectedSource.type }}
+                      </span>
+                      <span
+                        v-if="selectedSource.feedStatus === 'available'"
+                        class="detail-status"
+                        >已更新</span
+                      >
+                      <span
+                        v-if="selectedSource.articleCount"
+                        class="detail-count"
+                      >
+                        {{ selectedSource.articleCount }} 篇文章
+                      </span>
+                    </div>
+                    <h2 :id="`brew-detail-title-${selectedSource.id}`">
+                      {{ selectedSource.name }}
+                    </h2>
+                    <span class="detail-author">{{
+                      selectedSource.author
+                    }}</span>
+                  </div>
                 </div>
-                <a
-                  class="detail-latest-card"
-                  :href="selectedSource.articles[0].href || selectedSource.href"
-                  target="_blank"
-                  rel="noreferrer"
-                  @click.stop
+                <button
+                  class="brew-detail-close"
+                  type="button"
+                  aria-label="关闭详情"
+                  title="关闭详情"
+                  @click="closeSource"
                 >
-                  <span class="detail-latest-mark"><span></span>LATEST</span>
-                  <strong>{{ selectedSource.articles[0].title }}</strong>
-                  <p
-                    v-if="
-                      selectedSource.articles[0].summary ||
-                      selectedSource.summary
-                    "
-                  >
-                    {{
-                      selectedSource.articles[0].summary ||
-                      selectedSource.summary
-                    }}
-                  </p>
-                  <span class="detail-read-link">
-                    阅读全文 <IconGlyph name="external" :size="14" />
-                  </span>
-                </a>
-              </section>
+                  <IconGlyph name="x" :size="17" />
+                </button>
+              </header>
 
-              <section
-                class="detail-section detail-recent"
-                aria-labelledby="brew-detail-recent-title"
-              >
-                <div class="detail-section-heading">
-                  <h3 id="brew-detail-recent-title">近期文章</h3>
-                  <span
-                    >{{
-                      Math.max(selectedSource.articles.length - 1, 0)
-                    }}
-                    篇</span
-                  >
-                </div>
+              <div class="brew-detail-scroll">
                 <div
-                  v-if="selectedSource.articles.length > 1"
-                  class="detail-article-list"
+                  v-if="selectedSource.tags.length"
+                  class="detail-tags"
+                  aria-label="信息源标签"
                 >
-                  <template
-                    v-for="(item, index) in selectedSource.articles.slice(1)"
-                    :key="item.id"
+                  <span v-for="tag in selectedSource.tags" :key="tag">{{
+                    tag
+                  }}</span>
+                </div>
+
+                <template v-if="selectedSource.articles.length">
+                  <section
+                    class="detail-section detail-latest"
+                    aria-labelledby="brew-detail-latest-title"
                   >
+                    <div class="detail-section-heading">
+                      <h3 id="brew-detail-latest-title">最新文章</h3>
+                      <time v-if="selectedSource.date">{{
+                        selectedSource.date
+                      }}</time>
+                    </div>
                     <a
-                      v-if="item.href"
-                      class="detail-article-row"
-                      :href="item.href"
+                      class="detail-latest-card"
+                      :href="
+                        selectedSource.articles[0].href || selectedSource.href
+                      "
                       target="_blank"
                       rel="noreferrer"
                       @click.stop
                     >
-                      <span class="detail-article-index">{{
-                        String(index + 2).padStart(2, "0")
-                      }}</span>
-                      <span class="detail-article-copy">
-                        <strong>{{ item.title }}</strong>
-                        <time v-if="item.date">{{ item.date }}</time>
+                      <span class="detail-latest-mark"
+                        ><span></span>LATEST</span
+                      >
+                      <strong>{{ selectedSource.articles[0].title }}</strong>
+                      <p
+                        v-if="
+                          selectedSource.articles[0].summary ||
+                          selectedSource.summary
+                        "
+                      >
+                        {{
+                          selectedSource.articles[0].summary ||
+                          selectedSource.summary
+                        }}
+                      </p>
+                      <span class="detail-read-link">
+                        阅读全文 <IconGlyph name="external" :size="14" />
                       </span>
-                      <IconGlyph name="external" :size="14" />
                     </a>
-                    <div v-else class="detail-article-row">
-                      <span class="detail-article-index">{{
-                        String(index + 2).padStart(2, "0")
-                      }}</span>
-                      <span class="detail-article-copy">
-                        <strong>{{ item.title }}</strong>
-                        <time v-if="item.date">{{ item.date }}</time>
-                      </span>
+                  </section>
+
+                  <section
+                    class="detail-section detail-recent"
+                    aria-labelledby="brew-detail-recent-title"
+                  >
+                    <div class="detail-section-heading">
+                      <h3 id="brew-detail-recent-title">近期文章</h3>
+                      <span
+                        >{{
+                          Math.max(selectedSource.articles.length - 1, 0)
+                        }}
+                        篇</span
+                      >
                     </div>
-                  </template>
-                </div>
-                <p v-else class="detail-list-empty">
-                  订阅源暂时只有这一篇文章。
-                </p>
-              </section>
-            </template>
+                    <div
+                      v-if="selectedSource.articles.length > 1"
+                      class="detail-article-list"
+                    >
+                      <template
+                        v-for="(item, index) in selectedSource.articles.slice(
+                          1,
+                        )"
+                        :key="item.id"
+                      >
+                        <a
+                          v-if="item.href"
+                          class="detail-article-row"
+                          :href="item.href"
+                          target="_blank"
+                          rel="noreferrer"
+                          @click.stop
+                        >
+                          <span class="detail-article-index">{{
+                            String(index + 2).padStart(2, "0")
+                          }}</span>
+                          <span class="detail-article-copy">
+                            <strong>{{ item.title }}</strong>
+                            <time v-if="item.date">{{ item.date }}</time>
+                          </span>
+                          <IconGlyph name="external" :size="14" />
+                        </a>
+                        <div v-else class="detail-article-row">
+                          <span class="detail-article-index">{{
+                            String(index + 2).padStart(2, "0")
+                          }}</span>
+                          <span class="detail-article-copy">
+                            <strong>{{ item.title }}</strong>
+                            <time v-if="item.date">{{ item.date }}</time>
+                          </span>
+                        </div>
+                      </template>
+                    </div>
+                    <p v-else class="detail-list-empty">
+                      订阅源暂时只有这一篇文章。
+                    </p>
+                  </section>
+                </template>
 
-            <section v-else class="detail-no-feed" aria-live="polite">
-              <span class="detail-no-feed-icon">
-                <IconGlyph
-                  :name="selectedSource.type === '链接' ? 'link' : 'rss'"
-                  :size="20"
-                />
-              </span>
-              <strong>
-                {{
-                  selectedSource.feedStatus === "unset"
-                    ? "未设置订阅源"
-                    : selectedSource.feedStatus === "unavailable"
-                      ? "订阅源暂时不可用"
-                      : "暂无文章"
-                }}
-              </strong>
-              <p>
-                {{
-                  selectedSource.feedStatus === "unset"
-                    ? "这是一个友联入口，可以访问站点查看内容。"
-                    : selectedSource.feedStatus === "unavailable"
-                      ? "当前无法读取 RSS / Atom 内容，请稍后再试。"
-                      : "订阅源已连接，暂时还没有可展示的文章。"
-                }}
-              </p>
+                <section v-else class="detail-no-feed" aria-live="polite">
+                  <span class="detail-no-feed-icon">
+                    <IconGlyph
+                      :name="selectedSource.type === '链接' ? 'link' : 'rss'"
+                      :size="20"
+                    />
+                  </span>
+                  <strong>
+                    {{
+                      selectedSource.feedStatus === "unset"
+                        ? "未设置订阅源"
+                        : selectedSource.feedStatus === "unavailable"
+                          ? "订阅源暂时不可用"
+                          : "暂无文章"
+                    }}
+                  </strong>
+                  <p>
+                    {{
+                      selectedSource.feedStatus === "unset"
+                        ? "这是一个友链入口，可以访问站点查看内容。"
+                        : selectedSource.feedStatus === "unavailable"
+                          ? "当前无法读取 RSS / Atom 内容，请稍后再试。"
+                          : "订阅源已连接，暂时还没有可展示的文章。"
+                    }}
+                  </p>
+                </section>
+              </div>
+
+              <footer class="detail-footer">
+                <span class="detail-footer-state">
+                  <span
+                    class="detail-footer-dot"
+                    :class="{
+                      'is-live': selectedSource.feedStatus === 'available',
+                    }"
+                  ></span>
+                  友链站点
+                </span>
+                <a
+                  class="detail-action"
+                  :href="selectedSource.href"
+                  target="_blank"
+                  rel="noreferrer"
+                  @click.stop
+                >
+                  访问站点 <IconGlyph name="external" :size="14" />
+                </a>
+              </footer>
             </section>
-          </div>
-
-          <footer class="detail-footer">
-            <span class="detail-footer-state">
-              <span
-                class="detail-footer-dot"
-                :class="{
-                  'is-live': selectedSource.feedStatus === 'available',
-                }"
-              ></span>
-              友联站点
-            </span>
-            <a
-              class="detail-action"
-              :href="selectedSource.href"
-              target="_blank"
-              rel="noreferrer"
-              @click.stop
-            >
-              访问站点 <IconGlyph name="external" :size="14" />
-            </a>
-          </footer>
-        </section>
-      </aside>
-    </Transition>
-  </div>
+          </aside>
+        </Transition>
+      </div>
     </Transition>
   </div>
 </template>

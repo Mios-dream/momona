@@ -494,19 +494,19 @@ export interface SocialLink {
   tone: "blue" | "indigo" | "ink" | "violet";
 }
 
-/** 博客友联资料卡的数据结构。 */
+/** 博客友链资料卡的数据结构。 */
 export interface FriendLink {
-  /** 友联唯一标识。 */
+  /** 友链唯一标识。 */
   id: string;
   /** 博客昵称。 */
   nickname: string;
-  /** 友联主页地址。 */
+  /** 友链主页地址。 */
   href: string;
   /** 头像地址，可以为空或加载失败时使用默认头像图标。 */
   avatar: string;
   /** 一句签名或站点介绍。 */
   signature: string;
-  /** 友联标签。 */
+  /** 友链标签。 */
   tags: string[];
   /** 可选的 RSS / Atom 订阅地址。 */
   feedUrl?: string;
@@ -661,7 +661,7 @@ export interface BrewSource {
   image: string;
   /** 信息源主页地址。 */
   href: string;
-  /** RSS / Atom 地址；链接型友联没有该字段。 */
+  /** RSS / Atom 地址；链接型友链没有该字段。 */
   feedUrl?: string;
   /** 当前浏览器最近一次验证订阅源的结果。 */
   feedStatus?: "available" | "unavailable" | "unset";

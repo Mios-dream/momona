@@ -305,9 +305,9 @@ function emptyGameSettings(): NonNullable<HomeWidgetSettings["game"]> {
 }
 
 /**
- * 创建友联轮播组件的空设置。
+ * 创建友链轮播组件的空设置。
  *
- * @returns 可直接用于友联轮播组件的默认设置。
+ * @returns 可直接用于友链轮播组件的默认设置。
  */
 function emptyFriendSettings(): NonNullable<HomeWidgetSettings["friend"]> {
   return { interval: FRIEND_ROTATION_INTERVAL };
@@ -528,7 +528,7 @@ function normalizeAccount(
 }
 
 /**
- * 按组件类型规范化链接、游戏和友联轮播设置。
+ * 按组件类型规范化链接、游戏和友链轮播设置。
  *
  * @param type - 设置所属的首页组件类型。
  * @param value - 文件或接口中的未知设置值。

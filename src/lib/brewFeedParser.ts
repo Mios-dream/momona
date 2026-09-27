@@ -1,19 +1,19 @@
-import { XMLParser } from 'fast-xml-parser';
-import type { BrewArticle, BrewSource } from '../data/types';
+import { XMLParser } from "fast-xml-parser";
+import type { BrewArticle, BrewSource } from "../data/types";
 
 const ARTICLE_LIMIT = 6;
 
 export interface FriendFeedResult {
-  status: NonNullable<BrewSource['feedStatus']>;
+  status: NonNullable<BrewSource["feedStatus"]>;
   feedUrl?: string;
-  type: 'Atom' | 'RSS';
+  type: "Atom" | "RSS";
   totalItems: number;
   articles: BrewArticle[];
   error?: string;
 }
 
 const xmlParser = new XMLParser({
-  attributeNamePrefix: '@_',
+  attributeNamePrefix: "@_",
   ignoreAttributes: false,
   ignoreDeclaration: true,
   ignorePiTags: true,
@@ -29,7 +29,7 @@ const xmlParser = new XMLParser({
  * @returns 值为非数组对象时返回 true。
  */
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 /**
@@ -39,22 +39,22 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  * @returns 节点中的纯文本。
  */
 function textValue(value: unknown): string {
-  if (typeof value === 'string' || typeof value === 'number') {
+  if (typeof value === "string" || typeof value === "number") {
     return String(value).trim();
   }
   if (Array.isArray(value)) {
-    return value.map(textValue).filter(Boolean).join(' ').trim();
+    return value.map(textValue).filter(Boolean).join(" ").trim();
   }
-  if (!isRecord(value)) return '';
+  if (!isRecord(value)) return "";
 
-  const directText = value['#text'] ?? value.__cdata;
+  const directText = value["#text"] ?? value.__cdata;
   if (directText !== undefined) return textValue(directText);
 
   return Object.entries(value)
-    .filter(([key]) => !key.startsWith('@_'))
+    .filter(([key]) => !key.startsWith("@_"))
     .map(([, child]) => textValue(child))
     .filter(Boolean)
-    .join(' ')
+    .join(" ")
     .trim();
 }
 
@@ -69,12 +69,12 @@ function decodeHtmlEntities(value: string): string {
     /&(?:nbsp|amp|lt|gt|quot|apos|#39|#x[0-9a-f]+|#[0-9]+);/gi,
     (entity) => {
       const lower = entity.toLowerCase();
-      if (lower === '&nbsp;') return ' ';
-      if (lower === '&amp;') return '&';
-      if (lower === '&lt;') return '<';
-      if (lower === '&gt;') return '>';
-      if (lower === '&quot;') return '"';
-      if (lower === '&apos;' || lower === '&#39;') return "'";
+      if (lower === "&nbsp;") return " ";
+      if (lower === "&amp;") return "&";
+      if (lower === "&lt;") return "<";
+      if (lower === "&gt;") return ">";
+      if (lower === "&quot;") return '"';
+      if (lower === "&apos;" || lower === "&#39;") return "'";
 
       const hexadecimal = lower.match(/^&#x([0-9a-f]+);$/i);
       const decimal = lower.match(/^&#([0-9]+);$/);
@@ -100,8 +100,8 @@ function decodeHtmlEntities(value: string): string {
  * @returns 适合页面展示的纯文本摘要。
  */
 function cleanText(value: string): string {
-  return decodeHtmlEntities(value.replace(/<[^>]*>/g, ' '))
-    .replace(/\s+/g, ' ')
+  return decodeHtmlEntities(value.replace(/<[^>]*>/g, " "))
+    .replace(/\s+/g, " ")
     .trim();
 }
 
@@ -126,10 +126,7 @@ function toArray(value: unknown): unknown[] {
  * @param names - 可接受的子节点名称。
  * @returns 第一个匹配节点；没有匹配时返回 undefined。
  */
-function childValue(
-  parent: Record<string, unknown>,
-  names: string[],
-): unknown {
+function childValue(parent: Record<string, unknown>, names: string[]): unknown {
   for (const name of names) {
     if (parent[name] !== undefined) return parent[name];
   }
@@ -155,7 +152,7 @@ function childText(parent: Record<string, unknown>, names: string[]): string {
  * @returns 属性文本；不存在时返回空字符串。
  */
 function attributeValue(value: unknown, name: string): string {
-  if (!isRecord(value)) return '';
+  if (!isRecord(value)) return "";
   return textValue(value[`@_${name}`] ?? value[name]);
 }
 
@@ -166,22 +163,25 @@ function attributeValue(value: unknown, name: string): string {
  * @param atomEntry - 是否按 Atom entry 规则读取。
  * @returns 文章链接；没有链接时返回空字符串。
  */
-function childLink(parent: Record<string, unknown>, atomEntry: boolean): string {
-  const links = toArray(childValue(parent, ['link']));
+function childLink(
+  parent: Record<string, unknown>,
+  atomEntry: boolean,
+): string {
+  const links = toArray(childValue(parent, ["link"]));
   if (atomEntry) {
     const alternate = links.find(
       (link) =>
-        (attributeValue(link, 'rel') || 'alternate').toLowerCase() ===
-        'alternate',
+        (attributeValue(link, "rel") || "alternate").toLowerCase() ===
+        "alternate",
     );
     return (
-      attributeValue(alternate, 'href') ||
+      attributeValue(alternate, "href") ||
       textValue(alternate) ||
-      attributeValue(links[0], 'href') ||
+      attributeValue(links[0], "href") ||
       textValue(links[0])
     ).trim();
   }
-  return childText(parent, ['link']) || childText(parent, ['guid']);
+  return childText(parent, ["link"]) || childText(parent, ["guid"]);
 }
 
 /**
@@ -192,7 +192,7 @@ function childLink(parent: Record<string, unknown>, atomEntry: boolean): string 
  */
 function displayDate(value: string): string {
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '';
+  if (Number.isNaN(date.getTime())) return "";
   return `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`;
 }
 
@@ -206,9 +206,9 @@ function displayDate(value: string): string {
  * @returns 没有文章的订阅结果。
  */
 export function emptyFeedResult(
-  status: FriendFeedResult['status'],
+  status: FriendFeedResult["status"],
   feedUrl: string | undefined,
-  type: FriendFeedResult['type'],
+  type: FriendFeedResult["type"],
   error?: string,
 ): FriendFeedResult {
   return {
@@ -225,41 +225,44 @@ export function emptyFeedResult(
  * 解析 RSS/Atom XML，并按时间返回有限数量的文章。
  *
  * @param xml - RSS 或 Atom XML 文本。
- * @param friendId - 友联稳定 ID，用于生成文章 ID。
+ * @param friendId - 友链稳定 ID，用于生成文章 ID。
  * @returns 解析后的订阅源结果。
  * @throws XML 无效或根节点不是支持的订阅格式时抛出错误。
  */
 export function parseFeedXml(xml: string, friendId: string): FriendFeedResult {
   const parsed = xmlParser.parse(xml) as Record<string, unknown>;
-  const rootName = Object.keys(parsed)[0]?.toLowerCase() ?? '';
-  const root = parsed[Object.keys(parsed)[0] ?? ''];
-  if (!isRecord(root) || !['rss', 'feed', 'rdf', 'channel'].includes(rootName)) {
-    throw new Error('不是 RSS 或 Atom 订阅源');
+  const rootName = Object.keys(parsed)[0]?.toLowerCase() ?? "";
+  const root = parsed[Object.keys(parsed)[0] ?? ""];
+  if (
+    !isRecord(root) ||
+    !["rss", "feed", "rdf", "channel"].includes(rootName)
+  ) {
+    throw new Error("不是 RSS 或 Atom 订阅源");
   }
 
-  const atomEntry = rootName === 'feed';
+  const atomEntry = rootName === "feed";
   const channel = isRecord(root.channel) ? root.channel : undefined;
-  const rawItems = atomEntry
-    ? root.entry
-    : channel?.item ?? root.item;
+  const rawItems = atomEntry ? root.entry : (channel?.item ?? root.item);
   const items = toArray(rawItems).flatMap((value, index) => {
     if (!isRecord(value)) return [];
 
-    const title = childText(value, ['title']);
+    const title = childText(value, ["title"]);
     if (!title) return [];
     const dateValue = childText(
       value,
       atomEntry
-        ? ['published', 'updated']
-        : ['pubDate', 'pubdate', 'published', 'updated', 'date'],
+        ? ["published", "updated"]
+        : ["pubDate", "pubdate", "published", "updated", "date"],
     );
     const summary = childText(
       value,
-      atomEntry ? ['summary', 'content'] : ['description', 'summary', 'encoded'],
+      atomEntry
+        ? ["summary", "content"]
+        : ["description", "summary", "encoded"],
     );
     const href = childLink(value, atomEntry);
     const id =
-      childText(value, atomEntry ? ['id'] : ['guid']) ||
+      childText(value, atomEntry ? ["id"] : ["guid"]) ||
       href ||
       `${friendId}-${index + 1}`;
     const timestamp = Date.parse(dateValue);
@@ -285,8 +288,8 @@ export function parseFeedXml(xml: string, friendId: string): FriendFeedResult {
   );
 
   return {
-    status: 'available',
-    type: atomEntry ? 'Atom' : 'RSS',
+    status: "available",
+    type: atomEntry ? "Atom" : "RSS",
     totalItems: items.length,
     articles: items.slice(0, ARTICLE_LIMIT).map(({ article }) => article),
   };
@@ -309,14 +312,14 @@ export function applyFriendFeed(
   const latest = result.articles[0];
   return {
     ...source,
-    type: result.status === 'unset' ? source.type : result.type,
+    type: result.status === "unset" ? source.type : result.type,
     feedUrl: result.feedUrl || source.feedUrl,
     feedStatus: result.status,
-    layout: hasArticles ? (index % 4 === 0 ? 'featured' : 'standard') : 'link',
+    layout: hasArticles ? (index % 4 === 0 ? "featured" : "standard") : "link",
     articleCount: result.totalItems,
-    latestTitle: latest?.title || '',
-    summary: latest?.summary || '',
-    date: latest?.date || '',
+    latestTitle: latest?.title || "",
+    summary: latest?.summary || "",
+    date: latest?.date || "",
     articles: result.articles,
   };
 }

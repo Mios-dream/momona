@@ -53,7 +53,8 @@ const gameName = computed(
   () => ({ genshin: "原神", hsr: "星穹铁道", zzz: "绝区零" })[gameId.value],
 );
 const gameLevelLabel = computed(
-  () => ({ genshin: "冒险等阶", hsr: "开拓等级", zzz: "绳网等级" })[gameId.value],
+  () =>
+    ({ genshin: "冒险等阶", hsr: "开拓等级", zzz: "绳网等级" })[gameId.value],
 );
 const widgetDisplayName = computed(
   () => linkSettings.value?.title?.trim() || props.widget.label,
@@ -122,7 +123,7 @@ function updateGame(value: HoyoGame): void {
 }
 
 /**
- * 更新友联组件轮播间隔。
+ * 更新友链组件轮播间隔。
  *
  * @param value - 输入框中的轮播秒数文本。
  * @returns 无返回值；结果会被限制在允许范围内。
@@ -145,39 +146,41 @@ function updateFriendInterval(value: number): void {
  * @returns 对应的中文图标名称。
  */
 function iconLabel(icon: IconName): string {
-  return ({
-    external: "外部链接",
-    link: "链接",
-    github: "GitHub",
-    game: "游戏",
-    video: "视频",
-    music: "音乐",
-    mail: "邮件",
-    at: "@",
-    user: "用户",
-    globe: "网页",
-    star: "星标",
-    sparkles: "闪光",
-    messageCircle: "消息",
-    messagesSquare: "群聊",
-    send: "发送",
-    camera: "相机",
-    code2: "代码",
-    cloud: "云朵",
-    cloudFog: "雾",
-    cloudLightning: "雷电",
-    cloudRain: "降雨",
-    cloudSnow: "降雪",
-    headphones: "耳机",
-    radio: "电台",
-    bot: "机器人",
-    palette: "调色板",
-    shoppingBag: "商店",
-    mapPin: "位置",
-    circleUser: "用户",
-    disc3: "唱片",
-    droplets: "水滴",
-  })[icon] ?? icon;
+  return (
+    {
+      external: "外部链接",
+      link: "链接",
+      github: "GitHub",
+      game: "游戏",
+      video: "视频",
+      music: "音乐",
+      mail: "邮件",
+      at: "@",
+      user: "用户",
+      globe: "网页",
+      star: "星标",
+      sparkles: "闪光",
+      messageCircle: "消息",
+      messagesSquare: "群聊",
+      send: "发送",
+      camera: "相机",
+      code2: "代码",
+      cloud: "云朵",
+      cloudFog: "雾",
+      cloudLightning: "雷电",
+      cloudRain: "降雨",
+      cloudSnow: "降雪",
+      headphones: "耳机",
+      radio: "电台",
+      bot: "机器人",
+      palette: "调色板",
+      shoppingBag: "商店",
+      mapPin: "位置",
+      circleUser: "用户",
+      disc3: "唱片",
+      droplets: "水滴",
+    }[icon] ?? icon
+  );
 }
 
 /**
@@ -187,7 +190,7 @@ function iconLabel(icon: IconName): string {
  * @returns 页面展示用的平台名称。
  */
 function platformLabel(platform: LinkPlatform): string {
-  return ({
+  return {
     generic: "通用链接",
     qq: "QQ",
     github: "GitHub",
@@ -201,7 +204,7 @@ function platformLabel(platform: LinkPlatform): string {
     x: "X",
     discord: "Discord",
     telegram: "Telegram",
-  })[platform];
+  }[platform];
 }
 
 /**
@@ -211,7 +214,7 @@ function platformLabel(platform: LinkPlatform): string {
  * @returns 页面展示用的色调名称。
  */
 function toneLabel(tone: LinkWidgetSettings["tone"]): string {
-  return ({ blue: "晴蓝", indigo: "靛青", ink: "墨色", violet: "紫罗兰" })[tone];
+  return { blue: "晴蓝", indigo: "靛青", ink: "墨色", violet: "紫罗兰" }[tone];
 }
 
 /**
@@ -500,7 +503,7 @@ function requestGame(): void {
         class="editor-section"
       >
         <div class="editor-section-title">
-          <span>友联轮播</span><IconGlyph name="rss" :size="14" />
+          <span>友链轮播</span><IconGlyph name="rss" :size="14" />
         </div>
         <label class="editor-field">
           <span>切换频率</span>
@@ -521,7 +524,7 @@ function requestGame(): void {
             </option>
           </select>
         </label>
-        <p class="editor-hint">鼠标悬停或键盘聚焦友联卡时会暂时暂停轮播。</p>
+        <p class="editor-hint">鼠标悬停或键盘聚焦友链卡时会暂时暂停轮播。</p>
       </section>
 
       <section v-else class="editor-section editor-data-note">

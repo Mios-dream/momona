@@ -1,12 +1,12 @@
 import type { FriendLink } from "../../data/types";
 import { packItems } from "../../composables/usePackedLayout";
 
-/** 友联卡片在墙面布局中的形状类型。 */
+/** 友链卡片在墙面布局中的形状类型。 */
 export type FriendShape = "portrait" | "square" | "wide";
 
-/** 已完成排版的友联卡片及其动画参数。 */
+/** 已完成排版的友链卡片及其动画参数。 */
 export interface PositionedFriend {
-  /** 对应的友联数据。 */
+  /** 对应的友链数据。 */
   friend: FriendLink;
   /** 卡片宽度。 */
   width: number;
@@ -24,13 +24,13 @@ export interface PositionedFriend {
   delay: number;
 }
 
-/** 友联墙画布及卡片列表。 */
+/** 友链墙画布及卡片列表。 */
 export interface FriendLayout {
   /** 画布宽度。 */
   canvasWidth: number;
   /** 画布高度。 */
   canvasHeight: number;
-  /** 已排版的友联卡片。 */
+  /** 已排版的友链卡片。 */
   friends: PositionedFriend[];
 }
 
@@ -57,9 +57,9 @@ const desktopCardVariants: FriendWallSlot[] = [
 ];
 
 /**
- * 把友联卡片转换为稳定的墙面排版结果。
+ * 把友链卡片转换为稳定的墙面排版结果。
  *
- * @param items - 需要放入友联墙的友联列表。
+ * @param items - 需要放入友链墙的友链列表。
  * @returns 包含画布尺寸、卡片位置和动画参数的排版结果。
  */
 export function createFriendWallLayout(items: FriendLink[]): FriendLayout {

@@ -57,7 +57,7 @@ const pageTitle = computed(() => {
   const titles: Record<AppPage, string> = {
     home: "Love on the page",
     library: "资料库",
-    friends: "友联",
+    friends: "友链",
     brew: "Brew 阅读",
     reports: "数据报告",
     settings: "本地设置",
@@ -322,9 +322,9 @@ function handleHomeConfigChange(nextConfig: LocalConfig, persist = true): void {
 }
 
 /**
- * 将友联编辑结果合并到运行时配置和页面快照。
+ * 将友链编辑结果合并到运行时配置和页面快照。
  *
- * @param friends - 最新友联列表。
+ * @param friends - 最新友链列表。
  * @returns 无返回值。
  */
 function handleFriendsChange(friends: SiteData["friends"]): void {
@@ -436,7 +436,7 @@ onBeforeUnmount(() => {
       :style="backgroundStyle"
       aria-hidden="true"
     ></div>
-     <div class="app-background-overlay" aria-hidden="true"></div>
+    <div class="app-background-overlay" aria-hidden="true"></div>
     <NavigationRail
       :page="currentPage"
       :library-filter="activeLibraryFilter"
