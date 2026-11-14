@@ -594,10 +594,6 @@ onBeforeUnmount(() => {
   cursor: grabbing;
 }
 
-.reports-card-viewport::-webkit-scrollbar {
-  display: none;
-}
-
 .reports-card-slot {
   display: flex;
   min-width: 0;

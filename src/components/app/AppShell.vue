@@ -106,14 +106,19 @@ const backgroundFocus = ref(0);
 const backgroundBlurMode = computed(
   () => backgroundBlurModeByPage[currentPage.value],
 );
-const backgroundStyle = computed(() => ({
-  "--parallax-x": `${parallaxX.value.toFixed(2)}px`,
-  "--parallax-y": `${parallaxY.value.toFixed(2)}px`,
-  "--background-focus":
-    backgroundBlurMode.value === "pointer"
-      ? backgroundFocus.value.toFixed(3)
-      : "0.000",
-}));
+const backgroundStyle = computed<Record<string, string>>(() => {
+  const style: Record<string, string> = {
+    "--parallax-x": `${parallaxX.value.toFixed(2)}px`,
+    "--parallax-y": `${parallaxY.value.toFixed(2)}px`,
+  };
+
+  // 只有跟随指针的模式需要行内焦点值；其余模式交由样式表里的统一取值决定。
+  if (backgroundBlurMode.value === "pointer") {
+    style["--background-focus"] = backgroundFocus.value.toFixed(3);
+  }
+
+  return style;
+});
 
 let animationFrame: number | null = null;
 let pointerOffsetX = 0;

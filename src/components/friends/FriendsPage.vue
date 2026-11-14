@@ -730,16 +730,13 @@ onBeforeUnmount(() => {
   -webkit-user-select: none;
 }
 
-.friends-page::before,
-.friends-page::after {
+/* 画布点阵纹理，仅此一层；页面底色与模糊统一交给 .app-background，不再叠加白色遮罩。 */
+.friends-page::before {
   position: absolute;
   z-index: 0;
   inset: 0;
   pointer-events: none;
   content: "";
-}
-
-.friends-page::before {
   background-image: radial-gradient(
     circle,
     rgba(91, 109, 151, 0.22) 1px,
@@ -754,14 +751,6 @@ onBeforeUnmount(() => {
     #000 80%
   );
   opacity: 0.55;
-}
-
-.friends-page::after {
-  background: linear-gradient(
-    180deg,
-    rgba(250, 251, 255, 0.03),
-    rgba(250, 251, 255, 0.18)
-  );
 }
 
 .friends-intro {

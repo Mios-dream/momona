@@ -546,10 +546,6 @@ function selectCharacter(index: number): void {
   touch-action: pan-x;
 }
 
-.game-characters::-webkit-scrollbar {
-  display: none;
-}
-
 .game-characters button {
   display: grid;
   width: 30px;

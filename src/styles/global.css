@@ -65,6 +65,42 @@ body::-webkit-scrollbar {
   display: none;
 }
 
+/* 滚动条基础样式：全局默认细窄、圆角、紫色半透明滑块，轨道透明。
+   组件无需重复声明，仅在需要不同粗细或颜色时覆盖 --scrollbar-* 变量。 */
+:root {
+  --scrollbar-size: 6px;
+  --scrollbar-thumb: rgba(117, 100, 222, 0.26);
+  --scrollbar-thumb-hover: rgba(117, 100, 222, 0.46);
+  --scrollbar-track: transparent;
+}
+
+*::-webkit-scrollbar {
+  width: var(--scrollbar-size);
+  height: var(--scrollbar-size);
+}
+
+*::-webkit-scrollbar-track,
+*::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+}
+
+*::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background-color: var(--scrollbar-thumb);
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--scrollbar-thumb-hover);
+}
+
+/* 不支持 ::-webkit-scrollbar 的浏览器回退到标准滚动条属性。 */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
+  }
+}
+
 button,
 input,
 select {
@@ -112,6 +148,12 @@ img {
   overflow-x: hidden;
 }
 
+/**
+ * 背景壁纸的统一参数。
+ *
+ * 缩放、模糊强度、色调与过渡全部在这里集中定义，页面只允许覆写底色。
+ * 任何页面都不该单独调整壁纸的缩放或模糊，否则跨页面切换时会出现跳变。
+ */
 .app-background {
   position: fixed;
   z-index: -2;
@@ -119,19 +161,39 @@ img {
   background-image: url("/assets/cyrene-wallpaper.webp");
   background-position: center;
   background-size: cover;
-  --background-scale: 1.04;
+  --background-blur: 4px;
+  --background-saturate: 0.82;
+  --background-brightness: 1.04;
+  --background-focus: 0;
   --parallax-x: 0px;
   --parallax-y: 0px;
-  --background-blur-base: 3px;
-  --background-focus: 0;
-  filter: saturate(0.82) brightness(1.04)
-    blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
-  transform: translate3d(var(--parallax-x), var(--parallax-y), 0)
-    scale(var(--background-scale));
+  filter: saturate(var(--background-saturate))
+    brightness(var(--background-brightness))
+    blur(calc(var(--background-blur) * (1 - var(--background-focus))));
+  /* 放大 4% 让视差位移始终有壁纸覆盖，所有页面共用同一比例。 */
+  transform: translate3d(var(--parallax-x), var(--parallax-y), 0) scale(1.04);
   transition:
     transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
     filter 0.82s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
+}
+
+/* 模式 static：整体模糊，焦点值恒为 0，强度固定为 --background-blur。 */
+.app-frame[data-background-blur-mode="static"] .app-background {
+  --background-focus: 0;
+}
+
+/* 模式 pointer：焦点值由 AppShell 按指针位置写入，过渡收紧以跟随指针。 */
+.app-frame[data-background-blur-mode="pointer"] .app-background {
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.42s ease;
+}
+
+/* 模式 none：完全去掉模糊，但保留统一的去饱和与亮度。 */
+.app-frame[data-background-blur-mode="none"] .app-background {
+  filter: saturate(var(--background-saturate))
+    brightness(var(--background-brightness));
 }
 
 .app-background-overlay {
@@ -153,30 +215,10 @@ img {
   );
 }
 
+/* 资料库与设置页用浅蓝底色兜住壁纸未覆盖的区域。 */
 .app-frame[data-page="library"] .app-background,
 .app-frame[data-page="settings"] .app-background {
   background-color: #d5dbf3;
-  background-image: url("/assets/cyrene-wallpaper.webp");
-  filter: saturate(0.82) brightness(1.04)
-    blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
-  --background-scale: 1.04;
-}
-
-.app-frame[data-page="brew"] .app-background {
-  --background-scale: 1.015;
-  --background-blur-base: 1px;
-  filter: saturate(0.96) brightness(1.02)
-    blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
-  transition:
-    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    filter 0.42s ease;
-}
-
-.app-frame[data-page="brew"][data-brew-section="articles"] .app-background {
-  --background-scale: 1.03;
-  --background-blur-base: 7px;
-  filter: saturate(0.48) brightness(1.13)
-    blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
 }
 
 .app-shell {
@@ -340,35 +382,11 @@ body.is-settings-view {
     border-radius: 13px;
   }
 
+  /* 小屏壁纸裁切后色彩更浓，统一加大模糊并降低饱和度，页面不再各自覆写。 */
   .app-background {
-    --background-blur-base: 13px;
-    filter: saturate(0.52) brightness(1.1)
-      blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
-    transition-duration: 0.45s;
-  }
-
-  .app-frame[data-page="library"] .app-background,
-  .app-frame[data-page="settings"] .app-background {
-    background-color: #d5dbf3;
-    background-image: url("/assets/cyrene-wallpaper.webp");
-    --background-blur-base: 8px;
-    filter: saturate(0.72) brightness(1.04)
-      blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
-    --background-scale: 1.04;
-  }
-
-  .app-frame[data-page="brew"] .app-background {
-    --background-scale: 1.015;
-    --background-blur-base: 7px;
-    filter: saturate(0.72) brightness(1.05)
-      blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
-  }
-
-  .app-frame[data-page="brew"][data-brew-section="articles"] .app-background {
-    --background-scale: 1.02;
-    --background-blur-base: 10px;
-    filter: saturate(0.42) brightness(1.12)
-      blur(calc(var(--background-blur-base) * (1 - var(--background-focus))));
+    --background-blur: 8px;
+    --background-saturate: 0.72;
+    --background-brightness: 1.06;
   }
 
   .app-frame[data-page="library"] .weather-pill-wrap {

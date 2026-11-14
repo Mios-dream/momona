@@ -1,5 +1,12 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import {
+  computed,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  watch,
+} from "vue";
 import type {
   IconName,
   MusicCatalog,
@@ -65,12 +72,43 @@ const weather = ref<WeatherData | null>(null);
 const weatherLoading = ref(true);
 const playerState = ref<PlayerState>({});
 const isPlaylistOpen = ref(false);
+const expandedInnerRef = ref<HTMLElement | null>(null);
+const musicRef = ref<HTMLElement | null>(null);
+const stageRef = ref<HTMLElement | null>(null);
+/**
+ * 音乐卡片在内容切换期间的实际高度。
+ *
+ * 值为 null 时由内容自然撑开；切换播放器与播放列表时先锁定旧高度，
+ * 再过渡到新内容高度，卡片底边才能和外层面板同步移动。
+ */
+const musicHeight = ref<number | null>(null);
+/**
+ * 展开面板内容的目标高度。
+ *
+ * 高度由内容实测值驱动，播放器与播放列表切换时面板才能平滑过渡，
+ * 而不是依赖固定的展开高度。
+ */
+const expandedHeight = ref<number | null>(null);
 const quote = ref<QuoteState>({
   text: "愿每一次回望，都有新的理解。",
   from: "Momona",
 });
 let rotationTimer: number | null = null;
 let quoteRequest: AbortController | null = null;
+let expandedResizeObserver: ResizeObserver | null = null;
+let measureFrame: number | null = null;
+
+/** 展开状态下用实测内容高度驱动面板高度过渡。 */
+const panelStyle = computed(() =>
+  isExpanded.value && expandedHeight.value !== null
+    ? { height: `${expandedHeight.value}px` }
+    : undefined,
+);
+
+/** 音乐卡片切换期间锁定为固定高度，交由 transition 做高度过渡。 */
+const musicStyle = computed(() =>
+  musicHeight.value === null ? undefined : { height: `${musicHeight.value}px` },
+);
 
 const greeting = computed(() => {
   const hour = new Date().getHours();
@@ -371,10 +409,187 @@ function handleDocumentPointerDown(event: PointerEvent): void {
   startRotation();
 }
 
+/**
+ * 读取元素的纵向盒模型附加高度。
+ *
+ * @param element - 需要读取计算样式的元素。
+ * @returns 内边距与边框高度之和。
+ */
+function readVerticalBoxExtra(element: HTMLElement): number {
+  const styles = window.getComputedStyle(element);
+  /**
+   * 将 CSS 尺寸文本转换为非负数。
+   *
+   * @param value - 浏览器计算样式中的尺寸文本。
+   * @returns 可参与高度计算的非负像素值。
+   */
+  function parseSize(value: string): number {
+    return Number.parseFloat(value) || 0;
+  }
+
+  return (
+    parseSize(styles.paddingTop) +
+    parseSize(styles.paddingBottom) +
+    parseSize(styles.borderTopWidth) +
+    parseSize(styles.borderBottomWidth)
+  );
+}
+
+/**
+ * 读取面板当前允许的最大高度。
+ *
+ * @param panel - 状态控制台面板元素。
+ * @returns 计算后的最大高度；未设置上限时返回 Infinity。
+ */
+function readPanelMaxHeight(panel: HTMLElement): number {
+  const { maxHeight } = window.getComputedStyle(panel);
+  if (maxHeight === "none") return Number.POSITIVE_INFINITY;
+  return Number.parseFloat(maxHeight) || Number.POSITIVE_INFINITY;
+}
+
+/**
+ * 按展开面板的真实内容高度更新面板高度。
+ *
+ * 播放列表展开、收起或曲目数量变化时都会重新测量，让高度过渡保持连续。
+ *
+ * @returns 无返回值；未展开或元素缺失时直接结束。
+ */
+function measureExpandedHeight(): void {
+  measureFrame = null;
+  const panel = panelElement.value;
+  const inner = expandedInnerRef.value;
+  if (!panel || !inner || !isExpanded.value) return;
+
+  const nextHeight = Math.ceil(
+    Math.min(
+      inner.offsetHeight + readVerticalBoxExtra(panel),
+      readPanelMaxHeight(panel),
+    ),
+  );
+
+  if (nextHeight > 0 && nextHeight !== expandedHeight.value) {
+    expandedHeight.value = nextHeight;
+  }
+}
+
+/**
+ * 合并同一帧内的多次高度测量请求。
+ *
+ * @returns 无返回值；重复请求会在下一帧统一测量。
+ */
+function scheduleExpandedMeasure(): void {
+  if (measureFrame !== null) return;
+  measureFrame = window.requestAnimationFrame(measureExpandedHeight);
+}
+
+/**
+ * 监听展开内容尺寸，保证播放列表等局部内容变化能被高度过渡捕获。
+ *
+ * @returns 无返回值；展开内容未挂载时释放监听。
+ */
+async function observeExpandedContent(): Promise<void> {
+  expandedResizeObserver?.disconnect();
+  expandedResizeObserver = null;
+  if (!isExpanded.value) return;
+
+  await nextTick();
+  const inner = expandedInnerRef.value;
+  if (!inner) return;
+
+  expandedResizeObserver = new ResizeObserver(scheduleExpandedMeasure);
+  expandedResizeObserver.observe(inner);
+  measureExpandedHeight();
+}
+
+watch(isExpanded, () => {
+  musicHeight.value = null;
+  void observeExpandedContent();
+});
+
+/* 重渲染前锁定旧高度，重渲染后再量新内容高度并统一过渡。 */
+watch(isPlaylistOpen, freezeMusicHeight, { flush: "sync" });
+watch(isPlaylistOpen, applyMusicTargetHeight, { flush: "post" });
+
+/**
+ * 内容替换前锁定音乐卡片的当前高度，并暂停尺寸监听。
+ *
+ * 同步 watch 保证在 Vue 重渲染前拿到旧高度，
+ * 否则新内容挂载的瞬间卡片会直接跳到目标高度。
+ *
+ * @returns 无返回值；面板未展开或卡片不存在时跳过。
+ */
+function freezeMusicHeight(): void {
+  const card = musicRef.value;
+  if (!isExpanded.value || !card) return;
+
+  musicHeight.value = Math.round(card.getBoundingClientRect().height);
+  expandedResizeObserver?.disconnect();
+  expandedResizeObserver = null;
+  if (measureFrame !== null) {
+    window.cancelAnimationFrame(measureFrame);
+    measureFrame = null;
+  }
+}
+
+/**
+ * 读取新内容的自然高度，并让卡片与面板沿同一条曲线过渡过去。
+ *
+ * 舞台高度不受卡片固定高度影响，因此能稳定拿到目标值；
+ * 面板同步累加相同增量，底边才能和卡片一起移动。
+ *
+ * @returns 无返回值；元素缺失或新内容尚未布局时跳过。
+ */
+function applyMusicTargetHeight(): void {
+  const card = musicRef.value;
+  const stage = stageRef.value;
+  if (!card || !stage) return;
+
+  const natural = Math.round(
+    stage.offsetHeight + readVerticalBoxExtra(card),
+  );
+  const frozen = musicHeight.value;
+
+  if (frozen === null) {
+    musicHeight.value = natural;
+    return;
+  }
+
+  const delta = natural - frozen;
+  if (Math.abs(delta) < 1) {
+    musicHeight.value = null;
+    void observeExpandedContent();
+    return;
+  }
+
+  musicHeight.value = natural;
+  const panel = panelElement.value;
+  if (expandedHeight.value !== null) {
+    expandedHeight.value = Math.min(
+      expandedHeight.value + delta,
+      panel ? readPanelMaxHeight(panel) : Number.POSITIVE_INFINITY,
+    );
+  }
+}
+
+/**
+ * 高度过渡结束后释放固定高度，恢复由内容自然撑开。
+ *
+ * 结束值与自然高度一致，因此不会产生二次跳动；随后重启尺寸监听。
+ *
+ * @param event - 卡片冒泡上来的过渡结束事件。
+ * @returns 无返回值；非本卡片的 height 过渡时忽略。
+ */
+function handleMusicHeightTransitionEnd(event: TransitionEvent): void {
+  if (event.target !== musicRef.value || event.propertyName !== "height") return;
+  musicHeight.value = null;
+  void observeExpandedContent();
+}
+
 onMounted(async () => {
   isTeleportReady.value = true;
   window.addEventListener("music-player-state-change", handlePlayerState);
   window.addEventListener("keydown", handleKeydown);
+  window.addEventListener("resize", scheduleExpandedMeasure);
   document.addEventListener("pointerdown", handleDocumentPointerDown);
   window.dispatchEvent(new CustomEvent("music-player-request-state"));
 
@@ -387,7 +602,11 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   window.removeEventListener("music-player-state-change", handlePlayerState);
   window.removeEventListener("keydown", handleKeydown);
+  window.removeEventListener("resize", scheduleExpandedMeasure);
   document.removeEventListener("pointerdown", handleDocumentPointerDown);
+  expandedResizeObserver?.disconnect();
+  expandedResizeObserver = null;
+  if (measureFrame !== null) window.cancelAnimationFrame(measureFrame);
   stopRotation();
   quoteRequest?.abort();
 });
@@ -398,7 +617,8 @@ onBeforeUnmount(() => {
     <aside
       ref="panelElement"
       class="control-panel"
-      :class="{ 'is-expanded': isExpanded, 'is-playlist-open': isPlaylistOpen }"
+      :class="{ 'is-expanded': isExpanded }"
+      :style="panelStyle"
       aria-label="状态控制台"
     >
       <div class="control-panel-viewport">
@@ -444,230 +664,236 @@ onBeforeUnmount(() => {
           </button>
 
           <div v-else key="expanded" class="control-expanded">
-            <div class="control-head">
-              <div>
-                <span>STATUS CONSOLE</span>
-                <strong>今日状态</strong>
-              </div>
-              <button
-                type="button"
-                class="control-close"
-                aria-label="收起状态控制台"
-                title="收起"
-                aria-expanded="true"
-                @click="toggleExpanded"
-              >
-                <IconGlyph name="chevronDown" :size="15" />
-              </button>
-            </div>
-
-            <section class="control-quote glass-panel" aria-label="一言">
-              <div>
-                <p>{{ quote.text }}</p>
-                <small v-if="quote.from">—— {{ quote.from }}</small>
-              </div>
-            </section>
-
-            <section
-              class="control-weather"
-              :class="{ 'is-unavailable': !weather }"
-              aria-label="天气信息"
-            >
-              <span class="control-weather-icon">
-                <img
-                  v-if="weather"
-                  :src="weather.icon"
-                  :alt="weather.weather"
-                />
-                <IconGlyph
-                  v-else
-                  :name="weatherLoading ? 'refresh' : 'cloud'"
-                  :size="22"
-                />
-              </span>
-
-              <div v-if="weather" class="control-weather-copy">
-                <div class="control-weather-primary">
-                  <strong>{{ weather.temperature }}<sup>°C</sup></strong>
-                  <span>{{ weather.city }}</span>
-                </div>
-                <div class="control-weather-meta" aria-label="天气指标">
-                  <span>{{ weather.weather }}</span>
-                  <span
-                    ><IconGlyph name="droplets" :size="11" />{{
-                      weather.humidity
-                    }}%</span
-                  >
-                  <span
-                    ><IconGlyph name="wind" :size="11" />{{
-                      weather.windSpeed
-                    }}</span
-                  >
-                </div>
-              </div>
-
-              <div
-                v-else
-                class="control-weather-copy control-weather-unavailable-copy"
-              >
-                <strong>{{
-                  weatherLoading ? "正在读取天气" : "天气暂不可用"
-                }}</strong>
-                <span>{{ weatherLoading ? "正在定位" : "暂无可用定位" }}</span>
-              </div>
-
-              <div
-                v-if="weather"
-                class="control-weather-forecast"
-                aria-label="今日天气预报"
-              >
-                <span>{{ weather.weather }}</span>
+            <div ref="expandedInnerRef" class="control-expanded-inner">
+              <div class="control-head">
                 <div>
-                  <img :src="weather.icon" :alt="weather.weather" />
-                  <strong>{{ forecastHigh }}°</strong>
+                  <span>STATUS CONSOLE</span>
+                  <strong>今日状态</strong>
                 </div>
-                <small>{{ forecastLow }}°</small>
+                <button
+                  type="button"
+                  class="control-close"
+                  aria-label="收起状态控制台"
+                  title="收起"
+                  aria-expanded="true"
+                  @click="toggleExpanded"
+                >
+                  <IconGlyph name="chevronDown" :size="15" />
+                </button>
               </div>
-            </section>
 
-            <section
-              class="control-music"
-              :class="{ 'is-playlist': isPlaylistOpen }"
-              :aria-label="isPlaylistOpen ? '播放列表' : '音乐播放器'"
-            >
-              <Transition name="control-music-view" mode="out-in">
-                <MusicPicker
-                  v-if="isPlaylistOpen"
-                  key="playlist"
-                  v-model:open="isPlaylistOpen"
-                  :track="props.track"
-                  :catalog="props.catalog"
-                  :editable="props.editable"
-                  compact
-                  embedded
-                />
+              <section class="control-quote glass-panel" aria-label="一言">
+                <div>
+                  <p>{{ quote.text }}</p>
+                  <small v-if="quote.from">—— {{ quote.from }}</small>
+                </div>
+              </section>
 
-                <div v-else key="player" class="control-music-player">
-                  <div class="control-music-top">
-                    <span class="control-music-cover-wrap">
-                      <FallbackImage
-                        class="control-music-cover"
-                        :src="currentCover"
-                        :alt="`${currentTitle} 封面`"
-                        fallback-icon="music"
-                        :icon-size="20"
-                      />
-                    </span>
-                    <div class="control-section-copy control-music-copy">
-                      <strong>{{ currentTitle }}</strong>
-                      <small>{{ currentArtist }}</small>
-                    </div>
-                    <span
-                      class="control-music-equalizer"
-                      :class="{ 'is-playing': playerState.isPlaying }"
-                      aria-hidden="true"
-                    >
-                      <i></i><i></i><i></i>
-                    </span>
+              <section
+                class="control-weather"
+                :class="{ 'is-unavailable': !weather }"
+                aria-label="天气信息"
+              >
+                <span class="control-weather-icon">
+                  <img
+                    v-if="weather"
+                    :src="weather.icon"
+                    :alt="weather.weather"
+                  />
+                  <IconGlyph
+                    v-else
+                    :name="weatherLoading ? 'refresh' : 'cloud'"
+                    :size="22"
+                  />
+                </span>
+
+                <div v-if="weather" class="control-weather-copy">
+                  <div class="control-weather-primary">
+                    <strong>{{ weather.temperature }}<sup>°C</sup></strong>
+                    <span>{{ weather.city }}</span>
                   </div>
-
-                  <div class="control-music-progress" aria-label="播放进度">
+                  <div class="control-weather-meta" aria-label="天气指标">
+                    <span>{{ weather.weather }}</span>
                     <span
-                      class="control-music-progress-spacer"
-                      aria-hidden="true"
-                    ></span>
-                    <span>{{ currentTimeLabel }}</span>
-                    <input
-                      class="control-music-progress-input"
-                      type="range"
-                      min="0"
-                      :max="Math.max(playerState.duration || 0, 1)"
-                      :value="playerState.currentTime || 0"
-                      :style="{ '--music-progress': `${playbackProgress}%` }"
-                      aria-label="调整播放进度"
-                      @input="seekPlayback"
-                    />
-                    <span>{{ durationLabel }}</span>
-                  </div>
-
-                  <div class="control-music-toolbar">
-                    <button
-                      type="button"
-                      class="control-music-action"
-                      aria-label="歌词（暂无同步歌词）"
-                      title="暂无同步歌词"
-                      disabled
+                      ><IconGlyph name="droplets" :size="11" />{{
+                        weather.humidity
+                      }}%</span
                     >
-                      <IconGlyph name="messagesSquare" :size="14" />
-                    </button>
-                    <button
-                      type="button"
-                      class="control-music-action"
-                      :class="{ 'is-active': playbackMode !== 'sequential' }"
-                      :aria-label="repeatLabel"
-                      :title="repeatLabel"
-                      @click="cyclePlaybackMode"
+                    <span
+                      ><IconGlyph name="wind" :size="11" />{{
+                        weather.windSpeed
+                      }}</span
                     >
-                      <IconGlyph :name="playbackModeIcon" :size="14" />
-                    </button>
-                    <button
-                      type="button"
-                      class="control-music-action control-music-skip"
-                      aria-label="上一首"
-                      title="上一首"
-                      @click="publishPlayerEvent('music-player-previous')"
-                    >
-                      <IconGlyph name="skipBack" :size="15" />
-                    </button>
-                    <button
-                      type="button"
-                      class="control-play control-music-primary"
-                      :aria-label="
-                        playerState.isPlaying ? '暂停音乐' : '播放音乐'
-                      "
-                      :title="playerState.isPlaying ? '暂停音乐' : '播放音乐'"
-                      @click="publishPlayerToggle"
-                    >
-                      <IconGlyph
-                        :name="playerState.isPlaying ? 'pause' : 'play'"
-                        :size="17"
-                      />
-                    </button>
-                    <button
-                      type="button"
-                      class="control-music-action control-music-skip"
-                      aria-label="下一首"
-                      title="下一首"
-                      @click="publishPlayerEvent('music-player-next')"
-                    >
-                      <IconGlyph name="skipForward" :size="15" />
-                    </button>
-                    <button
-                      type="button"
-                      class="control-music-action"
-                      :class="{ 'is-active': playerState.isMuted }"
-                      :aria-label="playerState.isMuted ? '取消静音' : '静音'"
-                      :title="playerState.isMuted ? '取消静音' : '静音'"
-                      @click="publishPlayerEvent('music-player-mute')"
-                    >
-                      <IconGlyph
-                        :name="playerState.isMuted ? 'volumeX' : 'volume'"
-                        :size="15"
-                      />
-                    </button>
-                    <button
-                      type="button"
-                      class="control-music-action"
-                      aria-label="打开播放列表"
-                      title="打开播放列表"
-                      @click="isPlaylistOpen = true"
-                    >
-                      <IconGlyph name="listMusic" :size="14" />
-                    </button>
                   </div>
                 </div>
-              </Transition>
-            </section>
+
+                <div
+                  v-else
+                  class="control-weather-copy control-weather-unavailable-copy"
+                >
+                  <strong>{{
+                    weatherLoading ? "正在读取天气" : "天气暂不可用"
+                  }}</strong>
+                  <span>{{ weatherLoading ? "正在定位" : "暂无可用定位" }}</span>
+                </div>
+
+                <div
+                  v-if="weather"
+                  class="control-weather-forecast"
+                  aria-label="今日天气预报"
+                >
+                  <span>{{ weather.weather }}</span>
+                  <div>
+                    <img :src="weather.icon" :alt="weather.weather" />
+                    <strong>{{ forecastHigh }}°</strong>
+                  </div>
+                  <small>{{ forecastLow }}°</small>
+                </div>
+              </section>
+
+              <section
+                ref="musicRef"
+                class="control-music"
+                :style="musicStyle"
+                :aria-label="isPlaylistOpen ? '播放列表' : '音乐播放器'"
+                @transitionend="handleMusicHeightTransitionEnd"
+              >
+                <div ref="stageRef" class="control-music-stage">
+                  <Transition name="control-music-view">
+                    <MusicPicker
+                      v-if="isPlaylistOpen"
+                      key="playlist"
+                      v-model:open="isPlaylistOpen"
+                      :track="props.track"
+                      :catalog="props.catalog"
+                      :editable="props.editable"
+                      compact
+                      embedded
+                    />
+
+                    <div v-else key="player" class="control-music-player">
+                      <div class="control-music-top">
+                        <span class="control-music-cover-wrap">
+                          <FallbackImage
+                            class="control-music-cover"
+                            :src="currentCover"
+                            :alt="`${currentTitle} 封面`"
+                            fallback-icon="music"
+                            :icon-size="20"
+                          />
+                        </span>
+                        <div class="control-section-copy control-music-copy">
+                          <strong>{{ currentTitle }}</strong>
+                          <small>{{ currentArtist }}</small>
+                        </div>
+                        <span
+                          class="control-music-equalizer"
+                          :class="{ 'is-playing': playerState.isPlaying }"
+                          aria-hidden="true"
+                        >
+                          <i></i><i></i><i></i>
+                        </span>
+                      </div>
+
+                      <div class="control-music-progress" aria-label="播放进度">
+                        <span
+                          class="control-music-progress-spacer"
+                          aria-hidden="true"
+                        ></span>
+                        <span>{{ currentTimeLabel }}</span>
+                        <input
+                          class="control-music-progress-input"
+                          type="range"
+                          min="0"
+                          :max="Math.max(playerState.duration || 0, 1)"
+                          :value="playerState.currentTime || 0"
+                          :style="{ '--music-progress': `${playbackProgress}%` }"
+                          aria-label="调整播放进度"
+                          @input="seekPlayback"
+                        />
+                        <span>{{ durationLabel }}</span>
+                      </div>
+
+                      <div class="control-music-toolbar">
+                        <button
+                          type="button"
+                          class="control-music-action"
+                          aria-label="歌词（暂无同步歌词）"
+                          title="暂无同步歌词"
+                          disabled
+                        >
+                          <IconGlyph name="messagesSquare" :size="14" />
+                        </button>
+                        <button
+                          type="button"
+                          class="control-music-action"
+                          :class="{ 'is-active': playbackMode !== 'sequential' }"
+                          :aria-label="repeatLabel"
+                          :title="repeatLabel"
+                          @click="cyclePlaybackMode"
+                        >
+                          <IconGlyph :name="playbackModeIcon" :size="14" />
+                        </button>
+                        <button
+                          type="button"
+                          class="control-music-action control-music-skip"
+                          aria-label="上一首"
+                          title="上一首"
+                          @click="publishPlayerEvent('music-player-previous')"
+                        >
+                          <IconGlyph name="skipBack" :size="15" />
+                        </button>
+                        <button
+                          type="button"
+                          class="control-play control-music-primary"
+                          :aria-label="
+                            playerState.isPlaying ? '暂停音乐' : '播放音乐'
+                          "
+                          :title="playerState.isPlaying ? '暂停音乐' : '播放音乐'"
+                          @click="publishPlayerToggle"
+                        >
+                          <IconGlyph
+                            :name="playerState.isPlaying ? 'pause' : 'play'"
+                            :size="17"
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          class="control-music-action control-music-skip"
+                          aria-label="下一首"
+                          title="下一首"
+                          @click="publishPlayerEvent('music-player-next')"
+                        >
+                          <IconGlyph name="skipForward" :size="15" />
+                        </button>
+                        <button
+                          type="button"
+                          class="control-music-action"
+                          :class="{ 'is-active': playerState.isMuted }"
+                          :aria-label="playerState.isMuted ? '取消静音' : '静音'"
+                          :title="playerState.isMuted ? '取消静音' : '静音'"
+                          @click="publishPlayerEvent('music-player-mute')"
+                        >
+                          <IconGlyph
+                            :name="playerState.isMuted ? 'volumeX' : 'volume'"
+                            :size="15"
+                          />
+                        </button>
+                        <button
+                          type="button"
+                          class="control-music-action"
+                          aria-label="打开播放列表"
+                          title="打开播放列表"
+                          @click="isPlaylistOpen = true"
+                        >
+                          <IconGlyph name="listMusic" :size="14" />
+                        </button>
+                      </div>
+                    </div>
+                  </Transition>
+                </div>
+              </section>
+            </div>
           </div>
         </Transition>
       </div>
@@ -701,12 +927,9 @@ onBeforeUnmount(() => {
 .control-panel.is-expanded {
   width: min(400px, calc(100vw - 32px));
   height: min(384px, calc(100svh - 32px));
+  max-height: calc(100svh - 32px);
   border-radius: 18px;
   box-shadow: 0 18px 42px rgba(54, 45, 106, 0.16);
-}
-
-.control-panel.is-expanded.is-playlist-open {
-  height: min(487px, calc(100svh - 32px));
 }
 
 .control-panel:not(.is-expanded) {
@@ -831,29 +1054,32 @@ onBeforeUnmount(() => {
 }
 
 .control-expanded {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 18px;
+  scrollbar-width: none;
+}
+
+.control-expanded-inner {
   display: flex;
   width: 100%;
-  height: auto;
-  min-height: 0;
   padding: 12px;
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  overflow-y: auto;
-  scrollbar-width: none;
   gap: 9px;
-  border-radius: 18px;
 }
 
-.control-expanded > .control-head,
-.control-expanded > .control-quote,
-.control-expanded > .control-weather,
-.control-expanded > .control-music {
+.control-expanded-inner > .control-head,
+.control-expanded-inner > .control-quote,
+.control-expanded-inner > .control-weather,
+.control-expanded-inner > .control-music {
   flex: 0 0 auto;
-}
-
-.control-expanded::-webkit-scrollbar {
-  display: none;
 }
 
 .control-head {
@@ -1187,7 +1413,9 @@ onBeforeUnmount(() => {
 }
 
 .control-music {
+  position: relative;
   display: flex;
+  overflow: hidden;
   flex-direction: column;
   align-items: stretch;
   padding: 16px 16px 12px;
@@ -1200,11 +1428,17 @@ onBeforeUnmount(() => {
     rgba(229, 240, 255, 0.54) 58%,
     rgba(255, 234, 244, 0.38)
   );
+  transition: height 0.46s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
-.control-music.is-playlist {
-  padding: 10px;
-  gap: 0;
+/* 播放器与播放列表共用的定位舞台，切换时高度由卡片统一过渡。 */
+.control-music-stage {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  flex-direction: column;
+  gap: 6px;
 }
 
 .control-music-player {
@@ -1561,21 +1795,22 @@ onBeforeUnmount(() => {
   z-index: auto;
 }
 
+/* 播放器与播放列表切换：交叉淡入淡出，离场内容绝对定位让位给新内容。 */
 .control-music-view-enter-active,
 .control-music-view-leave-active {
-  transition:
-    opacity 0.2s ease,
-    transform 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.24s ease;
 }
 
-.control-music-view-enter-from {
-  opacity: 0;
-  transform: translateX(8px);
-}
-
+.control-music-view-enter-from,
 .control-music-view-leave-to {
   opacity: 0;
-  transform: translateX(-8px);
+}
+
+.control-music-view-leave-active {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
 }
 
 .control-panel-swap-enter-active,
@@ -1629,17 +1864,14 @@ onBeforeUnmount(() => {
 
   .control-panel.is-expanded {
     height: min(377px, calc(100svh - 24px));
-  }
-
-  .control-panel.is-expanded.is-playlist-open {
-    height: min(480px, calc(100svh - 24px));
+    max-height: calc(100svh - 24px);
   }
 
   .control-panel:not(.is-expanded) {
     width: min(160px, calc(100vw - 24px));
   }
 
-  .control-expanded {
+  .control-expanded-inner {
     padding: 10px;
     gap: 8px;
   }
@@ -1680,6 +1912,15 @@ onBeforeUnmount(() => {
 
 @media (prefers-reduced-motion: reduce) {
   .control-panel {
+    transition-duration: 0.01ms;
+  }
+
+  .control-music {
+    transition-duration: 0.01ms;
+  }
+
+  .control-music-view-enter-active,
+  .control-music-view-leave-active {
     transition-duration: 0.01ms;
   }
 

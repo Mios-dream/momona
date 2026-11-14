@@ -648,8 +648,6 @@ function requestGame(): void {
   padding: 14px 20px 18px;
   overflow: auto;
   overscroll-behavior: contain;
-  scrollbar-color: rgba(117, 100, 222, 0.32) transparent;
-  scrollbar-width: thin;
 }
 
 .editor-section {

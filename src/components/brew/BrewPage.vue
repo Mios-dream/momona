@@ -1298,8 +1298,6 @@ kbd {
   min-height: 0;
   padding: 0 28px 24px;
   overflow: auto;
-  scrollbar-color: rgba(117, 100, 222, 0.35) transparent;
-  scrollbar-width: thin;
 }
 
 .detail-tags {

@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from "vue";
 import type { MusicCatalog, MusicSettings, MusicTrack } from "../../data/types";
 import { musicPlatformLabel } from "../../lib/music";
 import IconGlyph from "../app/IconGlyph.vue";
+import SelectMenu from "../app/SelectMenu.vue";
 import ReportPlatformIcon from "../reports/ReportPlatformIcon.vue";
 
 interface Props {
@@ -85,6 +86,13 @@ function playlistKey(source: "netease" | "qq", playlistId: string): string {
 }
 
 const playlists = computed(() => props.catalog.playlists);
+/** 开发模式歌单下拉的选项，值与 activePlaylist 的匹配键保持一致。 */
+const playlistOptions = computed(() =>
+  playlists.value.map((playlist) => ({
+    value: playlistKey(playlist.source, playlist.id),
+    label: `${musicPlatformLabel(playlist.source)} · ${playlist.title}`,
+  })),
+);
 const activePlaylist = computed(() => {
   const stateSource =
     state.value.playlistSource ??
@@ -307,18 +315,17 @@ onBeforeUnmount(() =>
         </template>
       </div>
 
-      <label v-if="props.editable && playlists.length" class="music-playlist-select">
+      <div v-if="props.editable && playlists.length" class="music-playlist-select">
         <span>开发模式歌单</span>
-        <select v-model="selectedPlaylistKey" @change="choosePlaylist">
-          <option
-            v-for="playlist in playlists"
-            :key="`${playlist.source}-${playlist.id}`"
-            :value="playlistKey(playlist.source, playlist.id)"
-          >
-            {{ musicPlatformLabel(playlist.source) }} · {{ playlist.title }}
-          </option>
-        </select>
-      </label>
+        <SelectMenu
+          v-model="selectedPlaylistKey"
+          :options="playlistOptions"
+          menu-min-width="210"
+          placeholder="选择歌单"
+          aria-label="开发模式歌单"
+          @change="choosePlaylist"
+        />
+      </div>
 
       <div v-if="filteredTracks.length" class="music-track-list">
         <button
@@ -590,30 +597,16 @@ onBeforeUnmount(() =>
   gap: 4px;
 }
 
-.music-playlist-select span {
+.music-playlist-select > span {
   color: var(--muted);
   font-size: 0.52rem;
-}
-
-.music-playlist-select select {
-  width: 100%;
-  min-height: 31px;
-  padding: 0 8px;
-  border: 1px solid rgba(118, 126, 151, 0.18);
-  border-radius: 7px;
-  color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.76);
-  font-size: 0.55rem;
 }
 
 .is-embedded-panel .music-playlist-select {
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
-  gap: 8px;
-}
-
-.is-embedded-panel .music-playlist-select select {
-  min-width: 0;
+  column-gap: 8px;
+  row-gap: 0;
 }
 
 .music-track-list {
@@ -626,8 +619,9 @@ onBeforeUnmount(() =>
   gap: 4px 6px;
   min-height: 0;
   max-height: 162px;
+  padding-right: 4px;
   overflow-y: auto;
-  scrollbar-width: thin;
+  overscroll-behavior: contain;
 }
 
 .music-track-row {
