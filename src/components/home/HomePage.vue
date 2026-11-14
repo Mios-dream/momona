@@ -1474,7 +1474,11 @@ onBeforeUnmount(() => {
   .home-page {
     display: block;
     min-height: 0;
-    padding: 28px 28px 28px;
+    /*
+     * 底部留白 = 导航栏高度 58 + 距底 14 + 视觉间距 16。
+     * 主导航是 fixed 的，原来只留 28px，滚到最底时最后一张卡会被它压住。
+     */
+    padding: 28px 28px calc(88px + env(safe-area-inset-bottom, 0px));
     align-items: initial;
   }
 

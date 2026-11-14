@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, ref, watch } from "vue";
 import { navigationItems } from "../../data/navigation";
 import type {
   AppPage,
@@ -66,95 +66,98 @@ const railLabel = computed(() => {
 });
 
 const railElement = ref<HTMLElement | null>(null);
-const railHeight = ref<number | null>(null);
-const isRailHeightAnimating = ref(false);
+/**
+ * 过渡期间临时锁定的导航尺寸（像素）。
+ *
+ * 移动端的宽度是 max-content，计算值是关键字而不是长度，浏览器认为它
+ * 全程没有变化，CSS 过渡不会触发。所以切换导航模式时要先把实测像素宽高
+ * 写进样式，再在下一帧改成目标像素值，过渡才有可插值的起终点。
+ * 值为 null 表示尺寸交回内容自己决定，同时也代表「当前不在过渡中」。
+ */
+const railSize = ref<{ width: number; height: number } | null>(null);
 
-let heightAnimationFrame: number | null = null;
-let heightResetTimer: number | null = null;
+let sizeResetTimer: number | null = null;
 
 const railStyle = computed(() =>
-  railHeight.value === null ? undefined : { height: `${railHeight.value}px` },
+  railSize.value === null
+    ? undefined
+    : {
+        width: `${railSize.value.width}px`,
+        height: `${railSize.value.height}px`,
+      },
 );
 
 /**
- * 计算导航容器内边距和边框占用的额外高度。
+ * 把计算样式里的尺寸文本转换为像素值。
+ *
+ * @param value - 浏览器计算样式中的尺寸文本。
+ * @returns 解析失败时按 0 处理。
+ */
+function toPixels(value: string): number {
+  return Number.parseFloat(value) || 0;
+}
+
+/**
+ * 读取元素内边距与边框在宽、高两个方向上占用的尺寸。
+ *
+ * 不同导航模式的内边距不一样，换算目标宽高时要把它加回去。
  *
  * @param element - 需要读取样式的导航元素。
- * @returns 内边距和边框高度之和。
+ * @returns 两个轴上的内边距与边框之和。
  */
-function getRailBoxExtraHeight(element: HTMLElement): number {
+function readRailBoxExtra(element: HTMLElement): { x: number; y: number } {
   const styles = window.getComputedStyle(element);
-  /**
-   * 将 CSS 尺寸文本转换为非负数。
-   *
-   * @param value - 浏览器计算样式中的尺寸文本。
-   * @returns 可参与高度计算的非负像素值。
-   */
-  function parseSize(value: string): number {
-    return Number.parseFloat(value) || 0;
-  }
-
-  return (
-    parseSize(styles.paddingTop) +
-    parseSize(styles.paddingBottom) +
-    parseSize(styles.borderTopWidth) +
-    parseSize(styles.borderBottomWidth)
-  );
+  return {
+    x:
+      toPixels(styles.paddingLeft) +
+      toPixels(styles.paddingRight) +
+      toPixels(styles.borderLeftWidth) +
+      toPixels(styles.borderRightWidth),
+    y:
+      toPixels(styles.paddingTop) +
+      toPixels(styles.paddingBottom) +
+      toPixels(styles.borderTopWidth) +
+      toPixels(styles.borderBottomWidth),
+  };
 }
 
 /**
- * 使用隐藏探针读取导航切换后的盒模型额外高度。
- *
- * @param element - 当前导航元素。
- * @returns 隐藏探针的内边距和边框高度之和。
- */
-function getTargetRailBoxExtraHeight(element: HTMLElement): number {
-  const probe = element.cloneNode(false) as HTMLElement;
-  probe.style.position = "absolute";
-  probe.style.visibility = "hidden";
-  probe.style.pointerEvents = "none";
-  probe.style.height = "auto";
-  probe.style.transition = "none";
-  document.body.appendChild(probe);
-  const extraHeight = getRailBoxExtraHeight(probe);
-  probe.remove();
-  return extraHeight;
-}
-
-/**
- * 释放导航高度锁定，恢复由内容自然决定的高度。
+ * 取消尺寸过渡的兜底定时器。
  *
  * @returns 无返回值。
  */
-function releaseRailHeight(): void {
-  railHeight.value = null;
-  isRailHeightAnimating.value = false;
-  if (heightResetTimer !== null) {
-    window.clearTimeout(heightResetTimer);
-    heightResetTimer = null;
-  }
+function clearSizeTimer(): void {
+  if (sizeResetTimer === null) return;
+  window.clearTimeout(sizeResetTimer);
+  sizeResetTimer = null;
 }
 
 /**
- * 在导航内容切换前锁定当前高度，供过渡动画使用。
+ * 释放导航尺寸锁定，恢复由内容自然决定的宽高。
+ *
+ * @returns 无返回值。
+ */
+function releaseRailSize(): void {
+  railSize.value = null;
+  clearSizeTimer();
+}
+
+/**
+ * 在导航内容切换前锁定当前尺寸，供过渡动画使用。
  *
  * @returns 无返回值；没有挂载导航元素时直接结束。
  */
-function lockRailHeight(): void {
+function lockRailSize(): void {
   const rail = railElement.value;
   if (!rail) return;
 
-  if (heightAnimationFrame !== null) {
-    window.cancelAnimationFrame(heightAnimationFrame);
-    heightAnimationFrame = null;
-  }
-  if (heightResetTimer !== null) {
-    window.clearTimeout(heightResetTimer);
-    heightResetTimer = null;
-  }
+  clearSizeTimer();
 
-  isRailHeightAnimating.value = true;
-  railHeight.value = Math.ceil(rail.getBoundingClientRect().height);
+  const rect = rail.getBoundingClientRect();
+  railSize.value = {
+    width: Math.ceil(rect.width),
+    height: Math.ceil(rect.height),
+  };
 }
 
 watch(
@@ -168,68 +171,81 @@ watch(
 watch(
   navigationMode,
   () => {
-    lockRailHeight();
+    lockRailSize();
   },
   { flush: "sync" },
 );
 
 /**
- * 用进入中的按钮组测量目标高度，并让常驻边框平滑过渡到新高度。
+ * 用进入中的按钮组测量目标尺寸，并让常驻胶囊平滑过渡到新的宽高。
  *
  * @param enteringElement - 正在进入导航的按钮组元素。
  * @returns 无返回值。
  */
-function animateRailHeight(enteringElement: Element): void {
+async function animateRailSize(enteringElement: Element): Promise<void> {
   const rail = railElement.value;
   if (!(enteringElement instanceof HTMLElement) || !rail) return;
 
-  if (heightAnimationFrame !== null) {
-    window.cancelAnimationFrame(heightAnimationFrame);
-    heightAnimationFrame = null;
-  }
-  if (heightResetTimer !== null) {
-    window.clearTimeout(heightResetTimer);
-    heightResetTimer = null;
-  }
+  clearSizeTimer();
 
-  const currentHeight = rail.getBoundingClientRect().height;
-  const targetHeight = Math.ceil(
-    enteringElement.getBoundingClientRect().height +
-      getTargetRailBoxExtraHeight(rail),
-  );
+  const currentRect = rail.getBoundingClientRect();
+  /*
+   * 资料库按钮组自带 max-width: 100%，胶囊还窄的时候它会被压成旧宽度，
+   * 目标值等于当前值，宽度过渡就整个跳过了（切到资料库时胶囊直接变宽）。
+   * 测量前临时放开上限、量完立刻还原，两个动作在同一帧内完成，不会产生
+   * 中间态的绘制帧。
+   */
+  const constrainedMaxWidth = enteringElement.style.maxWidth;
+  enteringElement.style.maxWidth = "none";
+  const targetRect = enteringElement.getBoundingClientRect();
+  enteringElement.style.maxWidth = constrainedMaxWidth;
+  const extra = readRailBoxExtra(rail);
 
-  if (Math.abs(currentHeight - targetHeight) < 1) {
-    releaseRailHeight();
+  const currentWidth = Math.ceil(currentRect.width);
+  const currentHeight = Math.ceil(currentRect.height);
+  const targetWidth = Math.ceil(targetRect.width + extra.x);
+  const targetHeight = Math.ceil(targetRect.height + extra.y);
+
+  const widthChanged = Math.abs(currentWidth - targetWidth) >= 1;
+  const heightChanged = Math.abs(currentHeight - targetHeight) >= 1;
+
+  if (!widthChanged && !heightChanged) {
+    releaseRailSize();
     return;
   }
 
-  isRailHeightAnimating.value = true;
-  railHeight.value = Math.ceil(currentHeight);
+  /*
+   * 先把当前像素尺寸落进样式并强制回流，让浏览器记住过渡起点，
+   * 再换成目标尺寸，宽高才会真的从旧值插值过去。
+   *
+   * 这里不用 requestAnimationFrame：标签页在后台或帧率被压低时，它可能
+   * 被推迟到兜底定时器之后才执行，目标值等于没写进去，动画整个丢失。
+   * nextTick 只是等 Vue 打完补丁，不受帧率影响。
+   */
+  railSize.value = { width: currentWidth, height: currentHeight };
+  await nextTick();
+  if (railElement.value !== rail) return;
+  void rail.offsetWidth;
 
-  heightAnimationFrame = window.requestAnimationFrame(() => {
-    heightAnimationFrame = null;
-    railHeight.value = targetHeight;
-  });
-
-  heightResetTimer = window.setTimeout(releaseRailHeight, 620);
+  railSize.value = { width: targetWidth, height: targetHeight };
+  sizeResetTimer = window.setTimeout(releaseRailSize, 800);
 }
 
 /**
- * 在导航高度过渡结束后清理临时高度。
+ * 在导航尺寸过渡结束后清理临时宽高。
  *
  * @param event - CSS 过渡结束事件。
  * @returns 无返回值。
  */
 function handleRailTransitionEnd(event: TransitionEvent): void {
-  if (event.target !== event.currentTarget || event.propertyName !== "height")
+  if (event.target !== event.currentTarget) return;
+  if (event.propertyName !== "height" && event.propertyName !== "width")
     return;
-  releaseRailHeight();
+  releaseRailSize();
 }
 
 onBeforeUnmount(() => {
-  if (heightAnimationFrame !== null)
-    window.cancelAnimationFrame(heightAnimationFrame);
-  if (heightResetTimer !== null) window.clearTimeout(heightResetTimer);
+  clearSizeTimer();
 });
 
 /**
@@ -276,14 +292,14 @@ function openSubmenuFor(page: AppPage): void {
       navigationMode === 'app' && !isSubmenuPage(props.page)
         ? `navigation-rail--${props.page}`
         : '',
-      { 'is-height-animating': isRailHeightAnimating },
+      { 'is-resizing': railSize !== null },
     ]"
     :style="railStyle"
     :aria-label="railLabel"
     @transitionend="handleRailTransitionEnd"
   >
     <div class="rail-content-stage">
-      <Transition name="rail-content" @enter="animateRailHeight">
+      <Transition name="rail-content" @enter="animateRailSize">
         <div
           v-if="navigationMode === 'library'"
           key="library"
@@ -397,24 +413,32 @@ function openSubmenuFor(page: AppPage): void {
   z-index: 20;
   top: 50%;
   left: 24px;
-  display: grid;
+  display: flex;
   width: 65px;
   padding: 9px;
-  place-items: center;
+  align-items: flex-start;
   border: 1px solid var(--glass-border);
   border-radius: 26px;
   background: var(--glass);
   box-shadow: var(--glass-shadow);
   backdrop-filter: var(--glass-blur);
   transform: translateY(-50%);
+  /*
+   * 宽度和高度同一曲线、同一时长，移动端切换导航模式时胶囊整体均匀伸缩，
+   * 不会出现「高度先到位、宽度还在追」的错位感。
+   *
+   * 内边距刻意不参与过渡：它只差 2~3px，看不出来；但一旦让它渐变，
+   * 切换瞬间读到的 padding 就是插值中间值，目标宽高会算错，只能再挂一个
+   * 隐藏探针去取真实值。去掉过渡后直接读计算样式即可。
+   */
   transition:
-    height 0.52s cubic-bezier(0.22, 1, 0.36, 1),
-    width 0.34s ease,
-    padding 0.34s ease,
+    height 0.46s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.46s cubic-bezier(0.22, 1, 0.36, 1),
     border-radius 0.34s ease;
 }
 
-.navigation-rail.is-height-animating {
+/* 尺寸过渡期间裁掉溢出的内容，避免新旧按钮组同时露在胶囊外面。 */
+.navigation-rail.is-resizing {
   overflow: hidden;
 }
 
@@ -424,13 +448,23 @@ function openSubmenuFor(page: AppPage): void {
 }
 
 .rail-content-stage {
-  display: grid;
+  position: relative;
+  display: flex;
   width: 100%;
+  align-items: flex-start;
+  justify-content: center;
 }
 
+/*
+ * 只有进场的那一组参与舞台尺寸计算；退场的一组在下面改成绝对定位叠上来，
+ * 所以这里保持自身宽度（max-content / 100%），不让它被拉伸或压缩。
+ *
+ * 这一点很重要：以前两组都按容器宽度排版，切换时旧的一组会把这一行撑得
+ * 比胶囊还宽，新内容在「旧宽度」里居中于是整体右移，最右一格被 overflow
+ * 裁掉，动画结束才跳回原位。
+ */
 .rail-content-stage > * {
-  grid-area: 1 / 1;
-  align-self: start;
+  flex: 0 0 auto;
 }
 
 .rail-content {
@@ -451,12 +485,13 @@ function openSubmenuFor(page: AppPage): void {
 
 .rail-button {
   position: relative;
-  display: grid;
+  display: flex;
   width: 44px;
   height: 44px;
   flex: 0 0 44px;
   padding: 0;
-  place-items: center;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 14px;
   color: rgba(43, 50, 79, 0.65);
@@ -476,7 +511,6 @@ function openSubmenuFor(page: AppPage): void {
 }
 
 .rail-filter-divider {
-  display: block;
   width: 34px;
   height: 1px;
   flex: 0 0 1px;
@@ -516,8 +550,9 @@ function openSubmenuFor(page: AppPage): void {
 }
 
 .rail-link-icon {
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .rail-link-copy {
@@ -575,10 +610,27 @@ function openSubmenuFor(page: AppPage): void {
 
 .rail-content-enter-active,
 .rail-content-leave-active {
-  z-index: 1;
   transition:
     opacity 0.32s ease,
     transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/*
+ * 退场的一组脱离文档流叠在进场的那组上面，舞台的宽高只由留下的一组决定。
+ * 铺满整行（而不是用它自己的内容宽度 + left: 0）是为了和进场的一组对齐：
+ * 进场的一组由舞台居中，退场的一组若贴左就会在胶囊伸缩时左右乱跑。
+ */
+.rail-content-stage > .rail-content-leave-active {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1;
+}
+
+/* 进场的一组要压在上面：绝对定位的退场组默认画在流内元素之后。 */
+.rail-content-enter-active {
+  z-index: 2;
 }
 
 .rail-content-enter-from {
@@ -639,58 +691,65 @@ function openSubmenuFor(page: AppPage): void {
 }
 
 @media (max-width: 820px) {
+  /*
+   * 移动端：底部居中胶囊，宽度交给内容自己决定。
+   *
+   * 以前写死 min(344px, 100vw - 16px)：一级导航 6 个 40px 图标只占 260px，
+   * 两侧各空出 40 多像素；换到 360px 小屏又几乎铺满整行，看着又大又松。
+   * 现在有几项就多宽，切换导航模式时宽度会平滑过渡（width 已在 transition 里）。
+   */
   .navigation-rail {
     top: auto;
-    bottom: 16px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     left: 50%;
-    width: min(344px, calc(100vw - 16px));
-    min-height: 72px;
-    padding: 13px 10px;
-    border-radius: 30px;
+    width: max-content;
+    max-width: calc(100vw - 24px);
+    padding: 8px;
+    border-radius: 24px;
     transform: translateX(-50%);
   }
 
-  .navigation-rail--brew {
-    bottom: 16px;
-    width: 301px;
-  }
-
+  /*
+   * 移动端按钮组按内容取宽，居中交给舞台的 justify-content；内容比胶囊宽
+   * 时舞台居中会让两端同时溢出，过渡期间由胶囊裁掉。
+   *
+   * 退场的那组被铺成整行宽，内容还要靠 justify-content 自己居中，否则会贴左。
+   */
   .rail-content-app,
   .rail-content-brew {
     width: max-content;
     flex-direction: row;
+    justify-content: center;
     gap: 4px;
   }
 
-  .rail-content-app .rail-button {
+  /* Brew 的按钮原来是桌面的 44px，比其他模式大一圈，这里统一到 40px。 */
+  .rail-content-app .rail-button,
+  .rail-content-brew .rail-button {
     width: 40px;
     height: 40px;
     flex-basis: 40px;
     border-radius: 12px;
   }
 
-  .rail-content-app,
-  .rail-content-brew {
-    justify-self: center;
-  }
-
   .rail-brew-submenu {
     display: flex;
     margin-top: 0;
-    margin-left: 9px;
+    margin-left: 2px;
     flex-direction: row;
-    gap: 8px;
+    gap: 4px;
   }
 
   .rail-link-copy {
     display: none;
   }
 
+  /* 指示条贴在 8px 内边距里，距圆角边留 2px。 */
   .rail-link::before,
   .brew-nav-button.is-active::before {
-    top: -9px;
+    top: -6px;
     left: 50%;
-    width: 20px;
+    width: 18px;
     height: 3px;
     border-radius: 3px 3px 0 0;
     transform: translateX(-50%) scaleX(0.6);
@@ -701,34 +760,47 @@ function openSubmenuFor(page: AppPage): void {
     transform: translateX(-50%) scaleX(1);
   }
 
+  /*
+   * 资料库二级导航有 7 个按钮，原来用 left/right 各 16px 铺满整行，
+   * 按钮被拉得很散。改成 max-content 居中，垂直内边距略微加大，
+   * 让高度和一级导航（40 + 16 = 56）持平，切换时不出高度台阶。
+   *
+   * 只补垂直方向：左右内边距、圆角都和上面的 .navigation-rail 一样。
+   */
   .navigation-rail--library {
-    right: 16px;
-    left: 16px;
-    width: auto;
-    padding: 17px 12px;
-    transform: none;
+    padding-block: 11px;
   }
 
   .rail-content-library {
     width: max-content;
     max-width: 100%;
     flex-direction: row;
-    gap: 5px;
-    justify-self: center;
+    justify-content: center;
+    gap: 4px;
+  }
+
+  /*
+   * 尺寸过渡期间放开按钮组的宽度上限：胶囊还在变宽的时候它会先被压成
+   * 当前宽度、内容靠左溢出，最右边那个筛选按钮被切掉一半。放开后它按
+   * 自然宽度居中，两端对称地裁，看起来就是胶囊自己在展开。过渡一结束
+   * 上限立刻恢复，窄屏下仍然不会露到胶囊外面。
+   */
+  .navigation-rail.is-resizing .rail-content-library {
+    max-width: none;
   }
 
   .rail-content-library .rail-button {
     width: 36px;
     height: 36px;
     flex-basis: 36px;
-    border-radius: 12px;
+    border-radius: 11px;
   }
 
   .rail-content-library .rail-filter-divider {
     width: 1px;
-    height: 28px;
+    height: 24px;
     flex-basis: 1px;
-    margin: 0 1px;
+    margin: 0;
   }
 }
 
