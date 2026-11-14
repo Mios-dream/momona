@@ -71,12 +71,11 @@ const isBrandPlatform = computed(() => brandPlatforms.includes(props.settings.pl
   gap: 10px;
   overflow: hidden;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.66);
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
 }
 
 .home-link-card:hover {
-  background: rgba(255, 255, 255, 0.86);
+  background: var(--glass-strong);
   box-shadow: 0 22px 38px rgba(54, 45, 106, 0.18);
   transform: translateY(-4px);
 }
@@ -91,22 +90,18 @@ const isBrandPlatform = computed(() => brandPlatforms.includes(props.settings.pl
 
 .home-link-card.tone-blue {
   color: #087fb5;
-  background: linear-gradient(145deg, rgba(224, 248, 255, 0.82), rgba(255, 255, 255, 0.58));
 }
 
 .home-link-card.tone-indigo {
   color: #4d58a4;
-  background: linear-gradient(145deg, rgba(237, 239, 255, 0.88), rgba(255, 255, 255, 0.58));
 }
 
 .home-link-card.tone-ink {
   color: #26354d;
-  background: linear-gradient(145deg, rgba(232, 241, 248, 0.86), rgba(255, 255, 255, 0.58));
 }
 
 .home-link-card.tone-violet {
   color: var(--purple-deep);
-  background: linear-gradient(145deg, rgba(239, 234, 255, 0.88), rgba(255, 255, 255, 0.58));
 }
 
 .home-link-card.platform-qq { color: #147fc0; }

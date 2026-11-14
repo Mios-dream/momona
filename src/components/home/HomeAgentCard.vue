@@ -45,7 +45,6 @@ const hasProfile = computed(() =>
   display: flex;
   min-height: 150px;
   overflow: hidden;
-  background: rgba(238, 235, 255, 0.74);
 }
 
 .home-agent-card::before {

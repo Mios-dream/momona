@@ -58,7 +58,6 @@ const sortLabel: Record<GitHubRepositorySort, string> = {
   flex-direction: column;
   gap: 9px;
   overflow: hidden;
-  background: linear-gradient(145deg, rgba(240, 246, 252, 0.82), rgba(255, 255, 255, 0.56));
 }
 
 .github-card-head {

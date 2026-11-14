@@ -1133,7 +1133,7 @@ button:disabled {
   border-radius: 14px;
   background: rgba(255, 255, 255, 0.38);
   box-shadow: 0 14px 32px rgba(54, 45, 106, 0.08);
-  backdrop-filter: blur(18px) saturate(132%);
+  backdrop-filter: var(--glass-blur);
   gap: 6px;
 }
 .settings-sidebar-label {
@@ -1217,7 +1217,7 @@ button:disabled {
   border-radius: 16px;
   background: var(--glass);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(18px) saturate(132%);
+  backdrop-filter: var(--glass-blur);
   scrollbar-width: none;
 }
 .settings-panel-head {

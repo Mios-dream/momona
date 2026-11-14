@@ -13,11 +13,20 @@
   --ink-soft: #303b4f;
   --muted: #758096;
   --muted-strong: #5d6980;
-  --glass: rgba(255, 255, 255, 0.62);
+  /**
+   * 毛玻璃材质：全站唯一来源，取自左侧导航栏。
+   *
+   * 组件只使用这三个变量，不再各自手写半透明渐变，
+   * 否则透明度稍有差异就会让某些卡片被背景干扰。
+   */
+  --glass: rgba(255, 255, 255, 0.68);
   --glass-strong: rgba(255, 255, 255, 0.86);
   --glass-soft: rgba(255, 255, 255, 0.42);
   --glass-border: rgba(255, 255, 255, 0.84);
-  --glass-shadow: 0 18px 44px rgba(54, 45, 106, 0.14);
+  --glass-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.52) inset,
+    0 13px 34px rgba(54, 45, 106, 0.13);
+  --glass-blur: blur(21px) saturate(148%);
   --content-surface: #fbfcff;
   --content-border: rgba(255, 255, 255, 0.84);
   --content-shadow: 0 10px 25px rgba(72, 56, 135, 0.08);
@@ -203,15 +212,27 @@ img {
   pointer-events: none;
 }
 
+/*
+ * 全站统一的底部白色渐隐（基准值取自首页）。
+ *
+ * 它只压在壁纸上（z-index: -1），不参与任何卡片的 backdrop-filter 采样链之外，
+ * 作用是让下半屏的内容浮在浅色背景上、保证文字可读。
+ *
+ * 浓度是拿捏过的：底部 0.62 足够兜住页脚文字，26% 高度降到 0.28，58% 以上完全
+ * 透明 —— 屏幕中上部的壁纸保持原色，毛玻璃卡片才采得到颜色而不是一片白。
+ * 之前底部是 1.0（纯白压死），卡片模糊到白，观感退化成"半透明白"。
+ *
+ * 以前首页有一条覆盖把渐隐再减淡一点，现在已并回这里，各页共用同一组数值。
+ */
 .app-background-overlay::after {
   position: absolute;
   inset: 0;
   content: "";
   background: linear-gradient(
     to top,
-    rgba(255, 255, 255, 1) 0%,
-    rgba(255, 255, 255, 0.4) 35%,
-    rgba(255, 255, 255, 0) 70%
+    rgba(255, 255, 255, 0.62) 0%,
+    rgba(255, 255, 255, 0.28) 26%,
+    rgba(255, 255, 255, 0) 58%
   );
 }
 
@@ -318,15 +339,7 @@ body.is-settings-view {
   border-radius: 15px;
   background: var(--glass);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(18px) saturate(132%);
-  /* border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.74);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.28) inset,
-    0 -1px 0 rgba(0, 0, 0, 0.04) inset,
-    0 8px 28px rgba(31, 38, 135, 0.1);
-  backdrop-filter: blur(13.6px) saturate(180%); */
+  backdrop-filter: var(--glass-blur);
 }
 
 .compact-button {

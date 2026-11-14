@@ -526,7 +526,7 @@ onBeforeUnmount(() => {
   border-radius: 17px;
   background: rgba(255, 255, 255, 0.76);
   box-shadow: 0 20px 42px rgba(54, 45, 106, 0.18);
-  backdrop-filter: blur(22px) saturate(145%);
+  backdrop-filter: var(--glass-blur);
 }
 
 .page-guide > img {

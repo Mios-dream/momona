@@ -916,7 +916,7 @@ onBeforeUnmount(() => {
   color: var(--ink);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 9px 24px rgba(54, 45, 106, 0.11);
-  backdrop-filter: blur(20px) saturate(145%);
+  backdrop-filter: var(--glass-blur);
   transition:
     width 0.46s cubic-bezier(0.22, 1, 0.36, 1),
     height 0.46s cubic-bezier(0.22, 1, 0.36, 1),

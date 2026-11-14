@@ -127,7 +127,7 @@ onBeforeUnmount(() =>
   border-radius: 24px;
   background: rgba(255, 255, 255, 0.68);
   box-shadow: 0 10px 24px rgba(54, 45, 106, 0.11);
-  backdrop-filter: blur(18px) saturate(145%);
+  backdrop-filter: var(--glass-blur);
 }
 .music-status-cover {
   width: 32px;

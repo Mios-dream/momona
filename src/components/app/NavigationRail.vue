@@ -401,13 +401,11 @@ function openSubmenuFor(page: AppPage): void {
   width: 65px;
   padding: 9px;
   place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.84);
+  border: 1px solid var(--glass-border);
   border-radius: 26px;
-  background: rgba(255, 255, 255, 0.68);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.52) inset,
-    0 13px 34px rgba(54, 45, 106, 0.13);
-  backdrop-filter: blur(21px) saturate(148%);
+  background: var(--glass);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
   transform: translateY(-50%);
   transition:
     height 0.52s cubic-bezier(0.22, 1, 0.36, 1),

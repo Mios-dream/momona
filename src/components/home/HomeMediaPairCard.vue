@@ -276,7 +276,6 @@ onBeforeUnmount(() => {
   min-height: 150px;
   overflow: hidden;
   color: var(--ink);
-  background: rgba(255, 248, 250, 0.72);
 }
 
 .netease-stats-face,

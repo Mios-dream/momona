@@ -138,17 +138,11 @@ onBeforeUnmount(clearRotation);
   height: 100%;
   min-height: 0;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.9);
+  border: 1px solid var(--glass-border);
   border-radius: 15px;
-  background: linear-gradient(
-    160deg,
-    rgba(255, 238, 250, 0.98) 0%,
-    rgba(250, 247, 255, 0.97) 56%,
-    rgba(237, 246, 255, 0.98) 100%
-  );
-  box-shadow:
-    0 14px 28px rgba(63, 72, 133, 0.14),
-    inset 0 1px 0 rgba(255, 255, 255, 0.76);
+  background: var(--glass);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: var(--glass-blur);
   transition:
     transform 0.2s ease,
     box-shadow 0.2s ease;

@@ -44,7 +44,6 @@ onMounted(async () => {
   padding: 12px 15px 12px;
   flex-direction: column;
   justify-content: space-between;
-  background: linear-gradient(145deg, rgba(255, 255, 252, 0.78), rgba(232, 242, 255, 0.62));
 }
 
 .weather-main {

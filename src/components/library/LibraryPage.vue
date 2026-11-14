@@ -573,7 +573,7 @@ onBeforeUnmount(() => {
   color: rgba(51, 63, 87, 0.7);
   background: rgba(255, 255, 255, 0.54);
   box-shadow: 0 8px 20px rgba(54, 45, 106, 0.08);
-  backdrop-filter: blur(17px) saturate(135%);
+  backdrop-filter: var(--glass-blur);
   font-size: 0.58rem;
   pointer-events: none;
   transform: translateX(-50%);
@@ -593,7 +593,7 @@ onBeforeUnmount(() => {
   border-radius: 15px;
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 13px 28px rgba(54, 45, 106, 0.15);
-  backdrop-filter: blur(19px) saturate(140%);
+  backdrop-filter: var(--glass-blur);
   pointer-events: auto;
   transform: translateX(-50%);
 }

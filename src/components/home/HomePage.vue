@@ -883,7 +883,6 @@ onBeforeUnmount(() => {
   padding: 8px 12px;
   align-items: center;
   gap: 9px;
-  background: rgba(255, 255, 255, 0.76);
 }
 
 .home-status > .home-profile-image {
@@ -941,15 +940,40 @@ onBeforeUnmount(() => {
   min-width: 0;
   min-height: 0;
   padding: 4px;
-  animation: home-widget-enter 0.56s cubic-bezier(0.22, 1, 0.36, 1) both;
-  animation-delay: var(--widget-enter-delay, 0ms);
-  will-change: opacity, transform;
+  /*
+   * 入场动画千万别写在这一层。
+   *
+   * 这是卡片的"祖先"。祖先一旦有 opacity < 1 / transform，就会成为 backdrop root，
+   * 把后代 backdrop-filter 的采样范围切断到它自己内部 —— 卡片采不到背后的壁纸，
+   * 磨砂会彻底消失（不是动画期间消失，是永远消失，因为 fill-mode 会把终态冻住）。
+   * 实测：动画挂在这一层时，开关卡片 backdrop-filter 的像素差是 0.00。
+   *
+   * 所以第一段动画下沉到卡片自身（见下一条规则）。元素自己的 opacity 动画
+   * 只是让模糊被自己的透明度稀释，不会切断采样（实测 opacity 0.625 时差值 0.97，
+   * 静态时 2.92），动画结束自动恢复，全程没有跳变。
+   */
 }
 
 .home-slot > *:first-child {
   width: 100%;
   height: 100%;
   min-height: 0;
+}
+
+/*
+ * 入场动画直接挂在卡片上，和友链页 .friend-card 完全同构。
+ *
+ * 为什么这样就"模糊正常"：backdrop-filter 采样的是元素背后的内容，
+ * 元素自己是合成层/半透明都不影响这件事，只有**祖先**加了这些才会切断。
+ * 于是淡入、上浮、磨砂三者可以同时在场，不需要再补一段模糊动画。
+ *
+ * 只挑真的带毛玻璃的卡片：给普通元素临时塞动画本身无害，但没必要让
+ * 不透明元素参与合成。
+ */
+.home-slot > .glass-panel,
+.home-slot :deep(.home-friend-card-shell) {
+  animation: home-widget-enter 0.56s cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: var(--widget-enter-delay, 0ms);
 }
 
 .home-slot.is-selected {
@@ -1011,11 +1035,9 @@ onBeforeUnmount(() => {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .home-slot {
+  .home-slot > .glass-panel,
+  .home-slot :deep(.home-friend-card-shell) {
     animation: none;
-    opacity: 1;
-    transform: none;
-    will-change: auto;
   }
 
   .home-editor-backdrop-enter-active,
@@ -1137,7 +1159,7 @@ onBeforeUnmount(() => {
   border-radius: 11px;
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 13px 28px rgba(54, 45, 106, 0.14);
-  backdrop-filter: blur(18px) saturate(135%);
+  backdrop-filter: var(--glass-blur);
   transition:
     width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
     border-color 0.24s ease,
@@ -1234,7 +1256,7 @@ onBeforeUnmount(() => {
   border-radius: 12px;
   background: rgba(252, 253, 255, 0.94);
   box-shadow: 0 22px 48px rgba(47, 45, 91, 0.2);
-  backdrop-filter: blur(22px) saturate(135%);
+  backdrop-filter: var(--glass-blur);
 }
 
 .home-widget-catalog-enter-active,

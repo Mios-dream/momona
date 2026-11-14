@@ -1645,7 +1645,7 @@ a.detail-article-row:focus-visible {
     border-radius: 15px;
     background: rgba(255, 255, 255, 0.72);
     box-shadow: 0 10px 25px rgba(72, 56, 135, 0.08);
-    backdrop-filter: blur(18px) saturate(132%);
+    backdrop-filter: var(--glass-blur);
   }
 
   .brew-mobile-avatar {

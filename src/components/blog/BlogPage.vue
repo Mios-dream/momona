@@ -509,7 +509,7 @@ onBeforeUnmount(() => {
   border-radius: 15px;
   background: var(--blog-card-surface);
   box-shadow: 0 10px 25px rgba(72, 56, 135, 0.08);
-  backdrop-filter: blur(18px) saturate(132%);
+  backdrop-filter: var(--glass-blur);
   transition:
     transform 0.18s ease,
     background 0.18s ease,
@@ -517,7 +517,7 @@ onBeforeUnmount(() => {
     padding 0.52s cubic-bezier(0.22, 1, 0.36, 1);
   animation: blog-card-in 0.52s var(--blog-card-enter-delay)
     cubic-bezier(0.22, 1, 0.36, 1) both;
-  will-change: opacity;
+  /* 常驻 will-change: opacity 会让卡片成为 backdrop root，毛玻璃失效；提示交给关键帧。 */
 }
 
 .blog-card--featured {
@@ -906,6 +906,7 @@ onBeforeUnmount(() => {
 @keyframes blog-card-in {
   from {
     opacity: 0;
+    will-change: opacity;
   }
   to {
     opacity: 1;

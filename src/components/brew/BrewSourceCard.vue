@@ -133,11 +133,11 @@ function handleOpen(): void {
   border-radius: 15px;
   background: rgba(255, 255, 255, 0.72);
   box-shadow: 0 10px 25px rgba(72, 56, 135, 0.08);
-  backdrop-filter: blur(18px) saturate(132%);
+  backdrop-filter: var(--glass-blur);
   transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
   animation: brew-source-card-in 0.52s var(--brew-source-card-delay)
     cubic-bezier(0.22, 1, 0.36, 1) both;
-  will-change: opacity;
+  /* 常驻 will-change: opacity 会让卡片成为 backdrop root，毛玻璃失效；提示交给关键帧。 */
 }
 
 .brew-source-card:hover,
@@ -457,6 +457,7 @@ function handleOpen(): void {
 @keyframes brew-source-card-in {
   from {
     opacity: 0;
+    will-change: opacity;
   }
   to {
     opacity: 1;

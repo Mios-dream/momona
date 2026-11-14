@@ -447,7 +447,7 @@ onBeforeUnmount(() =>
   border-radius: 13px;
   background: rgba(253, 254, 255, 0.94);
   box-shadow: 0 20px 42px rgba(54, 45, 106, 0.2);
-  backdrop-filter: blur(22px) saturate(140%);
+  backdrop-filter: var(--glass-blur);
 }
 
 .music-picker-panel.is-embedded-panel {

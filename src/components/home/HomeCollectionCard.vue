@@ -249,7 +249,6 @@ onBeforeUnmount(() => {
   min-height: 150px;
   overflow: hidden;
   color: var(--ink);
-  background: rgba(255, 247, 252, 0.76);
 }
 
 .bangumi-stats-face,

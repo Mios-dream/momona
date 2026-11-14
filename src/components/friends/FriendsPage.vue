@@ -765,7 +765,7 @@ onBeforeUnmount(() => {
   border-radius: 15px;
   background: rgba(255, 255, 255, 0.67);
   box-shadow: 0 18px 38px rgba(54, 45, 106, 0.13);
-  backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: var(--glass-blur);
   pointer-events: auto;
   animation: friends-intro-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
@@ -929,7 +929,7 @@ onBeforeUnmount(() => {
     opacity 0.24s ease;
   animation: friend-card-in 0.72s var(--friend-delay)
     cubic-bezier(0.22, 1, 0.36, 1) both;
-  backdrop-filter: blur(18px) saturate(132%);
+  backdrop-filter: var(--glass-blur);
   will-change: transform;
 }
 
@@ -1268,7 +1268,7 @@ onBeforeUnmount(() => {
   border-radius: 13px;
   background: rgba(255, 255, 255, 0.78);
   box-shadow: 0 13px 28px rgba(54, 45, 106, 0.15);
-  backdrop-filter: blur(19px) saturate(140%);
+  backdrop-filter: var(--glass-blur);
   pointer-events: auto;
   transform: translateX(-50%);
 }
@@ -1350,7 +1350,7 @@ onBeforeUnmount(() => {
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.88);
   box-shadow: 0 26px 66px rgba(39, 37, 78, 0.26);
-  backdrop-filter: blur(24px) saturate(138%);
+  backdrop-filter: var(--glass-blur);
   user-select: text;
 }
 

@@ -586,7 +586,7 @@ function requestGame(): void {
   border-radius: 15px;
   background: var(--glass);
   box-shadow: var(--glass-shadow);
-  backdrop-filter: blur(18px) saturate(132%);
+  backdrop-filter: var(--glass-blur);
   transform: translate(-50%, -50%);
   isolation: isolate;
 }

@@ -402,11 +402,6 @@ onBeforeUnmount(clearRotation);
   min-height: 150px;
   overflow: hidden;
   color: #26344e;
-  background: linear-gradient(
-    140deg,
-    rgba(248, 250, 255, 0.94),
-    rgba(234, 241, 255, 0.7)
-  );
 }
 
 .github-overview-face,

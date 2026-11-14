@@ -456,7 +456,7 @@ onBeforeUnmount(() => syncGlobalListeners(false));
   border-radius: 11px;
   background: rgba(253, 254, 255, 0.96);
   box-shadow: 0 18px 38px rgba(54, 45, 106, 0.2);
-  backdrop-filter: blur(20px) saturate(140%);
+  backdrop-filter: var(--glass-blur);
   outline: none;
 }
 

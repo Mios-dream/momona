@@ -102,7 +102,7 @@ onBeforeUnmount(() => window.removeEventListener("music-player-state-change", ha
 </template>
 
 <style scoped>
-.home-music-card { position: relative; display: grid; width: 100%; height: 100%; min-width: 0; min-height: 0; padding: 11px; grid-template-rows: 47px minmax(0, 1fr) 31px; overflow: hidden; background: linear-gradient(145deg, rgba(255, 255, 255, 0.88), rgba(244, 251, 255, 0.72)); }
+.home-music-card { position: relative; display: grid; width: 100%; height: 100%; min-width: 0; min-height: 0; padding: 11px; grid-template-rows: 47px minmax(0, 1fr) 31px; overflow: hidden; }
 .music-card-top { display: flex; min-width: 0; align-items: flex-start; justify-content: space-between; }
 .music-platform { display: grid; width: 22px; height: 22px; place-items: center; color: var(--ink); }
 .music-platform :deep(svg) { display: block; }

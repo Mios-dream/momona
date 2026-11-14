@@ -40,11 +40,6 @@ const dateLabel = new Intl.DateTimeFormat("zh-CN", {
   padding: 14px 15px 13px;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(
-    145deg,
-    rgba(255, 246, 255, 0.76),
-    rgba(240, 231, 255, 0.54)
-  );
 }
 
 .home-greeting::after {
