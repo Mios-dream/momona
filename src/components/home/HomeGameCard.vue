@@ -21,7 +21,6 @@ interface GameMeta {
   artPosition: string;
   accent: string;
   softBackground: string;
-  border: string;
 }
 
 const GAME_META: Record<HoyoGame, GameMeta> = {
@@ -30,21 +29,18 @@ const GAME_META: Record<HoyoGame, GameMeta> = {
     artPosition: "center center",
     accent: "#C9A227",
     softBackground: "rgba(201, 162, 39, 0.16)",
-    border: "rgba(201, 162, 39, 0.28)",
   },
   hsr: {
     icon: "/assets/game-logos/starrail-icon.webp",
     artPosition: "center 25%",
     accent: "#6B5CE7",
     softBackground: "rgba(107, 92, 231, 0.16)",
-    border: "rgba(107, 92, 231, 0.28)",
   },
   zzz: {
     icon: "/assets/game-logos/zzz-icon.webp",
     artPosition: "center center",
     accent: "#E8C547",
     softBackground: "rgba(232, 197, 71, 0.16)",
-    border: "rgba(232, 197, 71, 0.28)",
   },
 };
 
@@ -56,7 +52,6 @@ const gameMeta = computed(() => GAME_META[game.value]);
 const gameStyle = computed<Record<string, string>>(() => ({
   "--game-accent": gameMeta.value.accent,
   "--game-soft-background": gameMeta.value.softBackground,
-  "--game-border": gameMeta.value.border,
 }));
 const gameName = computed(
   () => ({ genshin: "原神", hsr: "星穹铁道", zzz: "绝区零" })[game.value],
@@ -110,9 +105,7 @@ function characterThumbnail(character: GameShowcaseItem): string {
  * @returns 与稀有度对应的 CSS 颜色值。
  */
 function rarityRing(rarity?: number): string {
-  if (rarity === 5) return "#e8b33b";
-  if (rarity === 4) return "#a47ce0";
-  return gameMeta.value.border;
+  return rarity === 5 ? "#e8b33b" : "#a47ce0";
 }
 
 /**
@@ -348,7 +341,6 @@ function selectCharacter(index: number): void {
 .home-game-card {
   --game-accent: #6b5ce7;
   --game-soft-background: rgba(107, 92, 231, 0.16);
-  --game-border: rgba(107, 92, 231, 0.28);
   --game-wordmark: none;
   position: relative;
   display: flex;
@@ -356,7 +348,6 @@ function selectCharacter(index: number): void {
   min-height: 0;
   padding: 12px 13px;
   overflow: hidden;
-  border-color: var(--game-border);
   background: var(--glass);
   box-shadow:
     var(--glass-shadow),
