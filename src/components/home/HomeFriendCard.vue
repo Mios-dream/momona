@@ -191,7 +191,7 @@ onBeforeUnmount(clearRotation);
 
 .home-friend-card-link:focus-visible {
   border-radius: 14px;
-  outline: 2px solid rgba(117, 100, 222, 0.7);
+  outline: 2px solid color-mix(in srgb, var(--theme) 70%, transparent);
   outline-offset: -4px;
 }
 

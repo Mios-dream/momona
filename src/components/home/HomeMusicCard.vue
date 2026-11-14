@@ -112,6 +112,6 @@ onBeforeUnmount(() => window.removeEventListener("music-player-state-change", ha
 .music-card-copy strong { font-size: 0.8rem; line-height: 1.15; }
 .music-card-copy span { color: var(--muted); font-size: 0.61rem; }
 .music-play { display: grid; width: 31px; height: 31px; padding: 0; place-items: center; border: 1px solid rgba(255, 255, 255, 0.84); border-radius: 50%; color: var(--ink-soft); background: rgba(255, 255, 255, 0.82); box-shadow: 0 5px 12px rgba(54, 45, 106, 0.1); transition: color 0.18s ease, background 0.18s ease, transform 0.18s ease; }
-.music-play:hover { color: var(--purple-deep); background: #fff; transform: translateY(-1px); }
+.music-play:hover { color: var(--theme-strong); background: #fff; transform: translateY(-1px); }
 .is-empty .music-card-copy strong { color: var(--muted); }
 </style>

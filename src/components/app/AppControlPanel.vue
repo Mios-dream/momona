@@ -802,7 +802,7 @@ onBeforeUnmount(() => {
                         ></span>
                         <span>{{ currentTimeLabel }}</span>
                         <input
-                          class="control-music-progress-input"
+                          class="m-range control-music-progress-input"
                           type="range"
                           min="0"
                           :max="Math.max(playerState.duration || 0, 1)"
@@ -980,7 +980,7 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   align-items: center;
   justify-content: center;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
 }
 
 .control-collapsed-icon img {
@@ -1121,7 +1121,7 @@ onBeforeUnmount(() => {
 }
 
 .control-close:hover {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: #fff;
 }
 
@@ -1140,6 +1140,7 @@ onBeforeUnmount(() => {
 .control-quote {
   padding: 10px 11px;
   align-items: flex-start;
+  border: 1px solid rgba(118, 126, 151, 0.16);
   border-radius: 13px;
   background:
     linear-gradient(
@@ -1195,7 +1196,7 @@ onBeforeUnmount(() => {
   padding: 10px 12px;
   align-items: center;
   gap: 10px;
-  border: 1px solid rgba(132, 151, 186, 0.2);
+  border: 1px solid rgba(118, 126, 151, 0.16);
   border-radius: 14px;
   background:
     linear-gradient(
@@ -1218,7 +1219,7 @@ onBeforeUnmount(() => {
   align-items: center;
   justify-content: center;
   border-radius: 12px;
-  color: var(--blue);
+  color: var(--theme-strong);
 }
 
 .control-weather-icon {
@@ -1228,14 +1229,14 @@ onBeforeUnmount(() => {
   flex: 0 0 45px;
   align-items: center;
   justify-content: center;
-  color: #7097bd;
+  color: var(--theme-strong);
 }
 
 .control-weather-icon img {
   width: 42px;
   height: 42px;
   object-fit: contain;
-  filter: drop-shadow(0 4px 5px rgba(63, 116, 153, 0.12));
+  filter: drop-shadow(0 4px 5px rgba(38, 44, 66, 0.12));
 }
 
 .control-weather-copy {
@@ -1420,14 +1421,27 @@ onBeforeUnmount(() => {
   align-items: stretch;
   padding: 16px 16px 12px;
   gap: 6px;
-  border: 1px solid rgba(104, 151, 196, 0.34);
+  border: 1px solid rgba(118, 126, 151, 0.16);
   border-radius: 14px;
-  background: linear-gradient(
-    135deg,
-    rgba(255, 255, 255, 0.55),
-    rgba(229, 240, 255, 0.54) 58%,
-    rgba(255, 234, 244, 0.38)
-  );
+  /* 卡面是中性玻璃，和上方「一言」「天气」同一族。
+     主题色只留给播放键、进度条、播放中频谱这些真正要强调的点，
+     整卡铺色会让它在控制栏里跳出来，反而显得突兀。 */
+  background:
+    radial-gradient(
+      118% 92% at 100% 100%,
+      color-mix(in srgb, var(--theme) 9%, transparent),
+      transparent 64%
+    ),
+    linear-gradient(
+      108deg,
+      rgba(255, 255, 255, 0.92),
+      rgba(252, 249, 255, 0.78) 58%,
+      rgba(255, 247, 237, 0.74)
+    ),
+    rgba(255, 255, 255, 0.7);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 6px 15px rgba(72, 83, 126, 0.06);
   transition: height 0.46s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -1477,9 +1491,13 @@ onBeforeUnmount(() => {
   width: 62px;
   height: 62px;
   border-radius: 15px;
-  color: var(--purple-deep);
-  background: rgba(245, 248, 255, 0.72);
-  box-shadow: 0 6px 14px rgba(59, 91, 133, 0.12);
+  color: var(--theme-strong);
+  background: rgba(248, 249, 253, 0.78);
+  /* 封面自带一圈很淡的主题色光晕：让卡面认得出来是播放器，
+     又不会把整张卡染成粉色。 */
+  box-shadow:
+    0 6px 14px rgba(54, 45, 106, 0.1),
+    0 2px 12px color-mix(in srgb, var(--theme) 18%, transparent);
 }
 
 .control-music-cover :deep(img) {
@@ -1524,7 +1542,8 @@ onBeforeUnmount(() => {
   width: 3px;
   height: 7px;
   border-radius: 3px;
-  background: #6b8db2;
+  background: rgba(118, 126, 151, 0.34);
+  transition: background 0.24s ease;
 }
 
 .control-music-equalizer i:nth-child(2) {
@@ -1535,7 +1554,9 @@ onBeforeUnmount(() => {
   height: 10px;
 }
 
+/* 播放中才点亮成主题色：颜色表示状态，平时保持中性。 */
 .control-music-equalizer.is-playing i {
+  background: var(--theme);
   animation: music-wave 0.72s ease-in-out infinite alternate;
 }
 
@@ -1549,8 +1570,8 @@ onBeforeUnmount(() => {
 
 .control-play {
   border: 0;
-  color: #fff;
-  background: linear-gradient(135deg, #174c82 0%, #205f9c 100%);
+  color: var(--theme-on);
+  background: linear-gradient(135deg, var(--theme) 0%, var(--theme-hover) 100%);
 }
 
 .control-music-progress {
@@ -1571,11 +1592,6 @@ onBeforeUnmount(() => {
   flex: 0 0 34px;
 }
 
-.control-music-progress-input {
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
 .control-music-progress > span:nth-child(2) {
   text-align: left;
 }
@@ -1584,59 +1600,12 @@ onBeforeUnmount(() => {
   text-align: right;
 }
 
+/* 轨道与滑块由通用控件层（.m-range）绘制，这里只把进度变量接过去。 */
 .control-music-progress-input {
-  width: auto;
-  height: 14px;
-  margin: 0;
-  appearance: none;
-  cursor: pointer;
-  border: 0;
-  border-radius: 999px;
-  outline: 0;
-  background: linear-gradient(
-    to right,
-    #315f90 0 var(--music-progress),
-    rgba(118, 146, 176, 0.25) var(--music-progress) 100%
-  );
-  background-position: center;
-  background-repeat: no-repeat;
-  background-size: 100% 3px;
-}
-
-.control-music-progress-input::-webkit-slider-runnable-track {
-  height: 3px;
-  border-radius: inherit;
-  background: transparent;
-}
-
-.control-music-progress-input::-webkit-slider-thumb {
-  width: 15px;
-  height: 15px;
-  margin-top: -6px;
-  appearance: none;
-  border: 2px solid #7b95b5;
-  border-radius: 50%;
-  background: #f7fbff;
-}
-
-.control-music-progress-input::-moz-range-track {
-  height: 3px;
-  border-radius: inherit;
-  background: transparent;
-}
-
-.control-music-progress-input::-moz-range-progress {
-  height: 3px;
-  border-radius: inherit;
-  background: #315f90;
-}
-
-.control-music-progress-input::-moz-range-thumb {
-  width: 15px;
-  height: 15px;
-  border: 2px solid #7b95b5;
-  border-radius: 50%;
-  background: #f7fbff;
+  --range-progress: var(--music-progress, 0%);
+  --range-track: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 
 .control-music-toolbar {
@@ -1667,8 +1636,8 @@ onBeforeUnmount(() => {
 
 .control-music-action:hover,
 .control-music-action.is-active {
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
 }
 
 .control-music-action:hover {
@@ -1683,12 +1652,12 @@ onBeforeUnmount(() => {
 .control-music-skip {
   width: 36px;
   height: 36px;
-  border: 1px solid rgba(137, 162, 190, 0.2);
-  background: rgba(224, 233, 244, 0.62);
+  border: 1px solid rgba(118, 126, 151, 0.16);
+  background: rgba(255, 255, 255, 0.62);
 }
 
 .control-music-skip:hover {
-  background: rgba(238, 244, 251, 0.9);
+  background: rgba(255, 255, 255, 0.9);
 }
 
 .control-music-primary {
@@ -1697,8 +1666,8 @@ onBeforeUnmount(() => {
   height: 42px;
   z-index: 1;
   box-shadow:
-    0 4px 12px rgba(23, 76, 130, 0.35),
-    0 0 0 0 rgba(23, 76, 130, 0.4);
+    0 4px 12px color-mix(in srgb, var(--theme) 34%, transparent),
+    0 0 0 0 var(--theme-ring);
   will-change: transform, box-shadow;
   transition:
     transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
@@ -1711,7 +1680,7 @@ onBeforeUnmount(() => {
   inset: -2px;
   content: "";
   border-radius: 50%;
-  background: linear-gradient(135deg, #174c82, #205f9c);
+  background: linear-gradient(135deg, var(--theme-hover), var(--theme));
   opacity: 0;
   filter: blur(6.8px);
   pointer-events: none;
@@ -1721,8 +1690,8 @@ onBeforeUnmount(() => {
 .control-music-primary:hover {
   transform: translateY(-3px) scale(1.08);
   box-shadow:
-    0 6px 16px rgba(23, 76, 130, 0.45),
-    0 0 0 8px rgba(23, 76, 130, 0.1);
+    0 6px 16px color-mix(in srgb, var(--theme) 42%, transparent),
+    0 0 0 8px var(--theme-ring);
 }
 
 .control-music-primary:hover::before {
@@ -1732,8 +1701,8 @@ onBeforeUnmount(() => {
 .control-music-primary:active {
   transform: translateY(-1px) scale(1.02);
   box-shadow:
-    0 3px 8px rgba(23, 76, 130, 0.35),
-    0 0 0 0 rgba(23, 76, 130, 0);
+    0 3px 8px color-mix(in srgb, var(--theme) 32%, transparent),
+    0 0 0 0 transparent;
 }
 
 .control-music :deep(.music-picker) {
@@ -1760,8 +1729,8 @@ onBeforeUnmount(() => {
 
 .control-music :deep(.music-picker-trigger:hover),
 .control-music :deep(.music-picker-trigger[aria-expanded="true"]) {
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
   transform: translateY(-1px);
 }
 

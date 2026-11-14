@@ -48,11 +48,11 @@ const dateLabel = new Intl.DateTimeFormat("zh-CN", {
   bottom: -40px;
   width: 150px;
   height: 150px;
-  border: 1px solid rgba(241, 110, 168, 0.22);
+  border: 1px solid color-mix(in srgb, var(--theme) 22%, transparent);
   border-radius: 50%;
   box-shadow:
-    0 0 0 18px rgba(241, 110, 168, 0.07),
-    0 0 0 36px rgba(117, 100, 222, 0.05);
+    0 0 0 18px color-mix(in srgb, var(--theme) 7%, transparent),
+    0 0 0 36px color-mix(in srgb, var(--theme) 5%, transparent);
   content: "";
 }
 

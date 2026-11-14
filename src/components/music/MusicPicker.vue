@@ -401,7 +401,7 @@ onBeforeUnmount(() =>
 }
 
 .music-picker-trigger:hover .music-picker-trigger-copy strong {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
 }
 
 .music-picker-trigger > svg {
@@ -496,8 +496,8 @@ onBeforeUnmount(() =>
 }
 
 .music-picker-back:hover {
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
 }
 
 .music-picker-title {
@@ -538,8 +538,8 @@ onBeforeUnmount(() =>
 }
 
 .music-picker-search:focus-within {
-  border-color: rgba(117, 100, 222, 0.42);
-  color: var(--purple-deep);
+  border-color: color-mix(in srgb, var(--theme) 42%, transparent);
+  color: var(--theme-strong);
   background: rgba(255, 255, 255, 0.58);
 }
 
@@ -588,7 +588,7 @@ onBeforeUnmount(() =>
 
 .music-picker-close:hover,
 .music-picker-play:hover {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: #fff;
 }
 
@@ -640,8 +640,8 @@ onBeforeUnmount(() =>
 
 .music-track-row:hover,
 .music-track-row.is-current {
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.09);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 9%, transparent);
 }
 
 .music-track-index {
@@ -727,8 +727,8 @@ onBeforeUnmount(() =>
 
 .is-embedded-panel .music-track-row:hover,
 .is-embedded-panel .music-track-row.is-current {
-  border-color: rgba(117, 100, 222, 0.2);
-  background: rgba(117, 100, 222, 0.1);
+  border-color: color-mix(in srgb, var(--theme) 20%, transparent);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
 }
 
 .is-embedded-panel .music-track-index {

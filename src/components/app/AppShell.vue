@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import { backgroundBlurModeByPage } from "../../data/background";
 import { getAppPageFromPath } from "../../data/routes";
 import { cloneLocalConfig, normalizeLocalConfig } from "../../data/localConfig";
+import { applyThemeColor } from "../../lib/theme";
 import { applyLocalConfigToSiteData } from "../../lib/dataSources/index";
 import type {
   AppPage,
@@ -382,6 +383,9 @@ watch(
 
 watch(currentPage, syncSettingsViewportLock);
 
+/** 主题色变化时同步文档变量，静态首屏之外的客户端换色走这里。 */
+watch(() => runtimeConfig.value.site.theme, applyThemeColor);
+
 watch(currentPage, (page, previousPage) => {
   if (page === "brew" && previousPage !== "brew") {
     activeBrewSection.value = "articles";
@@ -392,6 +396,7 @@ onMounted(() => {
   currentPage.value = getAppPageFromPath(window.location.pathname, props.page);
   syncDocumentHead();
   syncSettingsViewportLock();
+  applyThemeColor(runtimeConfig.value.site.theme);
 
   const prefersReducedMotion = window.matchMedia(
     "(prefers-reduced-motion: reduce)",
@@ -591,7 +596,7 @@ onBeforeUnmount(() => {
 
 .page-guide-start:hover,
 .page-guide-close:hover {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
 }
 
 @media (max-width: 820px) {

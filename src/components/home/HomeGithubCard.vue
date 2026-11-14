@@ -72,7 +72,7 @@ const sortLabel: Record<GitHubRepositorySort, string> = {
 }
 
 .widget-eyebrow {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   font-size: 0.5rem;
   font-weight: 800;
   letter-spacing: 0.1em;

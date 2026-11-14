@@ -221,6 +221,8 @@ export interface SiteSettings {
   title: string;
   description: string;
   favicon: string;
+  /** 主题色，统一存为 6 位十六进制，由 `--theme` 变量驱动全站强调色。 */
+  theme: string;
 }
 
 /** GitHub 仓库的统一展示字段。 */

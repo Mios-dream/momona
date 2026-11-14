@@ -380,7 +380,7 @@ onBeforeUnmount(() => {
       <p>在这里，你可以看到我的朋友们的链接。</p>
       <button
         v-if="props.editable"
-        class="friends-add-button"
+        class="m-btn m-btn--primary friends-add-button"
         type="button"
         @click="openCreate"
       >
@@ -689,7 +689,7 @@ onBeforeUnmount(() => {
             <footer class="friend-form-actions">
               <button
                 v-if="currentFriend"
-                class="friend-delete-button"
+                class="m-btn m-btn--danger friend-delete-button"
                 type="button"
                 @click="requestDelete"
               >
@@ -699,13 +699,13 @@ onBeforeUnmount(() => {
               <span v-else></span>
               <div>
                 <button
-                  class="friend-cancel-button"
+                  class="m-btn m-btn--secondary friend-cancel-button"
                   type="button"
                   @click="closeEditor"
                 >
                   取消
                 </button>
-                <button class="friend-save-button" type="submit">
+                <button class="m-btn m-btn--primary friend-save-button" type="submit">
                   <IconGlyph name="save" :size="15" />
                   保存友链
                 </button>
@@ -784,7 +784,7 @@ onBeforeUnmount(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   font-size: 0.57rem;
   font-weight: 780;
   letter-spacing: 0.11em;
@@ -809,31 +809,14 @@ onBeforeUnmount(() => {
   font-size: 0.67rem;
 }
 
+/* 主按钮的底色、悬停、按下由通用控件层（.m-btn--primary）接管，这里只留尺寸。 */
 .friends-add-button {
-  display: inline-flex;
   width: max-content;
   min-height: 34px;
   margin-top: 15px;
   padding: 0 12px;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.86);
   border-radius: 10px;
-  color: #fff;
-  background: var(--purple-deep);
-  box-shadow: 0 8px 18px rgba(85, 65, 181, 0.2);
   font-size: 0.64rem;
-  font-weight: 720;
-  transition:
-    transform 0.2s ease,
-    box-shadow 0.2s ease,
-    background 0.2s ease;
-}
-
-.friends-add-button:hover {
-  background: #624ec6;
-  box-shadow: 0 12px 22px rgba(85, 65, 181, 0.26);
-  transform: translateY(-2px);
 }
 
 .friends-viewport {
@@ -1017,8 +1000,8 @@ onBeforeUnmount(() => {
 
 .friend-card-edit:hover,
 .friend-icon-button:hover {
-  color: var(--purple-deep);
-  border-color: rgba(117, 100, 222, 0.14);
+  color: var(--theme-strong);
+  border-color: color-mix(in srgb, var(--theme) 14%, transparent);
   background: rgba(244, 241, 255, 0.88);
   transform: translateY(-1px);
 }
@@ -1060,7 +1043,7 @@ onBeforeUnmount(() => {
   place-items: center;
   border: 2px solid rgba(255, 255, 255, 0.84);
   border-radius: 10px;
-  color: var(--friend-tone, var(--purple-deep));
+  color: var(--friend-tone, var(--theme-strong));
   background: rgba(255, 255, 255, 0.65);
   box-shadow: 0 4px 8px rgba(68, 52, 118, 0.08);
   font-size: 0.58rem;
@@ -1117,7 +1100,7 @@ onBeforeUnmount(() => {
   justify-content: center;
   gap: 3px;
   border-radius: 5px;
-  color: var(--friend-tone, var(--purple-deep));
+  color: var(--friend-tone, var(--theme-strong));
   background: var(--friend-tone-surface, rgba(224, 219, 255, 0.66));
   font-weight: 720;
   white-space: nowrap;
@@ -1138,7 +1121,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   padding: 4px 8px;
   border-radius: 5px;
-  color: var(--friend-tone, var(--purple-deep));
+  color: var(--friend-tone, var(--theme-strong));
   background: var(--friend-tone-surface, rgba(224, 219, 255, 0.58));
   font-size: 0.56rem;
   font-weight: 700;
@@ -1246,7 +1229,7 @@ onBeforeUnmount(() => {
 
 .friend-card-footer > svg {
   flex: 0 0 auto;
-  color: var(--friend-tone, var(--purple-deep));
+  color: var(--friend-tone, var(--theme-strong));
   transition: transform 0.2s ease;
 }
 
@@ -1287,7 +1270,7 @@ onBeforeUnmount(() => {
 }
 
 .friends-toolbar button:hover:not(:disabled) {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(241, 239, 255, 0.9);
 }
 
@@ -1382,7 +1365,7 @@ onBeforeUnmount(() => {
   padding: 10px 12px;
   align-items: center;
   gap: 12px;
-  border: 1px solid rgba(117, 100, 222, 0.1);
+  border: 1px solid color-mix(in srgb, var(--theme) 10%, transparent);
   border-radius: 11px;
   background: rgba(245, 244, 255, 0.72);
 }
@@ -1499,9 +1482,9 @@ onBeforeUnmount(() => {
 
 .friend-form-grid input:focus,
 .friend-form-grid textarea:focus {
-  border-color: rgba(117, 100, 222, 0.62);
+  border-color: color-mix(in srgb, var(--theme) 62%, transparent);
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(117, 100, 222, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme) 10%, transparent);
 }
 
 .friend-tone-fieldset {
@@ -1556,7 +1539,7 @@ onBeforeUnmount(() => {
 
 .friend-tone-button:hover,
 .friend-tone-button.is-active {
-  box-shadow: 0 0 0 3px rgba(117, 100, 222, 0.18);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme) 18%, transparent);
   transform: scale(1.13);
 }
 
@@ -1597,16 +1580,10 @@ onBeforeUnmount(() => {
 .friend-cancel-button,
 .friend-delete-button,
 .friend-save-button {
-  display: inline-flex;
   min-height: 33px;
   padding: 0 11px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid transparent;
   border-radius: 8px;
   font-size: 0.62rem;
-  font-weight: 720;
 }
 
 .friend-delete-actions button {
@@ -1616,14 +1593,12 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.7);
 }
 
-.friend-delete-actions .is-danger,
-.friend-delete-button {
+.friend-delete-actions .is-danger {
   color: #bb4e6d;
   background: rgba(255, 255, 255, 0.88);
 }
 
-.friend-delete-actions .is-danger:hover,
-.friend-delete-button:hover {
+.friend-delete-actions .is-danger:hover {
   background: #fff;
   box-shadow: 0 6px 14px rgba(187, 78, 109, 0.12);
 }
@@ -1637,30 +1612,6 @@ onBeforeUnmount(() => {
   gap: 7px;
 }
 
-.friend-delete-button {
-  border-color: rgba(214, 111, 136, 0.19);
-}
-
-.friend-cancel-button {
-  color: var(--muted-strong);
-  background: rgba(240, 242, 249, 0.8);
-}
-
-.friend-cancel-button:hover {
-  color: var(--ink);
-  background: rgba(233, 236, 246, 0.96);
-}
-
-.friend-save-button {
-  color: #fff;
-  background: var(--purple-deep);
-  box-shadow: 0 7px 15px rgba(85, 65, 181, 0.18);
-}
-
-.friend-save-button:hover {
-  background: #624ec6;
-  box-shadow: 0 10px 19px rgba(85, 65, 181, 0.24);
-}
 
 .modal-enter-active,
 .modal-leave-active,

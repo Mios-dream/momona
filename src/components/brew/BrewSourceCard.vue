@@ -236,7 +236,7 @@ function handleOpen(): void {
   justify-content: center;
   gap: 3px;
   border-radius: 5px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(224, 219, 255, 0.66);
   font-weight: 720;
   white-space: nowrap;
@@ -291,7 +291,7 @@ function handleOpen(): void {
   padding: 4px 8px;
   overflow: hidden;
   border-radius: 5px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(224, 219, 255, 0.58);
   font-size: 0.56rem;
   font-weight: 700;
@@ -397,7 +397,7 @@ function handleOpen(): void {
 .source-article-link:focus-visible,
 .source-title-link:hover,
 .source-title-link:focus-visible {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;

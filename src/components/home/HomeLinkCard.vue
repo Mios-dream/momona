@@ -101,7 +101,7 @@ const isBrandPlatform = computed(() => brandPlatforms.includes(props.settings.pl
 }
 
 .home-link-card.tone-violet {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
 }
 
 .home-link-card.platform-qq { color: #147fc0; }

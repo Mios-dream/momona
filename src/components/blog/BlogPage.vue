@@ -191,7 +191,7 @@ onBeforeUnmount(() => {
           <IconGlyph name="refresh" :size="23" />
           <strong>文章列表暂时无法读取</strong>
           <span>请稍后重试。</span>
-          <button type="button" class="blog-retry" @click="emit('retry')">
+          <button type="button" class="m-btn m-btn--primary blog-retry" @click="emit('retry')">
             <IconGlyph name="refresh" :size="14" />
             重新加载
           </button>
@@ -207,7 +207,7 @@ onBeforeUnmount(() => {
           <IconGlyph name="search" :size="23" />
           <strong>没有找到匹配文章</strong>
           <span>换个关键词，或者清除当前筛选条件。</span>
-          <button type="button" class="blog-retry" @click="resetFilters">
+          <button type="button" class="m-btn m-btn--primary blog-retry" @click="resetFilters">
             <IconGlyph name="refresh" :size="14" />
             清除筛选
           </button>
@@ -454,7 +454,7 @@ onBeforeUnmount(() => {
   justify-content: space-between;
   gap: 14px;
   border: 0;
-  border-left: 3px solid var(--purple);
+  border-left: 3px solid var(--theme);
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -494,8 +494,8 @@ onBeforeUnmount(() => {
   position: relative;
   display: flex;
   --blog-card-enter-delay: 0ms;
-  --blog-card-accent: #7564de;
-  --blog-card-soft: rgba(233, 229, 255, 0.72);
+  --blog-card-accent: var(--theme-strong);
+  --blog-card-soft: color-mix(in srgb, var(--theme) 12%, rgba(255, 255, 255, 0.72));
   --blog-card-surface: rgba(251, 250, 255, 0.86);
   --blog-card-hover: rgba(255, 255, 255, 0.94);
   min-width: 0;
@@ -530,8 +530,8 @@ onBeforeUnmount(() => {
 }
 
 .blog-card--tone-violet {
-  --blog-card-accent: #7564de;
-  --blog-card-soft: rgba(233, 229, 255, 0.76);
+  --blog-card-accent: var(--theme-strong);
+  --blog-card-soft: color-mix(in srgb, var(--theme) 12%, rgba(255, 255, 255, 0.76));
   --blog-card-surface: rgba(251, 250, 255, 0.68);
 }
 
@@ -889,17 +889,10 @@ onBeforeUnmount(() => {
 }
 
 .blog-retry {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
   margin-top: 5px;
   padding: 8px 12px;
-  border: 0;
   border-radius: 8px;
-  color: #fff;
-  background: var(--purple-deep);
   font-size: 0.68rem;
-  font-weight: 700;
   pointer-events: auto;
 }
 
@@ -959,8 +952,8 @@ onBeforeUnmount(() => {
 .blog-toolbar-action:hover,
 .blog-toolbar-action:focus-visible,
 .blog-toolbar-action.is-active {
-  color: var(--purple-deep);
-  background: rgba(234, 231, 255, 0.64);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 11%, rgba(255, 255, 255, 0.64));
 }
 
 .blog-search-panel,
@@ -1030,8 +1023,8 @@ onBeforeUnmount(() => {
 
 .blog-search-panel button:hover,
 .blog-search-panel button:focus-visible {
-  color: var(--purple-deep);
-  background: rgba(229, 225, 255, 0.72);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 14%, rgba(255, 255, 255, 0.72));
 }
 
 .blog-category-panel,
@@ -1088,8 +1081,8 @@ onBeforeUnmount(() => {
 .blog-category-options button.is-active,
 .blog-sort-panel button:hover,
 .blog-sort-panel button.is-active {
-  color: var(--purple-deep);
-  background: rgba(229, 225, 255, 0.72);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 14%, rgba(255, 255, 255, 0.72));
 }
 
 @media (max-width: 1199px) and (min-width: 821px) {

@@ -856,7 +856,8 @@ onBeforeUnmount(() => {
   left: 4px;
   z-index: 0;
   margin: 0;
-  color: rgba(70, 72, 139, 0.8);
+  /* 手写标题直接用主题色本体，不加暗、不叠透明度。 */
+  color: var(--theme);
   font-family: "Momona Script", cursive;
   font-size: 6rem;
   font-weight: 700;
@@ -982,7 +983,7 @@ onBeforeUnmount(() => {
 
 .home-slot.is-selected > *:first-child,
 .home-slot.is-dragging > *:first-child {
-  outline: 2px solid rgba(117, 100, 222, 0.72);
+  outline: 2px solid color-mix(in srgb, var(--theme) 72%, transparent);
   outline-offset: 2px;
 }
 
@@ -1066,9 +1067,9 @@ onBeforeUnmount(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 6px;
-  border: 1px dashed rgba(85, 65, 181, 0.52);
+  border: 1px dashed color-mix(in srgb, var(--theme-strong) 52%, transparent);
   border-radius: 10px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(255, 255, 255, 0.1);
   cursor: pointer;
   transition:
@@ -1077,7 +1078,7 @@ onBeforeUnmount(() => {
 }
 
 .home-widget-editor-surface:hover {
-  border-color: rgba(85, 65, 181, 0.85);
+  border-color: color-mix(in srgb, var(--theme-strong) 85%, transparent);
   background: rgba(255, 255, 255, 0.18);
 }
 
@@ -1100,7 +1101,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   padding: 3px 6px;
   border-radius: 6px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(255, 255, 255, 0.83);
   font-size: 0.52rem;
   font-weight: 780;
@@ -1122,7 +1123,7 @@ onBeforeUnmount(() => {
   place-items: center;
   border: 1px solid rgba(255, 255, 255, 0.86);
   border-radius: 7px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(255, 255, 255, 0.86);
   box-shadow: 0 5px 12px rgba(54, 45, 106, 0.1);
 }
@@ -1190,7 +1191,7 @@ onBeforeUnmount(() => {
   gap: 5px;
   border: 0;
   border-radius: 7px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: transparent;
   font-size: 0.57rem;
   white-space: nowrap;
@@ -1200,7 +1201,7 @@ onBeforeUnmount(() => {
 }
 
 .home-edit-leading:hover:not(:disabled) {
-  background: rgba(117, 100, 222, 0.1);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
 }
 
 .home-edit-leading:disabled {
@@ -1308,7 +1309,7 @@ onBeforeUnmount(() => {
 }
 
 .home-widget-catalog-close:hover {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: #fff;
 }
 
@@ -1358,10 +1359,10 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   align-items: center;
   gap: 4px;
-  border: 1px solid rgba(117, 100, 222, 0.18);
+  border: 1px solid color-mix(in srgb, var(--theme) 18%, transparent);
   border-radius: 7px;
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.08);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 8%, transparent);
   font-size: 0.52rem;
 }
 
@@ -1387,13 +1388,13 @@ onBeforeUnmount(() => {
 
 .home-edit-action:hover,
 .home-edit-action.is-quiet:hover {
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
 }
 
 .home-edit-action.is-primary {
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
 }
 
 .home-edit-notice {

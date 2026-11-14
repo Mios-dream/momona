@@ -758,7 +758,7 @@ function clearSearch(): void {
                   友链站点
                 </span>
                 <a
-                  class="detail-action"
+                  class="m-btn m-btn--primary detail-action"
                   :href="selectedSource.href"
                   target="_blank"
                   rel="noreferrer"
@@ -901,7 +901,7 @@ function clearSearch(): void {
   border: 0;
   border-radius: 8px;
   color: #fff;
-  background: var(--purple);
+  background: var(--theme);
   font-size: 0.62rem;
 }
 
@@ -1005,8 +1005,8 @@ function clearSearch(): void {
 }
 
 .brew-toolbar-actions button:hover {
-  color: var(--purple-deep);
-  background: rgba(234, 231, 255, 0.64);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 11%, rgba(255, 255, 255, 0.64));
 }
 
 .brew-search-panel,
@@ -1085,8 +1085,8 @@ function clearSearch(): void {
 
 .brew-sort-menu > button:hover,
 .brew-sort-menu > button.is-active {
-  color: var(--purple-deep);
-  background: rgba(229, 225, 255, 0.72);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 14%, rgba(255, 255, 255, 0.72));
 }
 
 .brew-type-filters {
@@ -1107,8 +1107,8 @@ function clearSearch(): void {
 }
 
 .brew-type-filters button.is-active {
-  color: var(--purple-deep);
-  background: rgba(229, 225, 255, 0.72);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 14%, rgba(255, 255, 255, 0.72));
 }
 
 .brew-shortcut-panel {
@@ -1136,7 +1136,7 @@ kbd {
   place-items: center;
   border: 1px solid rgba(118, 122, 150, 0.2);
   border-radius: 4px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(255, 255, 255, 0.6);
   font-size: 0.55rem;
 }
@@ -1189,8 +1189,8 @@ kbd {
   overflow: hidden;
   border: 2px solid rgba(255, 255, 255, 0.9);
   border-radius: 18px;
-  color: var(--purple-deep);
-  background: rgba(229, 225, 255, 0.72);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 14%, rgba(255, 255, 255, 0.72));
   box-shadow: 0 7px 18px rgba(72, 56, 135, 0.12);
   object-fit: cover;
 }
@@ -1218,7 +1218,7 @@ kbd {
   align-items: center;
   gap: 4px;
   border-radius: 7px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(224, 219, 255, 0.72);
   font-weight: 760;
 }
@@ -1289,7 +1289,7 @@ kbd {
 
 .brew-detail-close:hover,
 .brew-detail-close:focus-visible {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(224, 219, 255, 0.9);
   transform: rotate(6deg);
 }
@@ -1310,7 +1310,7 @@ kbd {
 .detail-tags span {
   padding: 5px 9px;
   border-radius: 7px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(224, 219, 255, 0.58);
   font-size: 0.59rem;
   font-weight: 720;
@@ -1367,7 +1367,7 @@ kbd {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   font-size: 0.53rem;
   font-weight: 800;
   letter-spacing: 0.08em;
@@ -1377,8 +1377,8 @@ kbd {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--purple);
-  box-shadow: 0 0 0 4px rgba(117, 100, 222, 0.12);
+  background: var(--theme);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme) 12%, transparent);
   content: "";
 }
 
@@ -1407,7 +1407,7 @@ kbd {
   margin-top: 14px;
   align-items: center;
   gap: 5px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   font-size: 0.61rem;
   font-weight: 760;
 }
@@ -1438,7 +1438,7 @@ a.detail-article-row {
 a.detail-article-row:hover,
 a.detail-article-row:focus-visible {
   padding-inline: 7px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
 }
 
 .detail-article-index {
@@ -1501,7 +1501,7 @@ a.detail-article-row:focus-visible {
   margin-bottom: 3px;
   place-items: center;
   border-radius: 13px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(224, 219, 255, 0.75);
 }
 
@@ -1549,27 +1549,11 @@ a.detail-article-row:focus-visible {
   box-shadow: 0 0 0 4px rgba(53, 165, 123, 0.12);
 }
 
+/* 底色与悬停由通用控件层（.m-btn--primary）接管，这里只留尺寸。 */
 .detail-action {
-  display: inline-flex;
   min-height: 33px;
   padding: 0 12px;
-  align-items: center;
-  gap: 6px;
-  border-radius: 9px;
-  color: #fff;
-  background: var(--purple);
-  box-shadow: 0 5px 12px rgba(117, 100, 222, 0.2);
   font-size: 0.62rem;
-  font-weight: 720;
-  transition:
-    background 0.18s ease,
-    transform 0.18s ease;
-}
-
-.detail-action:hover,
-.detail-action:focus-visible {
-  background: var(--purple-deep);
-  transform: translateY(-1px);
 }
 
 .brew-detail-enter-active,

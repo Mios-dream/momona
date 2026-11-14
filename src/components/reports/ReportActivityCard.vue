@@ -67,7 +67,7 @@ defineProps<Props>();
   height: 22px;
   place-items: center;
   border-radius: 7px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(255, 255, 255, 0.82);
   font-size: 0.72rem;
 }
@@ -82,7 +82,7 @@ defineProps<Props>();
 }
 
 .activity-card-copy span {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   font-size: 0.53rem;
   font-weight: 760;
 }

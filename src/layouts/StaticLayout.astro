@@ -1,5 +1,7 @@
 ---
 import "../styles/global.css";
+import "../styles/controls.css";
+import { normalizeThemeColor } from "../data/theme";
 
 interface Props {
   /** 浏览器标签页标题。 */
@@ -12,6 +14,8 @@ interface Props {
   siteDescription?: string;
   /** 配置中的 favicon 地址。 */
   favicon?: string;
+  /** 配置中的主题色，作为全站强调色的行内变量。 */
+  theme?: string;
   /** 可选的 RSS 订阅地址，用于浏览器和订阅工具自动发现。 */
   rssUrl?: string;
 }
@@ -22,6 +26,7 @@ const {
   siteTitle,
   siteDescription,
   favicon,
+  theme,
   rssUrl,
 } = Astro.props;
 const normalizedSiteTitle = siteTitle?.trim();
@@ -31,11 +36,13 @@ const browserTitle =
     : title;
 const browserDescription = siteDescription?.trim() || description;
 const faviconUrl = favicon?.trim() || "/favicon.svg";
+// 行内变量优先于 global.css 的默认值，避免打开页面时先闪一下默认主题色。
+const themeColor = normalizeThemeColor(theme);
 const normalizedRssUrl = rssUrl?.trim();
 ---
 
 <!doctype html>
-<html lang="zh-CN">
+<html lang="zh-CN" style={`--theme: ${themeColor}`}>
   <head>
     <meta charset="UTF-8" />
     <meta

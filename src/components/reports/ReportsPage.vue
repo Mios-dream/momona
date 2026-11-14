@@ -435,8 +435,8 @@ onBeforeUnmount(() => {
   height: 160px;
   opacity: 0.16;
   background-image:
-    linear-gradient(rgba(117, 100, 222, 0.28) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(117, 100, 222, 0.28) 1px, transparent 1px);
+    linear-gradient(color-mix(in srgb, var(--theme) 28%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--theme) 28%, transparent) 1px, transparent 1px);
   background-size: 22px 22px;
   mask-image: linear-gradient(to left, #000, transparent);
   transform: perspective(400px) rotateX(58deg) rotateZ(-5deg);
@@ -567,7 +567,7 @@ onBeforeUnmount(() => {
 
 .reports-play:hover,
 .reports-close:hover {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(214, 224, 247, 0.98);
   transform: translateY(-2px);
 }
@@ -626,8 +626,8 @@ onBeforeUnmount(() => {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 13px;
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.12);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 12%, transparent);
 }
 
 .reports-empty > div:last-child {
@@ -638,7 +638,7 @@ onBeforeUnmount(() => {
 }
 
 .reports-empty-kicker {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   font-size: 0.5rem;
   font-weight: 800;
   letter-spacing: 0.14em;

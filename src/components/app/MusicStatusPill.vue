@@ -172,7 +172,7 @@ onBeforeUnmount(() =>
   background: rgba(255, 255, 255, 0.78);
 }
 .music-status-play:hover {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: #fff;
 }
 .music-status-pill :deep(.music-picker-trigger) {

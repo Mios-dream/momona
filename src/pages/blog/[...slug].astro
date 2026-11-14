@@ -48,6 +48,7 @@ const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
   siteTitle={localConfig.site.title}
   siteDescription={localConfig.site.description}
   favicon={localConfig.site.favicon}
+  theme={localConfig.site.theme}
   rssUrl={rssUrl}
 >
   <main class="blog-post-shell" data-reading-page data-reader-theme="paper">
@@ -352,7 +353,7 @@ const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
   .blog-post-back {
     display: inline-flex;
     margin-bottom: 18px;
-    color: var(--purple-deep);
+    color: var(--reader-accent);
     font-size: 0.76rem;
     font-weight: 700;
   }
@@ -367,7 +368,7 @@ const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
 
   .blog-post-header {
     padding-bottom: 31px;
-    border-bottom: 1px solid rgba(117, 100, 222, 0.14);
+    border-bottom: 1px solid var(--reader-divider);
   }
 
   .blog-post-meta {
@@ -389,8 +390,8 @@ const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
   .blog-post-tags span {
     padding: 4px 8px;
     border-radius: 999px;
-    color: var(--purple-deep);
-    background: rgba(242, 239, 255, 0.74);
+    color: var(--reader-accent);
+    background: color-mix(in srgb, var(--reader-accent) 9%, #ffffff);
   }
 
   .blog-post-header h1 {
@@ -469,9 +470,13 @@ const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
   }
 
   .blog-markdown a {
-    color: var(--purple-deep);
+    color: var(--reader-accent);
     text-decoration: underline;
-    text-decoration-color: rgba(117, 100, 222, 0.35);
+    text-decoration-color: color-mix(
+      in srgb,
+      var(--reader-accent) 35%,
+      transparent
+    );
     text-underline-offset: 3px;
   }
 
@@ -488,8 +493,8 @@ const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
   .blog-markdown code {
     padding: 0.15em 0.4em;
     border-radius: 5px;
-    color: var(--purple-deep);
-    background: rgba(242, 239, 255, 0.86);
+    color: var(--reader-accent);
+    background: color-mix(in srgb, var(--reader-accent) 10%, #ffffff);
     font-family: Consolas, "SFMono-Regular", monospace;
     font-size: 0.86em;
   }
@@ -497,7 +502,7 @@ const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
   .blog-markdown pre {
     padding: 17px 18px;
     overflow-x: auto;
-    border: 1px solid rgba(117, 100, 222, 0.12);
+    border: 1px solid var(--reader-divider);
     border-radius: 9px;
     color: #eff3ff;
     background: #20263b;
@@ -522,17 +527,17 @@ const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
   .blog-markdown hr {
     margin: 2.2em 0;
     border: 0;
-    border-top: 1px solid rgba(117, 100, 222, 0.15);
+    border-top: 1px solid var(--reader-divider);
   }
 
   .blog-post-footer {
     margin-top: 38px;
     padding-top: 22px;
-    border-top: 1px solid rgba(117, 100, 222, 0.14);
+    border-top: 1px solid var(--reader-divider);
   }
 
   .blog-post-footer a {
-    color: var(--purple-deep);
+    color: var(--reader-accent);
     font-size: 0.76rem;
     font-weight: 700;
   }
@@ -547,9 +552,10 @@ const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
     --reader-ink-soft: #303b4f;
     --reader-muted: #758096;
     --reader-muted-strong: #5d6980;
-    --reader-accent: #5541b5;
-    --reader-accent-soft: rgba(117, 100, 222, 0.13);
-    --reader-divider: rgba(117, 100, 222, 0.16);
+    /* 默认阅读主题沿用站点主题色，其他阅读主题保留各自的固定配色。 */
+    --reader-accent: var(--theme-strong);
+    --reader-accent-soft: color-mix(in srgb, var(--theme) 13%, transparent);
+    --reader-divider: color-mix(in srgb, var(--theme) 16%, transparent);
     --reader-code: #20263b;
     --article-font-scale: 1;
     --article-line-height: 1.95;
@@ -609,7 +615,7 @@ const rssUrl = `${import.meta.env.BASE_URL}rss.xml`;
     height: 3px;
     overflow: hidden;
     pointer-events: none;
-    background: rgba(117, 100, 222, 0.12);
+    background: var(--reader-accent-soft);
   }
 
   .blog-reading-progress span {

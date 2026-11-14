@@ -394,7 +394,7 @@ onBeforeUnmount(() => {
   background:
     radial-gradient(
       ellipse 70% 55% at 30% 34%,
-      rgba(117, 100, 222, 0.1),
+      color-mix(in srgb, var(--theme) 10%, transparent),
       transparent 60%
     ),
     radial-gradient(
@@ -453,7 +453,7 @@ onBeforeUnmount(() => {
 }
 
 .report-stage-brand span {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   font-family: "Momona Script", cursive;
   font-size: 3.35rem;
   line-height: 0.8;
@@ -527,8 +527,8 @@ onBeforeUnmount(() => {
 
 .report-stage-icon-button:hover,
 .report-stage-pause:hover {
-  border-color: rgba(117, 100, 222, 0.4);
-  color: var(--purple-deep);
+  border-color: color-mix(in srgb, var(--theme) 40%, transparent);
+  color: var(--theme-strong);
   background: rgba(255, 255, 255, 0.84);
   transform: translateY(-2px);
 }
@@ -652,7 +652,7 @@ onBeforeUnmount(() => {
 
 .report-stage-progress span.is-current,
 .report-stage-progress span.is-past {
-  background: var(--purple);
+  background: var(--theme);
 }
 
 .report-stage-footer-copy {

@@ -48,11 +48,11 @@ defineProps<Props>();
 }
 
 .activity-heading > svg {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
 }
 
 .section-eyebrow {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   font-size: 0.54rem;
   font-weight: 800;
   letter-spacing: 0.1em;
@@ -92,7 +92,7 @@ defineProps<Props>();
   height: 22px;
   place-items: center;
   border-radius: 7px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(235, 231, 255, 0.72);
   font-size: 0.72rem;
 }

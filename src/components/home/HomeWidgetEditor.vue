@@ -546,7 +546,7 @@ function requestGame(): void {
     <footer class="editor-panel-foot">
       <div class="editor-panel-actions">
         <button
-          class="editor-remove-widget"
+          class="m-btn m-btn--danger editor-remove-widget"
           type="button"
           aria-label="从首页移除组件"
           title="从首页移除组件"
@@ -555,7 +555,7 @@ function requestGame(): void {
           <IconGlyph name="trash" :size="15" />移除组件
         </button>
         <button
-          class="editor-close-bottom glass-panel"
+          class="m-btn m-btn--primary editor-close-bottom glass-panel"
           type="button"
           aria-label="关闭组件配置"
           title="关闭组件配置"
@@ -611,7 +611,7 @@ function requestGame(): void {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   font-size: 0.53rem;
   font-weight: 800;
   letter-spacing: 0.11em;
@@ -687,21 +687,21 @@ function requestGame(): void {
   width: 3px;
   height: 14px;
   border-radius: 3px;
-  background: rgba(117, 100, 222, 0.72);
+  background: color-mix(in srgb, var(--theme) 72%, transparent);
   content: "";
 }
 
 .editor-section-title > small {
   padding: 4px 7px;
-  border: 1px solid rgba(117, 100, 222, 0.14);
+  border: 1px solid color-mix(in srgb, var(--theme) 14%, transparent);
   border-radius: 7px;
   color: var(--muted);
-  background: rgba(117, 100, 222, 0.06);
+  background: color-mix(in srgb, var(--theme) 6%, transparent);
   font-size: 0.53rem;
 }
 
 .editor-section-title > svg {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
 }
 
 .editor-field {
@@ -731,15 +731,15 @@ function requestGame(): void {
 
 .editor-field input:hover,
 .editor-field select:hover {
-  border-color: rgba(117, 100, 222, 0.32);
+  border-color: color-mix(in srgb, var(--theme) 32%, transparent);
   background: rgba(255, 255, 255, 0.92);
 }
 
 .editor-field input:focus,
 .editor-field select:focus {
-  border-color: rgba(117, 100, 222, 0.58);
+  border-color: color-mix(in srgb, var(--theme) 58%, transparent);
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(117, 100, 222, 0.1);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme) 10%, transparent);
 }
 
 .editor-size-grid {
@@ -758,7 +758,7 @@ function requestGame(): void {
 }
 
 .editor-check input {
-  accent-color: var(--purple);
+  accent-color: var(--theme);
 }
 
 .editor-inline-button,
@@ -768,10 +768,10 @@ function requestGame(): void {
   padding: 0 10px;
   align-items: center;
   gap: 5px;
-  border: 1px solid rgba(117, 100, 222, 0.18);
+  border: 1px solid color-mix(in srgb, var(--theme) 18%, transparent);
   border-radius: 9px;
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.08);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 8%, transparent);
   font-size: 0.56rem;
   transition:
     background 0.18s ease,
@@ -781,8 +781,8 @@ function requestGame(): void {
 
 .editor-inline-button:hover,
 .editor-fetch-button:hover:not(:disabled) {
-  border-color: rgba(117, 100, 222, 0.3);
-  background: rgba(117, 100, 222, 0.14);
+  border-color: color-mix(in srgb, var(--theme) 30%, transparent);
+  background: color-mix(in srgb, var(--theme) 14%, transparent);
   transform: translateY(-1px);
 }
 
@@ -859,48 +859,17 @@ function requestGame(): void {
     transform 0.18s ease;
 }
 
+/* 危险色由通用控件层（.m-btn--danger）统一给出，这里只留尺寸。 */
 .editor-remove-widget {
-  color: #bb4e6d;
-  background: rgba(255, 255, 255, 0.88);
-  border: 1px solid rgba(214, 111, 136, 0.19);
-  display: inline-flex;
   width: max-content;
   padding: 8px 10px;
-  align-items: center;
-  gap: 6px;
-}
-
-.editor-remove-widget:hover {
-  background: #fff;
-  box-shadow: 0 6px 14px rgba(187, 78, 109, 0.12);
-  transform: translateY(-1px);
-}
-
-.editor-remove-widget:active {
-  transform: translateY(0);
 }
 
 .editor-close-bottom {
-  display: inline-flex;
   width: max-content;
   padding: 8px 10px;
-  align-items: center;
-  gap: 6px;
-  border: 0;
   border-radius: 8px !important;
-  color: #fff;
-  background: var(--purple);
   font-size: 0.63rem;
-  white-space: nowrap;
-}
-
-.editor-close-bottom:hover {
-  color: #fff;
-  background: var(--purple-deep);
-}
-
-.editor-close-bottom:active {
-  transform: translateY(0);
 }
 
 @media (max-width: 820px) {

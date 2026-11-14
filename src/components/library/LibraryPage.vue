@@ -612,7 +612,7 @@ onBeforeUnmount(() => {
 }
 
 .library-zoom-toolbar button:hover:not(:disabled) {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(241, 239, 255, 0.9);
 }
 

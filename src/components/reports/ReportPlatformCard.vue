@@ -45,8 +45,13 @@ const theme = computed(() => {
   if (platform === "hoyolab" || props.card.kind === "game") {
     return { accent: "#e58c54", soft: "rgba(229, 140, 84, .24)", ink: "#bb633d" };
   }
+  // 个人资料卡不属于任何平台，跟着主题色走，避免在粉色主题里留一块紫色。
   if (platform === "profile") {
-    return { accent: "#7564de", soft: "rgba(117, 100, 222, .23)", ink: "#5541b5" };
+    return {
+      accent: "var(--theme)",
+      soft: "color-mix(in srgb, var(--theme) 22%, transparent)",
+      ink: "var(--theme-strong)",
+    };
   }
   if (platform === "bangumi") {
     return { accent: "#d86e98", soft: "rgba(216, 110, 152, .22)", ink: "#ad4c72" };

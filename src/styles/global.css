@@ -30,12 +30,47 @@
   --content-surface: #fbfcff;
   --content-border: rgba(255, 255, 255, 0.84);
   --content-shadow: 0 10px 25px rgba(72, 56, 135, 0.08);
-  --purple: #7564de;
-  --purple-deep: #5541b5;
   --blue: #119dd9;
   --pink: #f16ea8;
   --green: #35a57b;
   --orange: #ee9661;
+  /**
+   * 主题色：全站唯一的强调色来源。
+   *
+   * 只需要换 `--theme`，下面派生出来的色阶会一起变；设置页选中的颜色由
+   * `<html style="--theme: …">` 行内变量覆盖，所以换色不用改任何组件。
+   *
+   * 派生色一律用 oklch 只压亮度、保留彩度，不再和深色系直接混色。
+   * 早前是 `--theme-ink: color-mix(in srgb, var(--theme) 62%, #1f1a2e)`，
+   * 粉色被 #1f1a2e（偏紫的深蓝墨）拉向紫端并且掉饱和度，主按钮就成了
+   * 发灰的品红；这也是"主题色偏紫、不像粉色"的根源。
+   *
+   * - `--theme`：主色本体，主按钮底色、进度条、色块都用它；
+   * - `--theme-hover` / `--theme-active`：悬停、按下的实色；
+   * - `--theme-strong`：文字、图标等需要可读性的强调（白底 4.9:1）；
+   * - `--theme-on`：压在主题色实底上的文字颜色；
+   * - `--theme-soft` / `--theme-wash`：叠加在白色毛玻璃上的浅色底；
+   * - `--theme-line` / `--theme-ring`：描边与焦点光圈。
+   *
+   * 每一条先写 color-mix 兜底，再写 oklch(from …)：不支持相对色的浏览器
+   * 会丢掉第二条，颜色稍淡但仍是同一个色相，不会整块失效。
+   */
+  --theme: #fb7299;
+  --theme-hover: color-mix(in oklch, var(--theme) 90%, #000);
+  --theme-hover: oklch(from var(--theme) calc(l * 0.9) c h);
+  --theme-active: color-mix(in oklch, var(--theme) 82%, #000);
+  --theme-active: oklch(from var(--theme) calc(l * 0.82) c h);
+  --theme-strong: color-mix(in oklch, var(--theme) 78%, #000);
+  --theme-strong: oklch(from var(--theme) calc(l * 0.78) c h);
+  --theme-on: #ffffff;
+  --theme-soft: color-mix(in srgb, var(--theme) 12%, transparent);
+  --theme-wash: color-mix(in srgb, var(--theme) 12%, rgba(255, 255, 255, 0.74));
+  --theme-line: color-mix(in srgb, var(--theme) 30%, transparent);
+  --theme-ring: color-mix(in srgb, var(--theme) 14%, transparent);
+  /* 主按钮投影：同样由主题色派生，换色时阴影一起换。 */
+  --theme-shadow: 0 8px 18px color-mix(in srgb, var(--theme) 24%, transparent);
+  /* 原生控件（复选框、单选、滑块）跟随主题色。 */
+  accent-color: var(--theme);
   --page-padding: 24px;
   --rail-width: 76px;
   font-family: "Segoe UI", sans-serif;
@@ -78,8 +113,8 @@ body::-webkit-scrollbar {
    组件无需重复声明，仅在需要不同粗细或颜色时覆盖 --scrollbar-* 变量。 */
 :root {
   --scrollbar-size: 6px;
-  --scrollbar-thumb: rgba(117, 100, 222, 0.26);
-  --scrollbar-thumb-hover: rgba(117, 100, 222, 0.46);
+  --scrollbar-thumb: color-mix(in srgb, var(--theme) 26%, transparent);
+  --scrollbar-thumb-hover: color-mix(in srgb, var(--theme) 46%, transparent);
   --scrollbar-track: transparent;
 }
 
@@ -135,8 +170,8 @@ img {
 }
 
 ::selection {
-  color: #fff;
-  background: var(--purple);
+  color: var(--theme-on);
+  background: var(--theme-strong);
 }
 
 .sr-only {
@@ -295,8 +330,8 @@ img {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--pink);
-  box-shadow: 0 0 0 4px rgba(241, 110, 168, 0.12);
+  background: var(--theme);
+  box-shadow: 0 0 0 4px color-mix(in srgb, var(--theme) 12%, transparent);
   content: "";
 }
 
@@ -359,7 +394,8 @@ body.is-settings-view {
 }
 
 .compact-button:hover {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
+  border-color: var(--theme-line);
   background: rgba(255, 255, 255, 0.86);
   transform: translateY(-2px);
 }

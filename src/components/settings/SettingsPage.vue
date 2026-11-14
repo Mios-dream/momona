@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type {
   DataSourceId,
   HoyoGame,
@@ -25,6 +25,13 @@ import {
   normalizeMusicPlaylist,
   parseMusicPlaylistReference,
 } from "../../lib/music";
+import { applyThemeColor } from "../../lib/theme";
+import {
+  isThemePresetSelected,
+  normalizeThemeColor,
+  parseThemeColor,
+  themePresets,
+} from "../../data/theme";
 import IconGlyph from "../app/IconGlyph.vue";
 
 interface Props {
@@ -68,6 +75,8 @@ const selectedSourceId = ref<DataSourceId>(sourceCards[0]?.id ?? "bangumi");
 const sourceFilter = ref<SourceFilter>("all");
 const sourceQuery = ref("");
 const musicBusy = ref(false);
+/** 主题色输入框里的原始文本，允许用户中途输入不完整的色值。 */
+const themeDraft = ref(config.value.site.theme);
 const musicError = ref("");
 
 const providerStatuses = computed(
@@ -219,6 +228,48 @@ async function loadInitialState(): Promise<void> {
 
 onMounted(() => {
   void loadInitialState();
+});
+
+/**
+ * 选中一个主题色：写入配置并立即预览。
+ *
+ * @param value - 预设色值或颜色选择器返回的色值。
+ * @returns 无返回值；无法解析的输入会被忽略。
+ */
+function selectTheme(value: string): void {
+  const next = parseThemeColor(value);
+  if (!next) {
+    themeDraft.value = config.value.site.theme;
+    return;
+  }
+  config.value.site.theme = next;
+  themeDraft.value = next;
+  applyThemeColor(next);
+}
+
+/**
+ * 处理主题色文本框输入；只有解析成功时才实时预览。
+ *
+ * @param event - 文本框的输入事件。
+ * @returns 无返回值；输错时不改动当前主题色。
+ */
+function handleThemeInput(event: Event): void {
+  const raw = (event.target as HTMLInputElement).value;
+  themeDraft.value = raw;
+  const parsed = parseThemeColor(raw);
+  if (!parsed) return;
+  config.value.site.theme = parsed;
+  applyThemeColor(parsed);
+}
+
+/** 结束输入时把文本框收敛为规范色值，避免留下半截内容。 */
+function commitThemeDraft(): void {
+  selectTheme(themeDraft.value);
+}
+
+/** 离开设置页时把预览用的临时颜色还原为已保存的颜色。 */
+onBeforeUnmount(() => {
+  applyThemeColor(props.localConfig.site.theme);
 });
 
 function closeSyncError(): void {
@@ -439,7 +490,7 @@ function statusClass(status?: ProviderStatus): string {
         >
         <button
           type="button"
-          class="settings-primary"
+          class="m-btn m-btn--primary settings-primary"
           :disabled="anyBusy"
           @click="saveSettings"
         >
@@ -531,6 +582,86 @@ function statusClass(status?: ProviderStatus): string {
                   placeholder="一个静态的个人数字生活展示入口。"
                 ></textarea>
               </label>
+            </div>
+          </section>
+
+          <section
+            class="settings-section-block settings-section-block-separated"
+          >
+            <div class="settings-section-heading">
+              <div>
+                <h3>主题色</h3>
+                <p>
+                  导航、按钮、文章链接与进度条都跟随这个颜色，选中即可预览，保存后全站生效。
+                </p>
+              </div>
+              <IconGlyph name="palette" :size="17" />
+            </div>
+            <div class="settings-theme">
+              <div class="settings-theme-presets">
+                <span class="settings-theme-label">预设</span>
+                <div class="settings-theme-swatches" role="group" aria-label="主题色预设">
+                  <button
+                    v-for="preset in themePresets"
+                    :key="preset.id"
+                    type="button"
+                    :aria-pressed="
+                      isThemePresetSelected(config.site.theme, preset)
+                    "
+                    :class="[
+                      'settings-theme-swatch',
+                      {
+                        'is-active': isThemePresetSelected(
+                          config.site.theme,
+                          preset,
+                        ),
+                      },
+                    ]"
+                    @click="selectTheme(preset.value)"
+                  >
+                    <span
+                      class="settings-theme-dot"
+                      :style="{ background: preset.value }"
+                      aria-hidden="true"
+                    ></span>
+                    {{ preset.label }}
+                  </button>
+                </div>
+              </div>
+              <div class="settings-theme-custom">
+                <span class="settings-theme-label">自定义</span>
+                <div class="settings-theme-custom-row">
+                  <label class="settings-theme-picker" title="打开取色器">
+                    <input
+                      type="color"
+                      :value="config.site.theme"
+                      aria-label="选择自定义主题色"
+                      @input="
+                        selectTheme(($event.target as HTMLInputElement).value)
+                      "
+                    />
+                  </label>
+                  <input
+                    class="settings-theme-code"
+                    type="text"
+                    :value="themeDraft"
+                    aria-label="主题色色值"
+                    placeholder="#fb7299"
+                    spellcheck="false"
+                    @input="handleThemeInput"
+                    @change="commitThemeDraft"
+                    @blur="commitThemeDraft"
+                  />
+                </div>
+                <p class="settings-theme-hint">
+                  支持 #rrggbb 或 rgb(…) 写法，输错会退回当前色。
+                </p>
+              </div>
+            </div>
+            <div class="settings-theme-preview" aria-hidden="true">
+              <span class="settings-theme-preview-tag">#主题色</span>
+              <span class="settings-theme-preview-link">正文里的链接</span>
+              <span class="settings-theme-preview-button">主按钮</span>
             </div>
           </section>
 
@@ -693,7 +824,7 @@ function statusClass(status?: ProviderStatus): string {
                     >
                   </button>
                   <label
-                    class="settings-source-list-switch"
+                    class="m-switch settings-source-list-switch"
                     :aria-label="`启用 ${source.title}`"
                     @click.stop
                   >
@@ -860,7 +991,7 @@ function statusClass(status?: ProviderStatus): string {
               <footer class="settings-source-detail-foot">
                 <button
                   type="button"
-                  class="settings-source-sync"
+                  class="m-btn m-btn--secondary settings-source-sync"
                   :disabled="anyBusy"
                   @click="syncSource(selectedSource.id)"
                 >
@@ -888,7 +1019,7 @@ function statusClass(status?: ProviderStatus): string {
             </div>
             <button
               type="button"
-              class="settings-secondary"
+              class="m-btn m-btn--secondary settings-secondary"
               @click="exportConfig"
             >
               <IconGlyph name="fileDown" :size="15" />导出配置
@@ -921,7 +1052,7 @@ function statusClass(status?: ProviderStatus): string {
               <p>只在开发服务器运行期间按间隔重新同步已启用来源。</p>
             </div>
             <div class="settings-auto-refresh-control">
-              <label class="settings-switch" aria-label="启用本地开发自动刷新"
+              <label class="m-switch settings-switch" aria-label="启用本地开发自动刷新"
                 ><input
                   v-model="config.autoRefresh.enabled"
                   type="checkbox" /><span></span></label
@@ -949,7 +1080,7 @@ function statusClass(status?: ProviderStatus): string {
             <span>Token 保存在本地凭据文件，不会进入公开快照。</span
             ><button
               type="button"
-              class="settings-quiet-action"
+              class="m-btn m-btn--ghost settings-quiet-action"
               @click="activeTab = 'data'"
             >
               管理数据来源 <IconGlyph name="arrowRight" :size="14" />
@@ -995,7 +1126,7 @@ function statusClass(status?: ProviderStatus): string {
         <footer>
           <button
             type="button"
-            class="settings-primary"
+            class="m-btn m-btn--primary settings-primary"
             @click="closeSyncError"
           >
             知道了
@@ -1037,7 +1168,7 @@ function statusClass(status?: ProviderStatus): string {
 }
 .settings-eyebrow,
 .settings-section-index {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   font-size: 0.56rem;
   font-weight: 800;
   letter-spacing: 0.13em;
@@ -1076,39 +1207,15 @@ function statusClass(status?: ProviderStatus): string {
 .settings-notice.is-error {
   color: #bd455b;
 }
+/* 颜色、悬停、按下全部交给通用控件层（.m-btn--*），这里只保留设置页的尺寸。 */
 .settings-primary,
 .settings-secondary,
 .settings-quiet-action,
 .settings-source-sync {
-  display: inline-flex;
   min-height: 35px;
   padding: 0 12px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.82);
-  border-radius: 9px;
   font-size: 0.62rem;
   font-weight: 750;
-  white-space: nowrap;
-}
-.settings-primary {
-  border: 0;
-  color: #fff;
-  background: var(--purple-deep);
-  box-shadow: 0 9px 18px rgba(85, 65, 181, 0.2);
-}
-.settings-primary:hover:not(:disabled) {
-  background: #47349d;
-}
-.settings-secondary,
-.settings-quiet-action {
-  color: var(--purple-deep);
-  background: rgba(255, 255, 255, 0.64);
-}
-.settings-secondary:hover:not(:disabled),
-.settings-quiet-action:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.94);
 }
 button:disabled {
   cursor: default;
@@ -1163,11 +1270,11 @@ button:disabled {
     background 0.18s ease;
 }
 .settings-tab:hover {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(255, 255, 255, 0.55);
 }
 .settings-tab.is-active {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   background: rgba(255, 255, 255, 0.82);
   box-shadow: 0 5px 12px rgba(54, 45, 106, 0.06);
 }
@@ -1177,7 +1284,7 @@ button:disabled {
   width: 3px;
   height: 19px;
   border-radius: 0 3px 3px 0;
-  background: var(--pink);
+  background: var(--theme);
   content: "";
 }
 .settings-tab span {
@@ -1274,8 +1381,8 @@ button:disabled {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 8px;
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
   overflow: hidden;
 }
 .settings-site-favicon img {
@@ -1294,7 +1401,7 @@ button:disabled {
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
-  color: var(--purple-deep);
+  color: var(--theme-strong);
 }
 .settings-section-heading h3,
 .settings-extra-head h3 {
@@ -1319,6 +1426,141 @@ button:disabled {
 }
 .settings-field-wide {
   grid-column: 1 / -1;
+}
+/* 主题色：预设色板、自定义取色与即时预览。 */
+.settings-theme {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 210px;
+  align-items: start;
+  gap: 16px;
+}
+.settings-theme-presets,
+.settings-theme-custom {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 7px;
+}
+.settings-theme-label {
+  color: var(--muted);
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.settings-theme-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.settings-theme-swatch {
+  display: inline-flex;
+  padding: 6px 11px 6px 8px;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 999px;
+  color: var(--muted-strong);
+  background: rgba(255, 255, 255, 0.52);
+  font-size: 0.58rem;
+  font-weight: 700;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease;
+}
+.settings-theme-swatch:hover {
+  color: var(--theme-strong);
+  background: rgba(255, 255, 255, 0.86);
+  transform: translateY(-1px);
+}
+.settings-theme-swatch.is-active {
+  border-color: color-mix(in srgb, var(--theme) 42%, #ffffff);
+  color: var(--theme-strong);
+  background: var(--theme-wash);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme) 13%, transparent);
+}
+.settings-theme-dot {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.72);
+}
+.settings-theme-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.settings-page .settings-theme-picker {
+  display: block;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 auto;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.82);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 4px 10px color-mix(in srgb, var(--theme) 16%, transparent);
+  cursor: pointer;
+}
+.settings-page .settings-theme-picker input[type="color"] {
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.settings-theme-picker input[type="color"]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.settings-theme-picker input[type="color"]::-webkit-color-swatch {
+  border: 0;
+}
+.settings-theme-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.53rem;
+  line-height: 1.5;
+}
+.settings-theme-preview {
+  display: flex;
+  margin-top: 12px;
+  padding: 11px 12px;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 9px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.46);
+}
+.settings-theme-preview-tag {
+  padding: 3px 9px;
+  border-radius: 999px;
+  color: var(--theme-strong);
+  background: var(--theme-wash);
+  font-size: 0.55rem;
+  font-weight: 700;
+}
+.settings-theme-preview-link {
+  color: var(--theme-strong);
+  font-size: 0.58rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--theme) 45%, transparent);
+  text-underline-offset: 3px;
+}
+/* 主题色卡片里的"主按钮"样例：必须用主色本体，这样换色时预览和真按钮一致。 */
+.settings-theme-preview-button {
+  margin-left: auto;
+  padding: 6px 13px;
+  border-radius: 9px;
+  color: var(--theme-on);
+  background: var(--theme);
+  font-size: 0.56rem;
+  font-weight: 700;
+  box-shadow: 0 6px 12px color-mix(in srgb, var(--theme) 26%, transparent);
 }
 .settings-page label {
   display: flex;
@@ -1357,8 +1599,8 @@ button:disabled {
 .settings-page input:focus,
 .settings-page select:focus,
 .settings-page textarea:focus {
-  border-color: rgba(117, 100, 222, 0.56);
-  box-shadow: 0 0 0 3px rgba(117, 100, 222, 0.1);
+  border-color: color-mix(in srgb, var(--theme) 56%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme) 10%, transparent);
 }
 .settings-page input:disabled {
   cursor: not-allowed;
@@ -1486,8 +1728,8 @@ button:disabled {
 }
 .settings-source-filters button:hover,
 .settings-source-filters button.is-active {
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
 }
 .settings-source-list {
   display: grid;
@@ -1511,13 +1753,13 @@ button:disabled {
     background 0.18s ease;
 }
 .settings-source-list-item:hover {
-  border-color: rgba(117, 100, 222, 0.2);
+  border-color: color-mix(in srgb, var(--theme) 20%, transparent);
   background: rgba(255, 255, 255, 0.7);
 }
 .settings-source-list-item.is-selected {
-  border-color: rgba(117, 100, 222, 0.36);
-  background: rgba(117, 100, 222, 0.09);
-  box-shadow: inset 3px 0 0 var(--purple);
+  border-color: color-mix(in srgb, var(--theme) 36%, transparent);
+  background: color-mix(in srgb, var(--theme) 9%, transparent);
+  box-shadow: inset 3px 0 0 var(--theme);
 }
 .settings-source-list-item.is-disabled {
   opacity: 0.68;
@@ -1535,7 +1777,7 @@ button:disabled {
   text-align: left;
 }
 .settings-source-select:hover {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
 }
 .settings-source-select-copy {
   display: flex;
@@ -1586,55 +1828,17 @@ button:disabled {
   background: #df5a70;
 }
 .settings-source-list-status.is-cleared i {
-  background: var(--purple);
+  background: var(--theme);
 }
+/* 轨道与滑块由通用控件层（.m-switch）绘制，这里只压尺寸与对齐。
+   display / flex-direction 必须带 !important：.settings-page label 把它们改成了纵向。 */
 .settings-source-list-switch {
-  position: relative;
   display: inline-flex !important;
-  width: 30px;
-  height: 18px;
   margin: auto 8px auto 0;
   flex: 0 0 auto;
   flex-direction: row !important;
-  cursor: pointer;
-}
-.settings-source-list-switch input {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-.settings-source-list-switch > span {
-  position: relative;
-  display: block;
-  width: 30px;
-  height: 18px;
-  border-radius: 12px;
-  background: rgba(118, 126, 151, 0.25);
-  pointer-events: none;
-  transition: background 0.18s ease;
-}
-.settings-source-list-switch > span::after {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 4px rgba(38, 39, 72, 0.16);
-  content: "";
-  transition: transform 0.18s ease;
-}
-.settings-source-list-switch input:checked + span {
-  background: var(--purple);
-}
-.settings-source-list-switch input:checked + span::after {
-  transform: translateX(12px);
+  --switch-width: 30px;
+  --switch-height: 18px;
 }
 .settings-source-list-empty {
   margin: 16px 3px;
@@ -1697,8 +1901,8 @@ button:disabled {
   flex: 0 0 auto;
   place-items: center;
   border-radius: 9px;
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.11);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 11%, transparent);
 }
 .settings-source-summary {
   display: grid;
@@ -1750,50 +1954,10 @@ button:disabled {
   font-weight: 750;
 }
 .settings-switch {
-  position: relative;
   display: inline-flex !important;
-  width: 34px;
-  height: 20px;
   flex-direction: row !important;
-  cursor: pointer;
-}
-.settings-switch input {
-  position: absolute;
-  z-index: 2;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  margin: 0;
-  opacity: 0;
-  cursor: pointer;
-}
-.settings-switch > span {
-  position: relative;
-  display: block;
-  width: 34px;
-  height: 20px;
-  border-radius: 12px;
-  background: rgba(118, 126, 151, 0.25);
-  pointer-events: none;
-  transition: background 0.18s ease;
-}
-.settings-switch > span::after {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: 0 2px 4px rgba(38, 39, 72, 0.16);
-  content: "";
-  transition: transform 0.18s ease;
-}
-.settings-switch input:checked + span {
-  background: var(--purple);
-}
-.settings-switch input:checked + span::after {
-  transform: translateX(14px);
+  --switch-width: 34px;
+  --switch-height: 20px;
 }
 .settings-source-status {
   display: inline-flex;
@@ -1824,10 +1988,6 @@ button:disabled {
   padding: 0 8px;
   font-size: 0.54rem;
 }
-.settings-source-sync {
-  color: var(--purple-deep);
-  background: rgba(255, 255, 255, 0.72);
-}
 .settings-icon-button {
   display: grid;
   width: 30px;
@@ -1840,7 +2000,8 @@ button:disabled {
   background: rgba(255, 255, 255, 0.62);
 }
 .settings-icon-button:hover {
-  color: var(--purple-deep);
+  border-color: var(--theme-line);
+  color: var(--theme-strong);
   background: #fff;
 }
 .settings-panel-foot {
@@ -1858,8 +2019,8 @@ button:disabled {
   min-width: 30px;
   padding: 5px 7px;
   border-radius: 7px;
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
   font-size: 0.52rem;
   text-align: center;
 }
@@ -1886,7 +2047,7 @@ button:disabled {
   width: 15px !important;
   height: 15px;
   flex: 0 0 auto;
-  accent-color: var(--purple);
+  accent-color: var(--theme);
 }
 .settings-content-option > span {
   display: flex;
@@ -1942,9 +2103,9 @@ button:disabled {
   font-size: 0.53rem;
 }
 .settings-source-scope-control label:has(input:checked) {
-  border-color: rgba(117, 100, 222, 0.42);
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
+  border-color: color-mix(in srgb, var(--theme) 42%, transparent);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
 }
 .settings-source-scope-control input {
   position: absolute;
@@ -1971,7 +2132,7 @@ button:disabled {
   margin-bottom: 14px;
 }
 .settings-extra-head > svg {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
 }
 .settings-inline-actions {
   display: flex;
@@ -2006,7 +2167,7 @@ button:disabled {
 .settings-inline-toggle input {
   width: 15px !important;
   height: 15px;
-  accent-color: var(--purple);
+  accent-color: var(--theme);
 }
 .settings-inline-toggle span {
   color: var(--muted-strong);
@@ -2060,7 +2221,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border: 1px solid rgba(117, 100, 222, 0.14);
+  border: 1px solid color-mix(in srgb, var(--theme) 14%, transparent);
   border-radius: 10px;
   background: rgba(249, 248, 255, 0.52);
 }
@@ -2301,6 +2462,9 @@ button:disabled {
     flex-direction: column;
   }
   .settings-snapshot-grid {
+    grid-template-columns: 1fr;
+  }
+  .settings-theme {
     grid-template-columns: 1fr;
   }
   .settings-auto-refresh-control {

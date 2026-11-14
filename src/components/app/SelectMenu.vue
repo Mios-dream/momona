@@ -399,15 +399,15 @@ onBeforeUnmount(() => syncGlobalListeners(false));
 }
 
 .select-menu-trigger:hover {
-  border-color: rgba(117, 100, 222, 0.28);
+  border-color: color-mix(in srgb, var(--theme) 28%, transparent);
   background: rgba(255, 255, 255, 0.92);
 }
 
 .select-menu-trigger:focus-visible,
 .select-menu.is-open .select-menu-trigger {
-  border-color: rgba(117, 100, 222, 0.42);
+  border-color: color-mix(in srgb, var(--theme) 42%, transparent);
   background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 0 0 3px rgba(117, 100, 222, 0.12);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme) 12%, transparent);
   outline: none;
 }
 
@@ -429,7 +429,7 @@ onBeforeUnmount(() => syncGlobalListeners(false));
 }
 
 .select-menu.is-open .select-menu-chevron {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   transform: rotate(180deg);
 }
 
@@ -477,12 +477,12 @@ onBeforeUnmount(() => syncGlobalListeners(false));
 }
 
 .select-menu-option.is-active {
-  color: var(--purple-deep);
-  background: rgba(117, 100, 222, 0.1);
+  color: var(--theme-strong);
+  background: color-mix(in srgb, var(--theme) 10%, transparent);
 }
 
 .select-menu-option.is-selected {
-  color: var(--purple-deep);
+  color: var(--theme-strong);
   font-weight: 760;
 }
 
@@ -494,7 +494,7 @@ onBeforeUnmount(() => syncGlobalListeners(false));
 
 .select-menu-check {
   flex: 0 0 auto;
-  color: var(--purple);
+  color: var(--theme);
 }
 
 .select-menu-pop-enter-active,

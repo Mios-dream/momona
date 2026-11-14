@@ -6,6 +6,7 @@ import {
 } from "./homeWidgets";
 import { normalizeFriendLink } from "./friends";
 import { dataSourceIds } from "./sourceCatalog";
+import { defaultThemeColor, normalizeThemeColor } from "./theme";
 import type {
   HomeWidget,
   IconName,
@@ -84,6 +85,7 @@ function defaultSiteSettings(): SiteSettings {
     title: "Love on the page",
     description: "Momona 期待和你相遇的每一天。",
     favicon: "/favicon.svg",
+    theme: defaultThemeColor,
   };
 }
 
@@ -285,6 +287,7 @@ function normalizeSiteSettings(value: unknown): SiteSettings {
     title: text(record.title) || "Love on the page",
     description: text(record.description) || "一个静态的个人数字生活展示入口。",
     favicon: text(record.favicon) || "/favicon.svg",
+    theme: normalizeThemeColor(record.theme),
   };
 }
 

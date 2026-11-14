@@ -505,7 +505,7 @@ function openSubmenuFor(page: AppPage): void {
 
 .rail-button:hover,
 .rail-button.is-active {
-  color: var(--purple-deep);
+  color: var(--theme);
   background: rgba(255, 255, 255, 0.72);
   transform: translateY(-2px);
 }
@@ -523,8 +523,8 @@ function openSubmenuFor(page: AppPage): void {
 }
 
 .rail-filter-button.is-active {
-  color: var(--purple-deep);
-  background: rgba(242, 239, 255, 0.82);
+  color: var(--theme);
+  background: color-mix(in srgb, var(--theme) 9%, rgba(255, 255, 255, 0.82));
 }
 
 .rail-link::before,
@@ -534,7 +534,7 @@ function openSubmenuFor(page: AppPage): void {
   width: 3px;
   height: 20px;
   border-radius: 0 4px 4px 0;
-  background: var(--pink);
+  background: var(--theme);
   content: "";
   opacity: 0;
   transform: translateX(-5px) scaleY(0.6);
@@ -604,7 +604,7 @@ function openSubmenuFor(page: AppPage): void {
 
 .brew-nav-button:hover,
 .brew-nav-button.is-active {
-  color: var(--purple-deep);
+  color: var(--theme);
   background: rgba(255, 255, 255, 0.7);
 }
 
