@@ -26,6 +26,7 @@ import {
   parseMusicPlaylistReference,
 } from "../../lib/music";
 import { applyThemeColor } from "../../lib/theme";
+import { showToast } from "../../lib/toast";
 import {
   isThemePresetSelected,
   normalizeThemeColor,
@@ -63,8 +64,6 @@ const sourceBusy = ref<Record<DataSourceId, boolean>>({
 const gameBusy = ref(false);
 const gameError = ref("");
 const saveBusy = ref(false);
-const message = ref("");
-const messageTone = ref<"success" | "error" | "neutral">("neutral");
 const syncError = ref<{ title: string; message: string } | null>(null);
 const sourceSnapshotStatuses = ref<Record<DataSourceId, SourceSnapshotInfo>>(
   emptySourceSnapshotStatuses(),
@@ -311,12 +310,15 @@ async function loadMusicPlaylist(): Promise<void> {
     );
     if (!result) throw new Error("歌单中没有可展示的曲目");
     config.value.music = musicResultToSettings(result, config.value.music);
-    messageTone.value = "success";
-    message.value = `${musicPlatformLabel(result.platform)}歌单已读取：${result.track.title}`;
+    showToast(
+      `${musicPlatformLabel(result.platform)}歌单已读取：${result.track.title}`,
+      "success",
+      undefined,
+      "music",
+    );
   } catch (error) {
     musicError.value = String(error instanceof Error ? error.message : error);
-    messageTone.value = "error";
-    message.value = "音乐歌单读取失败";
+    showToast("音乐歌单读取失败", "error", undefined, "music");
   } finally {
     musicBusy.value = false;
   }
@@ -360,12 +362,15 @@ async function syncGameAccount(): Promise<void> {
     if (!result.account)
       throw new Error(result.message || "账号数据暂时无法读取");
     updateGameWidget({ account: result.account });
-    messageTone.value = "success";
-    message.value = `${gameName.value}账号已读取：${result.account.nickname}`;
+    showToast(
+      `${gameName.value}账号已读取：${result.account.nickname}`,
+      "success",
+      undefined,
+      "game",
+    );
   } catch (error) {
     gameError.value = String(error instanceof Error ? error.message : error);
-    messageTone.value = "error";
-    message.value = "游戏账号读取失败";
+    showToast("游戏账号读取失败", "error", undefined, "game");
   } finally {
     gameBusy.value = false;
   }
@@ -381,16 +386,13 @@ async function saveSiteSnapshot(): Promise<SiteData> {
 async function saveSettings(): Promise<void> {
   saveBusy.value = true;
   closeSyncError();
-  messageTone.value = "neutral";
-  message.value = "正在保存本地设置";
+  showToast("正在保存本地设置", "neutral");
   try {
     const data = await saveSiteSnapshot();
     emit("config-change", cloneLocalConfig(config.value), false);
-    messageTone.value = "success";
-    message.value = `已保存 · ${data.libraryTiles.length} 个资料项`;
+    showToast(`已保存 · ${data.libraryTiles.length} 个资料项`, "success");
   } catch (error) {
-    messageTone.value = "error";
-    message.value = `保存失败：${String(error instanceof Error ? error.message : error)}`;
+    showToast(`保存失败：${String(error instanceof Error ? error.message : error)}`, "error");
     showSyncError("保存设置失败", error);
   } finally {
     saveBusy.value = false;
@@ -402,8 +404,12 @@ async function syncSource(sourceId: DataSourceId): Promise<void> {
   sourceBusy.value[sourceId] = true;
   closeSyncError();
   const source = sourceCards.find((item) => item.id === sourceId);
-  messageTone.value = "neutral";
-  message.value = `正在同步 ${source?.title ?? sourceLabels[sourceId]}`;
+  showToast(
+    `正在同步 ${source?.title ?? sourceLabels[sourceId]}`,
+    "neutral",
+    undefined,
+    "sync",
+  );
   try {
     const result = await requestJson<{
       siteData: SiteData;
@@ -411,11 +417,14 @@ async function syncSource(sourceId: DataSourceId): Promise<void> {
     }>("/__momona/sync-source", { config: config.value, sourceId });
     const status = result.sourceStatus;
     cachePreview(result.siteData);
-    messageTone.value = status.status === "error" ? "error" : "success";
-    message.value =
+    showToast(
       status.status === "error"
         ? `${source?.title ?? sourceLabels[sourceId]} 同步失败；旧数据已保留`
-        : `${source?.title ?? sourceLabels[sourceId]} 已同步 · ${status.count} 项`;
+        : `${source?.title ?? sourceLabels[sourceId]} 已同步 · ${status.count} 项`,
+      status.status === "error" ? "error" : "success",
+      undefined,
+      "sync",
+    );
     if (status.status === "error") {
       showSyncError(
         `${source?.title ?? sourceLabels[sourceId]} 同步失败`,
@@ -423,8 +432,12 @@ async function syncSource(sourceId: DataSourceId): Promise<void> {
       );
     }
   } catch (error) {
-    messageTone.value = "error";
-    message.value = `${source?.title ?? sourceLabels[sourceId]} 请求失败`;
+    showToast(
+      `${source?.title ?? sourceLabels[sourceId]} 请求失败`,
+      "error",
+      undefined,
+      "sync",
+    );
     showSyncError(`${source?.title ?? sourceLabels[sourceId]} 同步失败`, error);
   } finally {
     sourceBusy.value[sourceId] = false;
@@ -451,8 +464,7 @@ function exportConfig(): void {
     ...exportedConfig,
     siteData: previewData.value,
   });
-  messageTone.value = "success";
-  message.value = "配置文件已导出";
+  showToast("配置文件已导出", "success");
 }
 
 function statusFor(id: DataSourceId): ProviderStatus | undefined {
@@ -482,12 +494,6 @@ function statusClass(status?: ProviderStatus): string {
         <p>站点身份、数据管理与同步状态</p>
       </div>
       <div class="settings-header-actions">
-        <span
-          v-if="message"
-          :class="['settings-notice', `is-${messageTone}`]"
-          aria-live="polite"
-          >{{ message }}</span
-        >
         <button
           type="button"
           class="m-btn m-btn--primary settings-primary"
@@ -1192,20 +1198,6 @@ function statusClass(status?: ProviderStatus): string {
   margin-left: 0;
   align-items: center;
   gap: 11px;
-}
-.settings-notice {
-  max-width: 340px;
-  overflow: hidden;
-  color: var(--muted-strong);
-  font-size: 0.58rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.settings-notice.is-success {
-  color: #26825e;
-}
-.settings-notice.is-error {
-  color: #bd455b;
 }
 /* 颜色、悬停、按下全部交给通用控件层（.m-btn--*），这里只保留设置页的尺寸。 */
 .settings-primary,
@@ -2352,11 +2344,6 @@ button:disabled {
     align-items: center;
     justify-content: flex-end;
     gap: 6px;
-  }
-  .settings-notice {
-    min-width: 0;
-    max-width: none;
-    flex: 1 1 auto;
   }
   .settings-shell {
     display: flex;

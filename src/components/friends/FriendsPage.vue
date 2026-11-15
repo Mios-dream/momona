@@ -19,6 +19,7 @@ import {
   type PositionedFriend,
 } from "./friendWallLayout";
 import FriendAvatar from "../app/FriendAvatar.vue";
+import { showToast } from "../../lib/toast";
 import IconGlyph from "../app/IconGlyph.vue";
 
 type FriendTone = FriendLink["tone"];
@@ -60,8 +61,6 @@ const editingId = ref<string | null>(null);
 const deletePending = ref(false);
 const draft = ref<FriendDraft>(createDraft());
 const nicknameInput = ref<HTMLInputElement | null>(null);
-const toastMessage = ref("");
-let toastTimer: number | null = null;
 
 const {
   canvasStyle,
@@ -172,24 +171,14 @@ async function persistFriends(
     return true;
   } catch (error) {
     friends.value = previousFriends;
-    showToast(String(error instanceof Error ? error.message : error));
+    showToast(
+      String(error instanceof Error ? error.message : error),
+      "error",
+      undefined,
+      "friends",
+    );
     return false;
   }
-}
-
-/**
- * 显示短暂的友链操作提示，并取消上一次定时器。
- *
- * @param message - 需要显示的提示文本。
- * @returns 无返回值。
- */
-function showToast(message: string): void {
-  toastMessage.value = message;
-  if (toastTimer !== null) window.clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => {
-    toastMessage.value = "";
-    toastTimer = null;
-  }, 2400);
 }
 
 /**
@@ -248,7 +237,7 @@ async function saveFriend(): Promise<void> {
   const feedUrl = normalizeFriendUrl(draft.value.feedUrl);
 
   if (!nickname || !signature || !href) {
-    showToast("请补全昵称、签名和有效网址");
+    showToast("请补全昵称、签名和有效网址", "error", undefined, "friends");
     return;
   }
 
@@ -273,7 +262,12 @@ async function saveFriend(): Promise<void> {
     : [nextFriend, ...friends.value];
   friends.value = nextFriends;
   if (!(await persistFriends(nextFriends, previousFriends))) return;
-  showToast(editingId.value ? "友链卡片已更新" : "新的友链已加入");
+  showToast(
+    editingId.value ? "友链卡片已更新" : "新的友链已加入",
+    "success",
+    undefined,
+    "friends",
+  );
   closeEditor();
 }
 
@@ -300,7 +294,7 @@ async function confirmDelete(): Promise<void> {
   friends.value = nextFriends;
   if (!(await persistFriends(nextFriends, previousFriends))) return;
   closeEditor();
-  showToast("友链已移除");
+  showToast("友链已移除", "success", undefined, "friends");
 }
 
 /** 根据友链数据重新计算整面自由画布。 */
@@ -358,9 +352,6 @@ onMounted(() => {
   pageReady.value = true;
 });
 
-onBeforeUnmount(() => {
-  if (toastTimer !== null) window.clearTimeout(toastTimer);
-});
 </script>
 
 <template>
@@ -524,13 +515,6 @@ onBeforeUnmount(() => {
         <IconGlyph name="refresh" :size="15" />
       </button>
     </div>
-
-    <Transition name="toast">
-      <div v-if="toastMessage" class="friends-toast" role="status">
-        <IconGlyph name="check" :size="15" />
-        {{ toastMessage }}
-      </div>
-    </Transition>
 
     <Transition name="modal">
       <div
@@ -1292,26 +1276,6 @@ onBeforeUnmount(() => {
   background: rgba(111, 121, 146, 0.18);
 }
 
-.friends-toast {
-  position: fixed;
-  z-index: 60;
-  right: 19px;
-  bottom: 18px;
-  display: inline-flex;
-  min-height: 36px;
-  padding: 0 12px;
-  align-items: center;
-  gap: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.84);
-  border-radius: 10px;
-  color: #276f58;
-  background: rgba(232, 250, 241, 0.88);
-  box-shadow: 0 14px 26px rgba(54, 45, 106, 0.14);
-  backdrop-filter: blur(16px);
-  font-size: 0.62rem;
-  pointer-events: auto;
-}
-
 .friend-modal-backdrop {
   position: fixed;
   z-index: 80;
@@ -1614,9 +1578,7 @@ onBeforeUnmount(() => {
 
 
 .modal-enter-active,
-.modal-leave-active,
-.toast-enter-active,
-.toast-leave-active {
+.modal-leave-active {
   transition: opacity 0.24s ease;
 }
 
@@ -1628,9 +1590,7 @@ onBeforeUnmount(() => {
 }
 
 .modal-enter-from,
-.modal-leave-to,
-.toast-enter-from,
-.toast-leave-to {
+.modal-leave-to {
   opacity: 0;
 }
 
@@ -1638,11 +1598,6 @@ onBeforeUnmount(() => {
 .modal-leave-to .friend-editor {
   opacity: 0;
   transform: translateY(15px) scale(0.98);
-}
-
-.toast-enter-from,
-.toast-leave-to {
-  transform: translateY(8px);
 }
 
 @keyframes friends-intro-in {
@@ -1714,11 +1669,6 @@ onBeforeUnmount(() => {
     width: 22px;
     height: 1px;
     margin: 3px 0;
-  }
-
-  .friends-toast {
-    right: 62px;
-    bottom: 18px;
   }
 
   .friend-form-grid {
