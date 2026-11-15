@@ -1,19 +1,19 @@
-<script setup lang="ts">
+<script setup lang="ts" generic="T extends string | number">
 import { computed, nextTick, onBeforeUnmount, ref, useId, watch } from "vue";
 import IconGlyph from "./IconGlyph.vue";
 
-interface SelectOption {
+interface SelectOption<V> {
   /** 选项提交值。 */
-  value: string;
+  value: V;
   /** 选项展示文案。 */
   label: string;
 }
 
 interface Props {
-  /** 当前选中值。 */
-  modelValue: string;
+  /** 当前选中值；字符串或数字由 options 的元素类型推断。 */
+  modelValue: T;
   /** 可选项列表。 */
-  options: SelectOption[];
+  options: SelectOption<T>[];
   /** 触发器上方的小标题。 */
   label?: string;
   /** 未选中任何选项时的占位文案。 */
@@ -22,8 +22,8 @@ interface Props {
   ariaLabel?: string;
   /** 是否禁用交互。 */
   disabled?: boolean;
-  /** 菜单最小宽度，默认与触发器同宽。 */
-  menuMinWidth?: number;
+  /** 菜单最小宽度，默认与触发器同宽；允许字符串以兼容静态属性写法。 */
+  menuMinWidth?: number | string;
   /** 菜单最大高度。 */
   menuMaxHeight?: number;
 }
@@ -38,8 +38,8 @@ const props = withDefaults(defineProps<Props>(), {
 });
 
 const emit = defineEmits<{
-  "update:modelValue": [value: string];
-  change: [value: string];
+  "update:modelValue": [value: T];
+  change: [value: T];
 }>();
 
 const menuId = useId();
@@ -92,7 +92,7 @@ function updateMenuPosition(): void {
 
   const viewportPadding = 8;
   const rect = trigger.getBoundingClientRect();
-  const width = Math.max(rect.width, props.menuMinWidth);
+  const width = Math.max(rect.width, Number(props.menuMinWidth) || 168);
   const left = Math.min(
     Math.max(viewportPadding, rect.left),
     Math.max(viewportPadding, window.innerWidth - width - viewportPadding),
@@ -176,7 +176,7 @@ function toggleMenu(): void {
  * @param option - 被点击或回车确认的选项。
  * @returns 无返回值；值未变化时只收起菜单。
  */
-function selectOption(option: SelectOption): void {
+function selectOption(option: SelectOption<T>): void {
   const changed = option.value !== props.modelValue;
   closeMenu(true);
   if (!changed) return;
@@ -357,6 +357,7 @@ onBeforeUnmount(() => syncGlobalListeners(false));
               v-if="option.value === props.modelValue"
               name="check"
               :size="12"
+              :stroke-width="3"
               class="select-menu-check"
             />
           </button>
@@ -382,32 +383,37 @@ onBeforeUnmount(() => syncGlobalListeners(false));
   display: flex;
   width: 100%;
   min-width: 0;
-  min-height: 31px;
-  padding: 0 8px;
+  min-height: 34px;
+  padding: 0 9px;
   align-items: center;
   justify-content: space-between;
   gap: 6px;
-  border: 1px solid rgba(118, 126, 151, 0.18);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
   color: var(--ink-soft);
-  background: rgba(255, 255, 255, 0.76);
+  background: var(--glass-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 2px 6px rgba(54, 45, 106, 0.05);
   text-align: left;
   transition:
     border-color 0.16s ease,
     background 0.16s ease,
-    box-shadow 0.16s ease;
+    box-shadow 0.16s ease,
+    scale 0.16s ease;
 }
 
-.select-menu-trigger:hover {
-  border-color: color-mix(in srgb, var(--theme) 28%, transparent);
-  background: rgba(255, 255, 255, 0.92);
+.select-menu-trigger:hover:not(:disabled) {
+  border-color: var(--theme-line);
+  background: #fff;
+  scale: 1.01;
 }
 
 .select-menu-trigger:focus-visible,
 .select-menu.is-open .select-menu-trigger {
-  border-color: color-mix(in srgb, var(--theme) 42%, transparent);
-  background: rgba(255, 255, 255, 0.96);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme) 12%, transparent);
+  border-color: color-mix(in srgb, var(--theme) 48%, transparent);
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--theme-ring);
   outline: none;
 }
 
@@ -452,10 +458,12 @@ onBeforeUnmount(() => syncGlobalListeners(false));
   gap: 2px;
   overflow-y: auto;
   overscroll-behavior: contain;
-  border: 1px solid rgba(255, 255, 255, 0.92);
+  border: 1px solid var(--glass-border);
   border-radius: 11px;
-  background: rgba(253, 254, 255, 0.96);
-  box-shadow: 0 18px 38px rgba(54, 45, 106, 0.2);
+  background: var(--glass-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.6),
+    0 18px 38px rgba(54, 45, 106, 0.2);
   backdrop-filter: var(--glass-blur);
   outline: none;
 }
@@ -464,6 +472,7 @@ onBeforeUnmount(() => syncGlobalListeners(false));
   display: flex;
   width: 100%;
   min-width: 0;
+  min-height: 28px;
   padding: 6px 8px;
   align-items: center;
   justify-content: space-between;
@@ -474,15 +483,21 @@ onBeforeUnmount(() => syncGlobalListeners(false));
   background: transparent;
   font-size: 0.55rem;
   text-align: left;
+  transition:
+    color 0.14s ease,
+    background 0.14s ease;
 }
 
 .select-menu-option.is-active {
   color: var(--theme-strong);
-  background: color-mix(in srgb, var(--theme) 10%, transparent);
+  background: var(--theme-wash);
 }
 
+/* 选中项用主题色实底 + 白色粗勾，与自建勾选框 / 开关保持同一套强调语言。 */
 .select-menu-option.is-selected {
-  color: var(--theme-strong);
+  color: var(--theme-on);
+  background: var(--theme);
+  box-shadow: 0 3px 9px color-mix(in srgb, var(--theme) 28%, transparent);
   font-weight: 760;
 }
 
@@ -494,7 +509,7 @@ onBeforeUnmount(() => syncGlobalListeners(false));
 
 .select-menu-check {
   flex: 0 0 auto;
-  color: var(--theme);
+  color: var(--theme-on);
 }
 
 .select-menu-pop-enter-active,

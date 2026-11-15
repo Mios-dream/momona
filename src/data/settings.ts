@@ -5,6 +5,18 @@ import type {
   SourceSnapshotInfo,
 } from "./types";
 
+/**
+ * 同步内容里只取布尔型字段。
+ *
+ * githubRepositoryScope / githubRepositorySort 是字符串枚举，由分段选择器与
+ * 下拉菜单绑定；把它们排除后，勾选框拿到的 v-model 就一定是 boolean。
+ */
+type BooleanContentKey = {
+  [K in keyof SourceContentConfig]: SourceContentConfig[K] extends boolean
+    ? K
+    : never;
+}[keyof SourceContentConfig];
+
 /** 设置页数据来源卡片的静态描述。 */
 export interface SourceCard {
   /** 与配置和快照关联的来源 ID。 */
@@ -25,9 +37,8 @@ export interface SourceCard {
   icon: IconName;
   /** 可选同步内容。 */
   contentOptions: Array<{
-    key: keyof SourceContentConfig;
+    key: BooleanContentKey;
     label: string;
-    description: string;
   }>;
 }
 
@@ -45,14 +56,14 @@ export const sourceCards: SourceCard[] = [
     description: "追番、游戏、书籍、音乐",
     accountLabel: "用户名或用户页 URL",
     accountKey: "username",
-    placeholder: "例如：miosdream 或 https://bgm.tv/user/…",
+    placeholder: "miosdream 或 https://bgm.tv/user/…",
     token: false,
     icon: "bookMarked",
     contentOptions: [
-      { key: "bangumiAnime", label: "追番", description: "动画与番剧收藏" },
-      { key: "bangumiGames", label: "游戏", description: "游戏收藏" },
-      { key: "bangumiBooks", label: "书籍", description: "书籍与小说收藏" },
-      { key: "bangumiMusic", label: "音乐", description: "音乐收藏" },
+      { key: "bangumiAnime", label: "追番" },
+      { key: "bangumiGames", label: "游戏" },
+      { key: "bangumiBooks", label: "书籍" },
+      { key: "bangumiMusic", label: "音乐" },
     ],
   },
   {
@@ -61,13 +72,13 @@ export const sourceCards: SourceCard[] = [
     description: "投稿、收藏、追番",
     accountLabel: "UID 或空间 URL",
     accountKey: "userId",
-    placeholder: "例如：205296924 或 https://space.bilibili.com/…",
+    placeholder: "205296924 或 https://space.bilibili.com/…",
     token: false,
     icon: "video",
     contentOptions: [
-      { key: "bilibiliVideos", label: "投稿视频", description: "你发布的公开视频" },
-      { key: "bilibiliFavorites", label: "收藏夹内容", description: "公开收藏夹中的视频" },
-      { key: "bilibiliBangumi", label: "追番 / 追剧", description: "公开追番与追剧列表" },
+      { key: "bilibiliVideos", label: "投稿视频" },
+      { key: "bilibiliFavorites", label: "收藏夹内容" },
+      { key: "bilibiliBangumi", label: "追番 / 追剧" },
     ],
   },
   {
@@ -76,11 +87,11 @@ export const sourceCards: SourceCard[] = [
     description: "仓库与统计",
     accountLabel: "用户名或个人页 URL",
     accountKey: "username",
-    placeholder: "例如：Mios-dream 或 https://github.com/…",
+    placeholder: "Mios-dream 或 https://github.com/…",
     token: true,
     icon: "github",
     contentOptions: [
-      { key: "githubRepositories", label: "公开仓库", description: "个人主页中的公开仓库" },
+      { key: "githubRepositories", label: "公开仓库" },
     ],
   },
   {
@@ -89,12 +100,12 @@ export const sourceCards: SourceCard[] = [
     description: "最近游玩、游戏库",
     accountLabel: "个人页 URL 或 SteamID64",
     accountKey: "username",
-    placeholder: "例如：76561198863810095 或 Steam 个人页链接",
+    placeholder: "76561198863810095 或 Steam 个人页链接",
     token: true,
     icon: "game",
     contentOptions: [
-      { key: "steamRecentGames", label: "最近游玩", description: "最近游戏、近两周时长和最后游玩日期" },
-      { key: "steamLibrary", label: "游戏库", description: "Steam 账号拥有的游戏及累计游玩时长" },
+      { key: "steamRecentGames", label: "最近游玩" },
+      { key: "steamLibrary", label: "游戏库" },
     ],
   },
   {
@@ -103,11 +114,11 @@ export const sourceCards: SourceCard[] = [
     description: "菠萝包轻小说开放书架",
     accountLabel: "开放书架地址",
     accountKey: "username",
-    placeholder: "例如：https://p.sfacg.com/p/8933368/",
+    placeholder: "https://p.sfacg.com/p/8933368/",
     token: false,
     icon: "bookMarked",
     contentOptions: [
-      { key: "sfacgBooks", label: "开放书架作品", description: "书架中的小说标题、作者和封面" },
+      { key: "sfacgBooks", label: "开放书架作品" },
     ],
   },
   {
@@ -116,13 +127,13 @@ export const sourceCards: SourceCard[] = [
     description: "喜欢、创建、收藏歌单",
     accountLabel: "用户 ID 或个人页 URL",
     accountKey: "username",
-    placeholder: "例如：32953014 或网易云用户页链接",
+    placeholder: "32953014 或网易云用户页链接",
     token: false,
     icon: "music",
     contentOptions: [
-      { key: "neteaseLiked", label: "喜欢的音乐", description: "我喜欢的音乐歌单" },
-      { key: "neteaseCreated", label: "创建的歌单", description: "自己创建的公开歌单" },
-      { key: "neteaseCollected", label: "收藏的歌单", description: "收藏的公开歌单" },
+      { key: "neteaseLiked", label: "喜欢的音乐" },
+      { key: "neteaseCreated", label: "创建的歌单" },
+      { key: "neteaseCollected", label: "收藏的歌单" },
     ],
   },
   {
@@ -131,13 +142,13 @@ export const sourceCards: SourceCard[] = [
     description: "喜欢、创建、收藏歌单",
     accountLabel: "QQ 音乐用户 ID",
     accountKey: "username",
-    placeholder: "例如：10000 或 QQ 音乐个人页链接",
+    placeholder: "10000 或 QQ 音乐个人页链接",
     token: false,
     icon: "radio",
     contentOptions: [
-      { key: "qqmusicLiked", label: "喜欢的音乐", description: "平台公开的喜欢歌单" },
-      { key: "qqmusicCreated", label: "创建的歌单", description: "自己创建的公开歌单" },
-      { key: "qqmusicCollected", label: "收藏的歌单", description: "收藏的公开歌单" },
+      { key: "qqmusicLiked", label: "喜欢的音乐" },
+      { key: "qqmusicCreated", label: "创建的歌单" },
+      { key: "qqmusicCollected", label: "收藏的歌单" },
     ],
   },
 ];

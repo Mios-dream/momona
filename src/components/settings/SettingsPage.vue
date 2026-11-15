@@ -2,6 +2,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import type {
   DataSourceId,
+  GitHubRepositoryScope,
+  GitHubRepositorySort,
   HoyoGame,
   LocalConfig,
   ProviderStatus,
@@ -34,6 +36,11 @@ import {
   themePresets,
 } from "../../data/theme";
 import IconGlyph from "../app/IconGlyph.vue";
+import SelectMenu from "../app/SelectMenu.vue";
+import MoCheckbox from "../ui/MoCheckbox.vue";
+import MoField from "../ui/MoField.vue";
+import MoSegmented from "../ui/MoSegmented.vue";
+import MoToggle from "../ui/MoToggle.vue";
 
 interface Props {
   /** AppShell 提供的构建期配置。 */
@@ -69,6 +76,34 @@ const sourceSnapshotStatuses = ref<Record<DataSourceId, SourceSnapshotInfo>>(
   emptySourceSnapshotStatuses(),
 );
 type SourceFilter = "all" | "enabled" | "disabled";
+
+/** 各控件统一走自建组件，选项集中在这里定义，模板只负责绑定。 */
+const sourceFilterOptions: { value: SourceFilter; label: string }[] = [
+  { value: "all", label: "全部" },
+  { value: "enabled", label: "已启用" },
+  { value: "disabled", label: "未启用" },
+];
+const repositoryScopeOptions: {
+  value: GitHubRepositoryScope;
+  label: string;
+}[] = [
+  { value: "all", label: "全部公开仓库" },
+  { value: "pinned", label: "Pinned 仓库" },
+];
+const repositorySortOptions: {
+  value: GitHubRepositorySort;
+  label: string;
+}[] = [
+  { value: "updated", label: "最近更新" },
+  { value: "stars", label: "Star 优先" },
+  { value: "forks", label: "Fork 优先" },
+  { value: "name", label: "名称排序" },
+];
+const refreshIntervalOptions: { value: number; label: string }[] = [
+  { value: 6, label: "每 6 小时" },
+  { value: 12, label: "每 12 小时" },
+  { value: 24, label: "每天" },
+];
 
 const selectedSourceId = ref<DataSourceId>(sourceCards[0]?.id ?? "bangumi");
 const sourceFilter = ref<SourceFilter>("all");
@@ -392,7 +427,10 @@ async function saveSettings(): Promise<void> {
     emit("config-change", cloneLocalConfig(config.value), false);
     showToast(`已保存 · ${data.libraryTiles.length} 个资料项`, "success");
   } catch (error) {
-    showToast(`保存失败：${String(error instanceof Error ? error.message : error)}`, "error");
+    showToast(
+      `保存失败：${String(error instanceof Error ? error.message : error)}`,
+      "error",
+    );
     showSyncError("保存设置失败", error);
   } finally {
     saveBusy.value = false;
@@ -491,7 +529,6 @@ function statusClass(status?: ProviderStatus): string {
       <div class="settings-heading">
         <span class="settings-eyebrow">MOMONA / CONTROL CENTER</span>
         <h1>设置</h1>
-        <p>站点身份、数据管理与同步状态</p>
       </div>
       <div class="settings-header-actions">
         <button
@@ -508,7 +545,11 @@ function statusClass(status?: ProviderStatus): string {
     </header>
 
     <div class="settings-shell">
-      <nav class="settings-sidebar" role="tablist" aria-label="设置分类">
+      <nav
+        class="settings-sidebar glass-panel"
+        role="tablist"
+        aria-label="设置分类"
+      >
         <span class="settings-sidebar-label">配置</span>
         <button
           v-for="tab in settingsTabs"
@@ -533,7 +574,7 @@ function statusClass(status?: ProviderStatus): string {
         <section
           v-if="activeTab === 'profile'"
           id="settings-panel-profile"
-          class="settings-panel"
+          class="settings-panel glass-panel"
           role="tabpanel"
           aria-labelledby="settings-tab-profile"
         >
@@ -541,7 +582,6 @@ function statusClass(status?: ProviderStatus): string {
             <div>
               <span class="settings-section-index">01 / GENERAL</span>
               <h2>基础设置</h2>
-              <p>页面标题与个人资料会成为所有页面的统一身份。</p>
             </div>
             <div class="settings-site-preview">
               <span class="settings-site-favicon"
@@ -564,30 +604,28 @@ function statusClass(status?: ProviderStatus): string {
             <div class="settings-section-heading">
               <div>
                 <h3>页面信息</h3>
-                <p>这些内容只负责网站身份，不影响数据同步。</p>
               </div>
               <IconGlyph name="globe" :size="17" />
             </div>
             <div class="settings-form-grid settings-form-grid-wide">
-              <label
-                >网站标题<input
-                  v-model="config.site.title"
-                  type="text"
-                  placeholder="Love on the page"
-              /></label>
-              <label
-                >Favicon 地址<input
-                  v-model="config.site.favicon"
-                  type="url"
-                  placeholder="/favicon.svg"
-              /></label>
-              <label class="settings-field-wide"
-                >网站描述<textarea
-                  v-model="config.site.description"
-                  rows="3"
-                  placeholder="一个静态的个人数字生活展示入口。"
-                ></textarea>
-              </label>
+              <MoField
+                v-model="config.site.title"
+                label="网站标题"
+                placeholder="Love on the page"
+              />
+              <MoField
+                v-model="config.site.favicon"
+                label="Favicon 地址"
+                type="url"
+                placeholder="/favicon.svg"
+              />
+              <MoField
+                v-model="config.site.description"
+                class="settings-field-wide"
+                label="网站描述"
+                multiline
+                :rows="3"
+              />
             </div>
           </section>
 
@@ -597,16 +635,18 @@ function statusClass(status?: ProviderStatus): string {
             <div class="settings-section-heading">
               <div>
                 <h3>主题色</h3>
-                <p>
-                  导航、按钮、文章链接与进度条都跟随这个颜色，选中即可预览，保存后全站生效。
-                </p>
+                <p class="settings-section-hint">选中即可预览，保存后生效。</p>
               </div>
               <IconGlyph name="palette" :size="17" />
             </div>
             <div class="settings-theme">
               <div class="settings-theme-presets">
                 <span class="settings-theme-label">预设</span>
-                <div class="settings-theme-swatches" role="group" aria-label="主题色预设">
+                <div
+                  class="settings-theme-swatches"
+                  role="group"
+                  aria-label="主题色预设"
+                >
                   <button
                     v-for="preset in themePresets"
                     :key="preset.id"
@@ -659,9 +699,6 @@ function statusClass(status?: ProviderStatus): string {
                     @blur="commitThemeDraft"
                   />
                 </div>
-                <p class="settings-theme-hint">
-                  支持 #rrggbb 或 rgb(…) 写法，输错会退回当前色。
-                </p>
               </div>
             </div>
             <div class="settings-theme-preview" aria-hidden="true">
@@ -677,7 +714,6 @@ function statusClass(status?: ProviderStatus): string {
             <div class="settings-section-heading">
               <div>
                 <h3>个人资料</h3>
-                <p>显示在首页状态栏、问候和个人相关卡片中。</p>
               </div>
               <IconGlyph name="user" :size="17" />
             </div>
@@ -690,30 +726,28 @@ function statusClass(status?: ProviderStatus): string {
                 ><small>{{ config.account.motto || "还没有签名" }}</small>
               </div>
               <div class="settings-form-grid settings-form-grid-wide">
-                <label
-                  >显示名称<input
-                    v-model="config.account.name"
-                    type="text"
-                    placeholder="例如：三三 sama"
-                /></label>
-                <label
-                  >英文名 / 用户名<input
-                    v-model="config.account.latinName"
-                    type="text"
-                    placeholder="例如：@miosdream"
-                /></label>
-                <label class="settings-field-wide"
-                  >签名<input
-                    v-model="config.account.motto"
-                    type="text"
-                    placeholder="一句想展示在首页的话"
-                /></label>
-                <label class="settings-field-wide"
-                  >头像地址<input
-                    v-model="config.account.avatar"
-                    type="url"
-                    placeholder="/assets/avatar.jpg"
-                /></label>
+                <MoField
+                  v-model="config.account.name"
+                  label="显示名称"
+                  placeholder="三三 sama"
+                />
+                <MoField
+                  v-model="config.account.latinName"
+                  label="英文名 / 用户名"
+                  placeholder="@miosdream"
+                />
+                <MoField
+                  v-model="config.account.motto"
+                  class="settings-field-wide"
+                  label="签名"
+                />
+                <MoField
+                  v-model="config.account.avatar"
+                  class="settings-field-wide"
+                  label="头像地址"
+                  type="url"
+                  placeholder="/assets/avatar.jpg"
+                />
               </div>
             </div>
           </section>
@@ -722,7 +756,7 @@ function statusClass(status?: ProviderStatus): string {
         <section
           v-else-if="activeTab === 'data'"
           id="settings-panel-data"
-          class="settings-panel"
+          class="settings-panel glass-panel"
           role="tabpanel"
           aria-labelledby="settings-tab-data"
         >
@@ -730,7 +764,6 @@ function statusClass(status?: ProviderStatus): string {
             <div>
               <span class="settings-section-index">02 / DATA</span>
               <h2>数据管理</h2>
-              <p>统一管理来源与同步内容，组件会自动读取统一快照。</p>
             </div>
           </header>
 
@@ -740,7 +773,6 @@ function statusClass(status?: ProviderStatus): string {
                 <div>
                   <span class="settings-section-index">PLATFORMS</span>
                   <h3>数据来源</h3>
-                  <p>选择平台后编辑同步范围。</p>
                 </div>
               </header>
               <label class="settings-source-search">
@@ -752,39 +784,12 @@ function statusClass(status?: ProviderStatus): string {
                   placeholder="搜索平台"
                 />
               </label>
-              <div
+              <MoSegmented
+                v-model="sourceFilter"
                 class="settings-source-filters"
-                role="tablist"
+                :options="sourceFilterOptions"
                 aria-label="来源筛选"
-              >
-                <button
-                  type="button"
-                  role="tab"
-                  :aria-selected="sourceFilter === 'all'"
-                  :class="{ 'is-active': sourceFilter === 'all' }"
-                  @click="sourceFilter = 'all'"
-                >
-                  全部
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  :aria-selected="sourceFilter === 'enabled'"
-                  :class="{ 'is-active': sourceFilter === 'enabled' }"
-                  @click="sourceFilter = 'enabled'"
-                >
-                  已启用
-                </button>
-                <button
-                  type="button"
-                  role="tab"
-                  :aria-selected="sourceFilter === 'disabled'"
-                  :class="{ 'is-active': sourceFilter === 'disabled' }"
-                  @click="sourceFilter = 'disabled'"
-                >
-                  未启用
-                </button>
-              </div>
+              />
               <div
                 v-if="visibleSourceCards.length"
                 class="settings-source-list"
@@ -829,17 +834,13 @@ function statusClass(status?: ProviderStatus): string {
                       }}</em></span
                     >
                   </button>
-                  <label
-                    class="m-switch settings-source-list-switch"
-                    :aria-label="`启用 ${source.title}`"
-                    @click.stop
-                  >
-                    <input
+                  <span class="settings-source-list-switch" @click.stop>
+                    <MoToggle
                       v-model="config.sources[source.id].enabled"
-                      type="checkbox"
+                      size="sm"
+                      :aria-label="`启用 ${source.title}`"
                     />
-                    <span></span>
-                  </label>
+                  </span>
                 </article>
               </div>
               <p v-else class="settings-source-list-empty">
@@ -860,7 +861,6 @@ function statusClass(status?: ProviderStatus): string {
                   <div>
                     <span class="settings-section-index">ACTIVE SOURCE</span>
                     <h3>{{ selectedSource.title }}</h3>
-                    <p>{{ selectedSource.description }}</p>
                   </div>
                 </div>
                 <div class="settings-source-detail-actions">
@@ -876,56 +876,34 @@ function statusClass(status?: ProviderStatus): string {
                   >
                 </div>
               </header>
-              <div class="settings-source-summary">
-                <span
-                  ><small>同步内容</small
-                  ><strong>{{
-                    adapterLabel(selectedSource.id) || "未选择内容"
-                  }}</strong></span
-                ><span
-                  ><small>来源状态</small
-                  ><strong>{{
-                    sourceSnapshotText(
-                      sourceSnapshotStatuses[selectedSource.id],
-                    )
-                  }}</strong></span
-                ><span
-                  ><small>同步上限</small
-                  ><strong
-                    >{{ config.sources[selectedSource.id].limit }} 项</strong
-                  ></span
-                >
-              </div>
               <div class="settings-source-fields">
-                <label
-                  >{{ selectedSource.accountLabel
-                  }}<input
-                    v-model="
-                      config.sources[selectedSource.id][
-                        selectedSource.accountKey
-                      ]
-                    "
-                    type="text"
-                    :placeholder="selectedSource.placeholder"
-                /></label>
-                <label
-                  >同步数量上限<input
-                    v-model.number="config.sources[selectedSource.id].limit"
-                    type="number"
-                    min="1"
-                    max="120"
-                /></label>
-                <label v-if="selectedSource.token" class="settings-field-wide"
-                  >Token（仅本地）<input
-                    v-model="config.sources[selectedSource.id].token"
-                    type="password"
-                    autocomplete="off"
-                    :placeholder="
-                      selectedSource.id === 'steam'
-                        ? '可选，Steam Web API Key'
-                        : '可选，用于提高 GitHub 限额'
-                    "
-                /></label>
+                <MoField
+                  v-model="
+                    config.sources[selectedSource.id][selectedSource.accountKey]
+                  "
+                  :label="selectedSource.accountLabel"
+                  :placeholder="selectedSource.placeholder"
+                />
+                <MoField
+                  v-model="config.sources[selectedSource.id].limit"
+                  label="同步数量上限"
+                  type="number"
+                  :min="1"
+                  :max="120"
+                />
+                <MoField
+                  v-if="selectedSource.token"
+                  v-model="config.sources[selectedSource.id].token"
+                  class="settings-field-wide"
+                  label="Token（仅本地）"
+                  type="password"
+                  autocomplete="off"
+                  :placeholder="
+                    selectedSource.id === 'steam'
+                      ? '可选，Steam Web API Key'
+                      : '可选，用于提高 GitHub 限额'
+                  "
+                />
               </div>
               <div class="settings-source-adapter">
                 <header class="settings-source-adapter-head">
@@ -937,61 +915,33 @@ function statusClass(status?: ProviderStatus): string {
                   >
                 </header>
                 <div class="settings-content-options">
-                  <label
+                  <MoCheckbox
                     v-for="option in selectedSource.contentOptions"
                     :key="option.key"
-                    class="settings-content-option"
-                    ><input
-                      v-model="
-                        config.sources[selectedSource.id].content[option.key]
-                      "
-                      type="checkbox"
-                    /><span
-                      ><strong>{{ option.label }}</strong
-                      ><small>{{ option.description }}</small></span
-                    ></label
-                  >
+                    v-model="
+                      config.sources[selectedSource.id].content[option.key]
+                    "
+                    :label="option.label"
+                  />
                 </div>
                 <div
                   v-if="selectedSource.id === 'github'"
                   class="settings-source-scope"
                 >
                   <span class="settings-source-scope-label">仓库适配</span>
-                  <div
-                    class="settings-source-scope-control"
-                    role="radiogroup"
+                  <MoSegmented
+                    v-model="
+                      config.sources.github.content.githubRepositoryScope
+                    "
+                    :options="repositoryScopeOptions"
                     aria-label="GitHub 仓库范围"
-                  >
-                    <label
-                      ><input
-                        v-model="
-                          config.sources.github.content.githubRepositoryScope
-                        "
-                        type="radio"
-                        value="all"
-                      /><span>全部公开仓库</span></label
-                    ><label
-                      ><input
-                        v-model="
-                          config.sources.github.content.githubRepositoryScope
-                        "
-                        type="radio"
-                        value="pinned"
-                      /><span>Pinned 仓库</span></label
-                    >
-                  </div>
-                  <label class="settings-source-sort"
-                    >仓库展示顺序<select
-                      v-model="
-                        config.sources.github.content.githubRepositorySort
-                      "
-                    >
-                      <option value="updated">最近更新</option>
-                      <option value="stars">Star 优先</option>
-                      <option value="forks">Fork 优先</option>
-                      <option value="name">名称排序</option>
-                    </select></label
-                  >
+                  />
+                  <SelectMenu
+                    v-model="config.sources.github.content.githubRepositorySort"
+                    class="settings-source-sort"
+                    label="仓库展示顺序"
+                    :options="repositorySortOptions"
+                  />
                 </div>
               </div>
               <footer class="settings-source-detail-foot">
@@ -1013,7 +963,7 @@ function statusClass(status?: ProviderStatus): string {
         <section
           v-else
           id="settings-panel-status"
-          class="settings-panel"
+          class="settings-panel glass-panel"
           role="tabpanel"
           aria-labelledby="settings-tab-status"
         >
@@ -1021,7 +971,6 @@ function statusClass(status?: ProviderStatus): string {
             <div>
               <span class="settings-section-index">03 / STATUS</span>
               <h2>同步状态</h2>
-              <p>查看来源最近一次结果；失败不会清空已有快照。</p>
             </div>
             <button
               type="button"
@@ -1055,20 +1004,20 @@ function statusClass(status?: ProviderStatus): string {
             <div>
               <span class="settings-section-index">LOCAL AUTOMATION</span>
               <h3>本地自动刷新</h3>
-              <p>只在开发服务器运行期间按间隔重新同步已启用来源。</p>
+              <p>仅开发服务器运行期间生效</p>
             </div>
             <div class="settings-auto-refresh-control">
-              <label class="m-switch settings-switch" aria-label="启用本地开发自动刷新"
-                ><input
-                  v-model="config.autoRefresh.enabled"
-                  type="checkbox" /><span></span></label
-              ><label
-                >间隔<select v-model.number="config.autoRefresh.intervalHours">
-                  <option :value="6">每 6 小时</option>
-                  <option :value="12">每 12 小时</option>
-                  <option :value="24">每天</option>
-                </select></label
-              >
+              <MoToggle
+                v-model="config.autoRefresh.enabled"
+                aria-label="启用本地开发自动刷新"
+              />
+              <SelectMenu
+                v-model="config.autoRefresh.intervalHours"
+                class="settings-auto-refresh-interval"
+                label="间隔"
+                :options="refreshIntervalOptions"
+                :menu-min-width="124"
+              />
             </div>
           </section>
           <div class="settings-snapshot-grid">
@@ -1184,11 +1133,6 @@ function statusClass(status?: ProviderStatus): string {
   font-size: clamp(1.55rem, 3vw, 2.2rem);
   line-height: 1;
 }
-.settings-heading p {
-  margin: 0;
-  color: var(--muted-strong);
-  font-size: 0.68rem;
-}
 .settings-header-actions {
   position: absolute;
   right: 0;
@@ -1221,6 +1165,8 @@ button:disabled {
   align-items: stretch;
   gap: 18px;
 }
+/* 侧栏与主内容区的毛玻璃材质统一交给全局 .glass-panel class，
+   这里只保留布局，避免两套自定义底色/圆角/投影造成视觉不一致。 */
 .settings-sidebar {
   display: flex;
   height: 100%;
@@ -1228,11 +1174,6 @@ button:disabled {
   align-self: stretch;
   padding: 10px 8px;
   flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.38);
-  box-shadow: 0 14px 32px rgba(54, 45, 106, 0.08);
-  backdrop-filter: var(--glass-blur);
   gap: 6px;
 }
 .settings-sidebar-label {
@@ -1312,11 +1253,6 @@ button:disabled {
   padding: 24px;
   overflow-x: hidden;
   overflow-y: auto;
-  border: 1px solid var(--glass-border);
-  border-radius: 16px;
-  background: var(--glass);
-  box-shadow: var(--glass-shadow);
-  backdrop-filter: var(--glass-blur);
   scrollbar-width: none;
 }
 .settings-panel-head {
@@ -1328,14 +1264,8 @@ button:disabled {
   gap: 18px;
 }
 .settings-panel-head h2 {
-  margin: 5px 0 5px;
+  margin: 5px 0 0;
   font-size: 1.05rem;
-}
-.settings-panel-head p {
-  margin: 0;
-  color: var(--muted-strong);
-  font-size: 0.62rem;
-  line-height: 1.45;
 }
 .settings-site-preview {
   display: flex;
@@ -1395,14 +1325,13 @@ button:disabled {
   gap: 14px;
   color: var(--theme-strong);
 }
-.settings-section-heading h3,
-.settings-extra-head h3 {
-  margin: 0 0 4px;
+.settings-section-heading h3 {
+  margin: 0;
   color: var(--ink);
   font-size: 0.79rem;
 }
-.settings-section-heading p,
-.settings-extra-head p {
+/* 只给真正需要的行为提示用，避免继承区块标题的强调色与字号。 */
+.settings-section-hint {
   margin: 0;
   color: var(--muted);
   font-size: 0.56rem;
@@ -1510,12 +1439,6 @@ button:disabled {
 .settings-theme-picker input[type="color"]::-webkit-color-swatch {
   border: 0;
 }
-.settings-theme-hint {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.53rem;
-  line-height: 1.5;
-}
 .settings-theme-preview {
   display: flex;
   margin-top: 12px;
@@ -1563,17 +1486,21 @@ button:disabled {
   font-size: 0.58rem;
   font-weight: 700;
 }
+/* 搜索框、取色器、色值输入仍用原生 input，但材质与自建组件保持同一套令牌。 */
 .settings-page input,
 .settings-page select,
 .settings-page textarea {
   width: 100%;
   min-width: 0;
   padding: 0 10px;
-  border: 1px solid rgba(125, 132, 163, 0.18);
+  border: 1px solid var(--glass-border);
   border-radius: 8px;
   outline: none;
   color: var(--ink);
-  background: rgba(255, 255, 255, 0.65);
+  background: var(--glass-strong);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.62),
+    0 2px 6px rgba(54, 45, 106, 0.05);
   font: inherit;
   font-size: 0.63rem;
 }
@@ -1592,7 +1519,8 @@ button:disabled {
 .settings-page select:focus,
 .settings-page textarea:focus {
   border-color: color-mix(in srgb, var(--theme) 56%, transparent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--theme) 10%, transparent);
+  background: #fff;
+  box-shadow: 0 0 0 3px var(--theme-ring);
 }
 .settings-page input:disabled {
   cursor: not-allowed;
@@ -1636,24 +1564,40 @@ button:disabled {
   line-height: 1.35;
   text-overflow: ellipsis;
 }
+/* 数据管理面板改为纵向 flex：工作区吃掉标题栏以外的全部剩余高度，
+   两块玻璃卡随网格行拉伸到底，不再写死 560px 造成底部溢出或留白。 */
+#settings-panel-data {
+  display: flex;
+  flex-direction: column;
+}
+#settings-panel-data .settings-panel-head {
+  flex: 0 0 auto;
+}
 .settings-source-workspace {
   display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
   grid-template-columns: 252px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   gap: 12px;
   align-items: stretch;
 }
-.settings-source-index,
-.settings-source-detail,
-.settings-extra-card {
-  min-width: 0;
-  border: 1px solid rgba(255, 255, 255, 0.72);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.4);
-}
+/* 次级玻璃卡沿用控制栏消息卡的配方：叠在近白的 .glass-panel 上时改用更透的
+   --glass-soft，补白色发丝边、内高光/内暗边与紧凑柔光，并再模糊一次，
+   靠材质与投影把边界刻出来，而不是靠与底板几乎相同的底色差。
+   外阴影半径按面板 24px 内边距收敛，避免被 overflow 裁出硬边。 */
 .settings-source-index,
 .settings-source-detail {
-  height: 560px;
-  box-sizing: border-box;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--glass-border);
+  border-radius: 15px;
+  background: var(--glass-soft);
+  box-shadow:
+    /* inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 -1px 0 rgba(54, 45, 106, 0.045), */ 0
+    4px 12px rgba(54, 45, 106, 0.13);
+  backdrop-filter: var(--glass-blur);
 }
 .settings-source-index {
   display: flex;
@@ -1668,14 +1612,8 @@ button:disabled {
   gap: 10px;
 }
 .settings-source-index-head h3 {
-  margin: 4px 0 3px;
+  margin: 4px 0 0;
   font-size: 0.76rem;
-}
-.settings-source-index-head p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.52rem;
-  line-height: 1.4;
 }
 .settings-source-search {
   display: flex !important;
@@ -1697,31 +1635,9 @@ button:disabled {
   box-shadow: none !important;
   background: transparent !important;
 }
+/* 筛选、开关、勾选框、下拉全部改用自建组件，这里只保留布局定位。 */
 .settings-source-filters {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 4px;
   margin-top: 8px;
-}
-.settings-source-filters button {
-  display: flex;
-  min-width: 0;
-  min-height: 28px;
-  padding: 0 5px;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  border: 0;
-  border-radius: 7px;
-  color: var(--muted);
-  background: transparent;
-  font-size: 0.49rem;
-  font-weight: 700;
-}
-.settings-source-filters button:hover,
-.settings-source-filters button.is-active {
-  color: var(--theme-strong);
-  background: color-mix(in srgb, var(--theme) 10%, transparent);
 }
 .settings-source-list {
   display: grid;
@@ -1737,16 +1653,17 @@ button:disabled {
   min-width: 0;
   min-height: 54px;
   align-items: stretch;
-  border: 1px solid transparent;
+  /* 卡片已换成 --glass-soft，行要比容器更实一档才不会糊在一起。 */
+  border: 1px solid rgba(255, 255, 255, 0.58);
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.42);
+  background: rgba(255, 255, 255, 0.55);
   transition:
     border-color 0.18s ease,
     background 0.18s ease;
 }
 .settings-source-list-item:hover {
   border-color: color-mix(in srgb, var(--theme) 20%, transparent);
-  background: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.78);
 }
 .settings-source-list-item.is-selected {
   border-color: color-mix(in srgb, var(--theme) 36%, transparent);
@@ -1822,15 +1739,11 @@ button:disabled {
 .settings-source-list-status.is-cleared i {
   background: var(--theme);
 }
-/* 轨道与滑块由通用控件层（.m-switch）绘制，这里只压尺寸与对齐。
-   display / flex-direction 必须带 !important：.settings-page label 把它们改成了纵向。 */
+/* 外层 span 负责拦住点击冒泡，避免切换启用状态时顺带选中该来源。 */
 .settings-source-list-switch {
-  display: inline-flex !important;
+  display: inline-flex;
   margin: auto 8px auto 0;
   flex: 0 0 auto;
-  flex-direction: row !important;
-  --switch-width: 30px;
-  --switch-height: 18px;
 }
 .settings-source-list-empty {
   margin: 16px 3px;
@@ -1842,9 +1755,13 @@ button:disabled {
   display: flex;
   padding: 18px;
   flex-direction: column;
+  /* 极矮视口下工作区会被压短，让详情区自己滚动而不是溢出卡片外。 */
+  overflow-y: auto;
+  scrollbar-width: none;
 }
 .settings-source-detail-head {
   display: flex;
+  margin-bottom: 14px;
   align-items: flex-start;
   justify-content: space-between;
   gap: 14px;
@@ -1859,13 +1776,8 @@ button:disabled {
   min-width: 0;
 }
 .settings-source-detail-title h3 {
-  margin: 4px 0 3px;
+  margin: 4px 0 0;
   font-size: 0.88rem;
-}
-.settings-source-detail-title p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 0.54rem;
 }
 .settings-source-detail-actions {
   display: flex;
@@ -1896,32 +1808,6 @@ button:disabled {
   color: var(--theme-strong);
   background: color-mix(in srgb, var(--theme) 11%, transparent);
 }
-.settings-source-summary {
-  display: grid;
-  grid-template-columns: 1.5fr 0.9fr 0.8fr;
-  gap: 7px;
-  margin-bottom: 14px;
-  padding: 8px 0;
-  border-top: 1px solid rgba(118, 126, 151, 0.13);
-  border-bottom: 1px solid rgba(118, 126, 151, 0.13);
-}
-.settings-source-summary span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 3px;
-}
-.settings-source-summary small {
-  color: var(--muted);
-  font-size: 0.48rem;
-}
-.settings-source-summary strong {
-  overflow: hidden;
-  color: var(--muted-strong);
-  font-size: 0.55rem;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
 .settings-source-fields {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 150px;
@@ -1944,12 +1830,6 @@ button:disabled {
   color: var(--muted-strong);
   font-size: 0.56rem;
   font-weight: 750;
-}
-.settings-switch {
-  display: inline-flex !important;
-  flex-direction: row !important;
-  --switch-width: 34px;
-  --switch-height: 20px;
 }
 .settings-source-status {
   display: inline-flex;
@@ -2024,44 +1904,6 @@ button:disabled {
   padding-top: 11px;
   border-top: 1px solid rgba(118, 126, 151, 0.13);
 }
-.settings-content-option {
-  display: flex !important;
-  min-height: 38px;
-  padding: 6px 7px;
-  flex-direction: row !important;
-  align-items: center;
-  gap: 7px;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.46);
-  cursor: pointer;
-}
-.settings-content-option > input {
-  width: 15px !important;
-  height: 15px;
-  flex: 0 0 auto;
-  accent-color: var(--theme);
-}
-.settings-content-option > span {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-  gap: 2px;
-}
-.settings-content-option strong,
-.settings-content-option small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.settings-content-option strong {
-  color: var(--ink-soft);
-  font-size: 0.55rem;
-}
-.settings-content-option small {
-  color: var(--muted);
-  font-size: 0.48rem;
-  font-weight: 500;
-}
 .settings-source-scope {
   display: grid;
   gap: 7px;
@@ -2074,45 +1916,10 @@ button:disabled {
   font-size: 0.56rem;
   font-weight: 700;
 }
-.settings-source-scope-control {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 5px;
-}
-.settings-source-scope-control label {
-  position: relative;
-  display: flex !important;
-  min-height: 31px;
-  padding: 0 8px;
-  flex-direction: row !important;
-  align-items: center;
-  justify-content: center;
-  border: 1px solid rgba(125, 132, 163, 0.16);
-  border-radius: 8px;
-  color: var(--muted-strong);
-  background: rgba(255, 255, 255, 0.42);
-  cursor: pointer;
-  font-size: 0.53rem;
-}
-.settings-source-scope-control label:has(input:checked) {
-  border-color: color-mix(in srgb, var(--theme) 42%, transparent);
-  color: var(--theme-strong);
-  background: color-mix(in srgb, var(--theme) 10%, transparent);
-}
-.settings-source-scope-control input {
-  position: absolute;
-  width: 1px !important;
-  height: 1px !important;
-  opacity: 0;
-  pointer-events: none;
-}
 .settings-source-sort {
-  max-width: 190px;
+  width: 190px;
+  max-width: 100%;
   margin-top: 5px;
-}
-.settings-source-sort select {
-  height: 31px;
-  font-size: 0.55rem;
 }
 .settings-extra-grid {
   display: grid;
@@ -2165,19 +1972,43 @@ button:disabled {
   color: var(--muted-strong);
   font-size: 0.55rem;
 }
+/* 与数据管理同理：状态页改为纵向 flex，状态列表吃掉剩余高度，
+   行卡用 1fr 均匀铺满，页脚落到面板底部，不再整体溢出被裁。 */
+#settings-panel-status {
+  display: flex;
+  flex-direction: column;
+}
+#settings-panel-status .settings-panel-head {
+  flex: 0 0 auto;
+}
 .settings-status-list {
   display: grid;
+  min-height: 0;
+  flex: 1 1 auto;
+  grid-auto-rows: minmax(34px, 1fr);
   gap: 6px;
+}
+/* 次级卡统一沿用控制栏消息卡配方：更透的玻璃底 + 白色发丝边 +
+   内高光 / 内暗边 + 紧凑柔光 + 二次模糊，靠材质把边界从近白面板里刻出来。 */
+.settings-status-row,
+.settings-auto-refresh,
+.settings-snapshot-grid > div {
+  border: 1px solid var(--glass-border);
+  background: var(--glass-soft);
+  box-shadow:
+    /* inset 0 1px 0 rgba(255, 255, 255, 0.72),
+    inset 0 -1px 0 rgba(54, 45, 106, 0.045), */ 0
+    3px 8px rgba(54, 45, 106, 0.11);
+  backdrop-filter: var(--glass-blur);
 }
 .settings-status-row {
   display: grid;
   grid-template-columns: 8px 82px minmax(0, 1fr) auto;
-  min-height: 39px;
+  min-height: 34px;
   padding: 0 10px;
   align-items: center;
   gap: 9px;
   border-radius: 9px;
-  background: rgba(255, 255, 255, 0.46);
   font-size: 0.57rem;
 }
 .settings-status-row strong {
@@ -2213,9 +2044,7 @@ button:disabled {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  border: 1px solid color-mix(in srgb, var(--theme) 14%, transparent);
-  border-radius: 10px;
-  background: rgba(249, 248, 255, 0.52);
+  border-radius: 15px;
 }
 .settings-auto-refresh h3 {
   margin: 4px 0;
@@ -2235,8 +2064,9 @@ button:disabled {
   justify-content: flex-end;
   gap: 12px;
 }
-.settings-auto-refresh-control > label:last-child {
-  min-width: 106px;
+.settings-auto-refresh-interval {
+  width: 112px;
+  flex: 0 0 auto;
 }
 .settings-snapshot-grid {
   display: grid;
@@ -2251,8 +2081,7 @@ button:disabled {
   flex-direction: column;
   justify-content: center;
   gap: 5px;
-  border-radius: 9px;
-  background: rgba(255, 255, 255, 0.42);
+  border-radius: 12px;
 }
 .settings-snapshot-grid small {
   color: var(--muted);
@@ -2392,8 +2221,15 @@ button:disabled {
   .settings-site-preview {
     align-self: flex-start;
   }
+  /* 小屏回到自然高度的内容流：两块卡上下排列，由面板整体滚动，
+     不再强行拉伸工作区。 */
+  #settings-panel-data {
+    display: block;
+  }
   .settings-source-workspace {
+    flex: 0 0 auto;
     grid-template-columns: 1fr;
+    grid-template-rows: auto auto;
   }
   .settings-source-index,
   .settings-source-detail {
@@ -2457,6 +2293,14 @@ button:disabled {
   .settings-auto-refresh-control {
     width: 100%;
     justify-content: flex-start;
+  }
+  /* 小屏恢复自然高度的内容流，状态列表不再纵向拉伸。 */
+  #settings-panel-status {
+    display: block;
+  }
+  .settings-status-list {
+    flex: 0 0 auto;
+    grid-auto-rows: auto;
   }
   .settings-status-row {
     grid-template-columns: 8px 1fr auto;
