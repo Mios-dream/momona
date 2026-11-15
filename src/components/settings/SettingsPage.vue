@@ -1002,7 +1002,6 @@ function statusClass(status?: ProviderStatus): string {
           </div>
           <section class="settings-auto-refresh">
             <div>
-              <span class="settings-section-index">LOCAL AUTOMATION</span>
               <h3>本地自动刷新</h3>
               <p>仅开发服务器运行期间生效</p>
             </div>

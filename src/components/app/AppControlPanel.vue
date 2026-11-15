@@ -13,11 +13,7 @@ import type {
   MusicPlaybackMode,
   MusicSettings,
 } from "../../data/types";
-import {
-  airQualityLabel,
-  getWeatherInfo,
-  type WeatherData,
-} from "../../lib/weather";
+import { getWeatherInfo, type WeatherData } from "../../lib/weather";
 import {
   clearNotifications,
   markNotificationsRead,
@@ -26,6 +22,17 @@ import {
 } from "../../lib/toast";
 import FallbackImage from "./FallbackImage.vue";
 import IconGlyph from "./IconGlyph.vue";
+import cloudIconMeta from "../../assets/icon/icon_cloud.png";
+import messageIconMeta from "../../assets/icon/icon_message.png";
+import musicIconMeta from "../../assets/icon/icon_music.png";
+import starIconMeta from "../../assets/icon/icon_star.png";
+
+/* Astro 会把图片默认导入编译成元数据对象（{src,width,height,format}），
+   绑定到 <img> 必须取 .src 拿最终 URL，直接用对象会渲染成 404。 */
+const cloudIcon = cloudIconMeta.src;
+const messageIcon = messageIconMeta.src;
+const musicIcon = musicIconMeta.src;
+const starIcon = starIconMeta.src;
 import MusicPicker from "../music/MusicPicker.vue";
 
 interface Props {
@@ -79,6 +86,8 @@ const panelElement = ref<HTMLElement | null>(null);
 const activeCollapsedItem = ref<CollapsedItem>("quote");
 /** 展开面板当前所在的分区。 */
 const panelTab = ref<PanelTab>("control");
+/** 通知清空动画播放中：列表逐条错峰退场，结束后才真正清空历史。 */
+const isClearingNotifications = ref(false);
 const weather = ref<WeatherData | null>(null);
 const weatherLoading = ref(true);
 const playerState = ref<PlayerState>({});
@@ -139,6 +148,19 @@ const categoryIcons: Record<NotificationCategory, IconName> = {
   friends: "messagesSquare",
 };
 
+/**
+ * 有贴纸图标的通知来源：收起态横幅优先使用 `src/assets/icon` 的 PNG 贴纸。
+ *
+ * 只替换语义完全吻合的来源（天气→云、音乐→音符、友链→对话气泡），
+ * system/game/sync 没有对应贴纸，继续用线性图标，不强行替换。
+ * 通知中心列表的图标底是主题色实底，贴纸叠上去会撞色，维持白色线性图标。
+ */
+const categoryStickerIcons: Partial<Record<NotificationCategory, string>> = {
+  weather: cloudIcon,
+  music: musicIcon,
+  friends: messageIcon,
+};
+
 const categoryLabels: Record<NotificationCategory, string> = {
   system: "系统",
   weather: "天气",
@@ -176,14 +198,6 @@ function relativeTime(time: number): string {
     minute: "2-digit",
   }).format(time);
 }
-
-const greetingDate = computed(() =>
-  new Intl.DateTimeFormat("zh-CN", {
-    month: "long",
-    day: "numeric",
-    weekday: "long",
-  }).format(new Date()),
-);
 
 const currentTitle = computed(
   () => playerState.value.currentSong?.name || props.track?.title || "暂无音乐",
@@ -280,17 +294,6 @@ const collapsedTitle = computed(() => {
   return quote.value.text;
 });
 
-const collapsedDetail = computed(() => {
-  if (banner.value) return `${relativeTime(banner.value.time)} · 点击查看`;
-  if (activeCollapsedItem.value === "weather") {
-    return weather.value
-      ? `${weather.value.humidity}% 湿度 · ${airQualityLabel(weather.value.aqi)}`
-      : "点击展开控制台";
-  }
-  if (activeCollapsedItem.value === "greeting") return greetingDate.value;
-  return quote.value.from ? `—— ${quote.value.from}` : "今日一言";
-});
-
 const forecastHigh = computed(() => {
   if (!weather.value) return null;
   return (
@@ -316,6 +319,25 @@ const collapsedIcon = computed<IconName>(() => {
   }
   if (activeCollapsedItem.value === "greeting") return "sparkles";
   return "messageCircle";
+});
+
+/**
+ * 收起态胶囊当前内容的贴纸图标；为 null 时回落到线性图标 collapsedIcon。
+ *
+ * 只替换语义吻合的位置：一言→粉色对话气泡、问候→笑脸星星、
+ * 天气不可用→云朵贴纸、部分通知来源见 categoryStickerIcons。
+ * 播放器控制、箭头等功能性符号以及无对应贴纸的内容一律保留线性图标。
+ */
+const collapsedPngIcon = computed<string | null>(() => {
+  if (banner.value) return categoryStickerIcons[banner.value.category] ?? null;
+  if (activeCollapsedItem.value === "quote") return messageIcon;
+  if (activeCollapsedItem.value === "greeting") return starIcon;
+  if (activeCollapsedItem.value === "weather") {
+    // 有实测天气时走服务返回的天气图，读取中保留刷新指示，仅不可用时贴纸兜底。
+    if (weather.value) return null;
+    return weatherLoading.value ? null : cloudIcon;
+  }
+  return null;
 });
 
 /** 横幅状态下图标按通知级别着色；常规内容保持主题色。 */
@@ -459,6 +481,33 @@ function stopRotation(): void {
     window.clearInterval(rotationTimer);
     rotationTimer = null;
   }
+}
+
+/**
+ * 播放通知整组退场的清空动画，结束后再真正清空历史。
+ *
+ * 动画期间列表进入 `is-clearing` 态：所有卡片作为一组同时向右收拢淡出，
+ * 避免逐条错峰在列表里留下"空洞"；结束后调用 clearNotifications()，
+ * 由列表 ↔ 空状态的整体过渡让「暂无通知」自然浮现。
+ *
+ * @returns 无返回值；动画播放中重复点击会被忽略。
+ */
+function handleClearNotifications(): void {
+  if (isClearingNotifications.value || notificationState.items.length === 0) {
+    return;
+  }
+  isClearingNotifications.value = true;
+  const reducedMotion = window.matchMedia(
+    "(prefers-reduced-motion: reduce)",
+  ).matches;
+  window.setTimeout(
+    () => {
+      clearNotifications();
+      isClearingNotifications.value = false;
+    },
+    // 时长与 CSS 同步：卡片 40ms 后开始 0.3s 退场，留少量缓冲。
+    reducedMotion ? 0 : 440,
+  );
 }
 
 /**
@@ -755,15 +804,13 @@ onBeforeUnmount(() => {
             aria-expanded="false"
             @click="toggleExpanded(banner ? 'notifications' : 'control')"
           >
-            <span
-              class="control-collapsed-icon"
-              :class="collapsedIconClass"
-            >
+            <span class="control-collapsed-icon" :class="collapsedIconClass">
               <img
                 v-if="!banner && activeCollapsedItem === 'weather' && weather"
                 :src="weather.icon"
                 :alt="weather.weather"
               />
+              <img v-else-if="collapsedPngIcon" :src="collapsedPngIcon" alt="" />
               <IconGlyph v-else :name="collapsedIcon" :size="16" />
             </span>
             <Transition name="control-copy" mode="out-in">
@@ -773,39 +820,18 @@ onBeforeUnmount(() => {
                 :key="banner ? 'notice' : activeCollapsedItem"
                 class="control-collapsed-copy"
               >
-                <small v-if="banner" class="control-notice-kicker">
-                  {{ bannerLabel }}
-                </small>
                 <strong>{{ collapsedTitle }}</strong>
-                <em>{{ collapsedDetail }}</em>
               </span>
             </Transition>
             <span
-              v-if="
-                !banner &&
-                unreadCount > 0
-              "
+              v-if="!banner && unreadCount > 0"
               class="control-collapsed-badge"
               aria-label="未读通知数量"
             >
-              <i aria-hidden="true"></i>{{ unreadCount > 9 ? "9+" : unreadCount }}
+              <i aria-hidden="true"></i
+              >{{ unreadCount > 9 ? "9+" : unreadCount }}
             </span>
-            <span
-              v-if="
-                !banner &&
-                activeCollapsedItem === 'weather' &&
-                typeof weather?.aqi === 'number'
-              "
-              class="control-collapsed-aqi"
-              aria-label="空气质量指数"
-            >
-              <i aria-hidden="true"></i>{{ weather.aqi }}
-            </span>
-            <span
-              v-if="banner"
-              class="control-notice-open"
-              aria-hidden="true"
-            >
+            <span v-if="banner" class="control-notice-open" aria-hidden="true">
               <IconGlyph name="chevronDown" :size="13" />
             </span>
             <IconGlyph
@@ -819,7 +845,11 @@ onBeforeUnmount(() => {
           <div v-else key="expanded" class="control-expanded">
             <div ref="expandedInnerRef" class="control-expanded-inner">
               <div class="control-head">
-                <div class="control-tabs" role="tablist" aria-label="控制台分区">
+                <div
+                  class="control-tabs"
+                  role="tablist"
+                  aria-label="控制台分区"
+                >
                   <button
                     type="button"
                     role="tab"
@@ -874,226 +904,232 @@ onBeforeUnmount(() => {
                   :aria-hidden="panelTab === 'notifications'"
                 >
                   <section class="control-quote glass-panel" aria-label="一言">
-                <div>
-                  <p>{{ quote.text }}</p>
-                  <small v-if="quote.from">—— {{ quote.from }}</small>
-                </div>
-              </section>
+                    <div>
+                      <p>{{ quote.text }}</p>
+                      <small v-if="quote.from">—— {{ quote.from }}</small>
+                    </div>
+                  </section>
 
-              <section
-                class="control-weather"
-                :class="{ 'is-unavailable': !weather }"
-                aria-label="天气信息"
-              >
-                <span class="control-weather-icon">
-                  <img
-                    v-if="weather"
-                    :src="weather.icon"
-                    :alt="weather.weather"
-                  />
-                  <IconGlyph
-                    v-else
-                    :name="weatherLoading ? 'refresh' : 'cloud'"
-                    :size="22"
-                  />
-                </span>
+                  <section
+                    class="control-weather"
+                    :class="{ 'is-unavailable': !weather }"
+                    aria-label="天气信息"
+                  >
+                    <span class="control-weather-icon">
+                      <img
+                        v-if="weather"
+                        :src="weather.icon"
+                        :alt="weather.weather"
+                      />
+                      <img v-else-if="!weatherLoading" :src="cloudIcon" alt="" />
+                      <IconGlyph v-else name="refresh" :size="22" />
+                    </span>
 
-                <div v-if="weather" class="control-weather-copy">
-                  <div class="control-weather-primary">
-                    <strong>{{ weather.temperature }}<sup>°C</sup></strong>
-                    <span>{{ weather.city }}</span>
-                  </div>
-                  <div class="control-weather-meta" aria-label="天气指标">
-                    <span>{{ weather.weather }}</span>
-                    <span
-                      ><IconGlyph name="droplets" :size="11" />{{
-                        weather.humidity
-                      }}%</span
-                    >
-                    <span
-                      ><IconGlyph name="wind" :size="11" />{{
-                        weather.windSpeed
-                      }}</span
-                    >
-                  </div>
-                </div>
-
-                <div
-                  v-else
-                  class="control-weather-copy control-weather-unavailable-copy"
-                >
-                  <strong>{{
-                    weatherLoading ? "正在读取天气" : "天气暂不可用"
-                  }}</strong>
-                  <span>{{
-                    weatherLoading ? "正在定位" : "暂无可用定位"
-                  }}</span>
-                </div>
-
-                <div
-                  v-if="weather"
-                  class="control-weather-forecast"
-                  aria-label="今日天气预报"
-                >
-                  <span>{{ weather.weather }}</span>
-                  <div>
-                    <img :src="weather.icon" :alt="weather.weather" />
-                    <strong>{{ forecastHigh }}°</strong>
-                  </div>
-                  <small>{{ forecastLow }}°</small>
-                </div>
-              </section>
-
-              <section
-                ref="musicRef"
-                class="control-music"
-                :style="musicStyle"
-                :aria-label="isPlaylistOpen ? '播放列表' : '音乐播放器'"
-                @transitionend="handleMusicHeightTransitionEnd"
-              >
-                <div ref="stageRef" class="control-music-stage">
-                  <Transition name="control-music-view">
-                    <MusicPicker
-                      v-if="isPlaylistOpen"
-                      key="playlist"
-                      v-model:open="isPlaylistOpen"
-                      :track="props.track"
-                      :catalog="props.catalog"
-                      :editable="props.editable"
-                      compact
-                      embedded
-                    />
-
-                    <div v-else key="player" class="control-music-player">
-                      <div class="control-music-top">
-                        <span class="control-music-cover-wrap">
-                          <FallbackImage
-                            class="control-music-cover"
-                            :src="currentCover"
-                            :alt="`${currentTitle} 封面`"
-                            fallback-icon="music"
-                            :icon-size="20"
-                          />
-                        </span>
-                        <div class="control-section-copy control-music-copy">
-                          <strong>{{ currentTitle }}</strong>
-                          <small>{{ currentArtist }}</small>
-                        </div>
-                        <span
-                          class="control-music-equalizer"
-                          :class="{ 'is-playing': playerState.isPlaying }"
-                          aria-hidden="true"
-                        >
-                          <i></i><i></i><i></i>
-                        </span>
+                    <div v-if="weather" class="control-weather-copy">
+                      <div class="control-weather-primary">
+                        <strong>{{ weather.temperature }}<sup>°C</sup></strong>
+                        <span>{{ weather.city }}</span>
                       </div>
-
-                      <div class="control-music-progress" aria-label="播放进度">
+                      <div class="control-weather-meta" aria-label="天气指标">
+                        <span>{{ weather.weather }}</span>
                         <span
-                          class="control-music-progress-spacer"
-                          aria-hidden="true"
-                        ></span>
-                        <span>{{ currentTimeLabel }}</span>
-                        <input
-                          class="m-range control-music-progress-input"
-                          type="range"
-                          min="0"
-                          :max="Math.max(playerState.duration || 0, 1)"
-                          :value="playerState.currentTime || 0"
-                          :style="{
-                            '--music-progress': `${playbackProgress}%`,
-                          }"
-                          aria-label="调整播放进度"
-                          @input="seekPlayback"
-                        />
-                        <span>{{ durationLabel }}</span>
-                      </div>
-
-                      <div class="control-music-toolbar">
-                        <button
-                          type="button"
-                          class="control-music-action"
-                          aria-label="歌词（暂无同步歌词）"
-                          title="暂无同步歌词"
-                          disabled
+                          ><IconGlyph name="droplets" :size="11" />{{
+                            weather.humidity
+                          }}%</span
                         >
-                          <IconGlyph name="messagesSquare" :size="14" />
-                        </button>
-                        <button
-                          type="button"
-                          class="control-music-action"
-                          :class="{
-                            'is-active': playbackMode !== 'sequential',
-                          }"
-                          :aria-label="repeatLabel"
-                          :title="repeatLabel"
-                          @click="cyclePlaybackMode"
+                        <span
+                          ><IconGlyph name="wind" :size="11" />{{
+                            weather.windSpeed
+                          }}</span
                         >
-                          <IconGlyph :name="playbackModeIcon" :size="14" />
-                        </button>
-                        <button
-                          type="button"
-                          class="control-music-action control-music-skip"
-                          aria-label="上一首"
-                          title="上一首"
-                          @click="publishPlayerEvent('music-player-previous')"
-                        >
-                          <IconGlyph name="skipBack" :size="15" />
-                        </button>
-                        <button
-                          type="button"
-                          class="control-play control-music-primary"
-                          :aria-label="
-                            playerState.isPlaying ? '暂停音乐' : '播放音乐'
-                          "
-                          :title="
-                            playerState.isPlaying ? '暂停音乐' : '播放音乐'
-                          "
-                          @click="publishPlayerToggle"
-                        >
-                          <IconGlyph
-                            :name="playerState.isPlaying ? 'pause' : 'play'"
-                            :size="17"
-                          />
-                        </button>
-                        <button
-                          type="button"
-                          class="control-music-action control-music-skip"
-                          aria-label="下一首"
-                          title="下一首"
-                          @click="publishPlayerEvent('music-player-next')"
-                        >
-                          <IconGlyph name="skipForward" :size="15" />
-                        </button>
-                        <button
-                          type="button"
-                          class="control-music-action"
-                          :class="{ 'is-active': playerState.isMuted }"
-                          :aria-label="
-                            playerState.isMuted ? '取消静音' : '静音'
-                          "
-                          :title="playerState.isMuted ? '取消静音' : '静音'"
-                          @click="publishPlayerEvent('music-player-mute')"
-                        >
-                          <IconGlyph
-                            :name="playerState.isMuted ? 'volumeX' : 'volume'"
-                            :size="15"
-                          />
-                        </button>
-                        <button
-                          type="button"
-                          class="control-music-action"
-                          aria-label="打开播放列表"
-                          title="打开播放列表"
-                          @click="isPlaylistOpen = true"
-                        >
-                          <IconGlyph name="listMusic" :size="14" />
-                        </button>
                       </div>
                     </div>
-                  </Transition>
-                </div>
-              </section>
+
+                    <div
+                      v-else
+                      class="control-weather-copy control-weather-unavailable-copy"
+                    >
+                      <strong>{{
+                        weatherLoading ? "正在读取天气" : "天气暂不可用"
+                      }}</strong>
+                      <span>{{
+                        weatherLoading ? "正在定位" : "暂无可用定位"
+                      }}</span>
+                    </div>
+
+                    <div
+                      v-if="weather"
+                      class="control-weather-forecast"
+                      aria-label="今日天气预报"
+                    >
+                      <span>{{ weather.weather }}</span>
+                      <div>
+                        <img :src="weather.icon" :alt="weather.weather" />
+                        <strong>{{ forecastHigh }}°</strong>
+                      </div>
+                      <small>{{ forecastLow }}°</small>
+                    </div>
+                  </section>
+
+                  <section
+                    ref="musicRef"
+                    class="control-music"
+                    :style="musicStyle"
+                    :aria-label="isPlaylistOpen ? '播放列表' : '音乐播放器'"
+                    @transitionend="handleMusicHeightTransitionEnd"
+                  >
+                    <div ref="stageRef" class="control-music-stage">
+                      <Transition name="control-music-view">
+                        <MusicPicker
+                          v-if="isPlaylistOpen"
+                          key="playlist"
+                          v-model:open="isPlaylistOpen"
+                          :track="props.track"
+                          :catalog="props.catalog"
+                          :editable="props.editable"
+                          compact
+                          embedded
+                        />
+
+                        <div v-else key="player" class="control-music-player">
+                          <div class="control-music-top">
+                            <span class="control-music-cover-wrap">
+                              <FallbackImage
+                                class="control-music-cover"
+                                :src="currentCover"
+                                :alt="`${currentTitle} 封面`"
+                                fallback-icon="music"
+                                :icon-size="20"
+                              />
+                            </span>
+                            <div
+                              class="control-section-copy control-music-copy"
+                            >
+                              <strong>{{ currentTitle }}</strong>
+                              <small>{{ currentArtist }}</small>
+                            </div>
+                            <span
+                              class="control-music-equalizer"
+                              :class="{ 'is-playing': playerState.isPlaying }"
+                              aria-hidden="true"
+                            >
+                              <i></i><i></i><i></i>
+                            </span>
+                          </div>
+
+                          <div
+                            class="control-music-progress"
+                            aria-label="播放进度"
+                          >
+                            <span
+                              class="control-music-progress-spacer"
+                              aria-hidden="true"
+                            ></span>
+                            <span>{{ currentTimeLabel }}</span>
+                            <input
+                              class="m-range control-music-progress-input"
+                              type="range"
+                              min="0"
+                              :max="Math.max(playerState.duration || 0, 1)"
+                              :value="playerState.currentTime || 0"
+                              :style="{
+                                '--music-progress': `${playbackProgress}%`,
+                              }"
+                              aria-label="调整播放进度"
+                              @input="seekPlayback"
+                            />
+                            <span>{{ durationLabel }}</span>
+                          </div>
+
+                          <div class="control-music-toolbar">
+                            <button
+                              type="button"
+                              class="control-music-action"
+                              aria-label="歌词（暂无同步歌词）"
+                              title="暂无同步歌词"
+                              disabled
+                            >
+                              <IconGlyph name="messagesSquare" :size="14" />
+                            </button>
+                            <button
+                              type="button"
+                              class="control-music-action"
+                              :class="{
+                                'is-active': playbackMode !== 'sequential',
+                              }"
+                              :aria-label="repeatLabel"
+                              :title="repeatLabel"
+                              @click="cyclePlaybackMode"
+                            >
+                              <IconGlyph :name="playbackModeIcon" :size="14" />
+                            </button>
+                            <button
+                              type="button"
+                              class="control-music-action control-music-skip"
+                              aria-label="上一首"
+                              title="上一首"
+                              @click="
+                                publishPlayerEvent('music-player-previous')
+                              "
+                            >
+                              <IconGlyph name="skipBack" :size="15" />
+                            </button>
+                            <button
+                              type="button"
+                              class="control-play control-music-primary"
+                              :aria-label="
+                                playerState.isPlaying ? '暂停音乐' : '播放音乐'
+                              "
+                              :title="
+                                playerState.isPlaying ? '暂停音乐' : '播放音乐'
+                              "
+                              @click="publishPlayerToggle"
+                            >
+                              <IconGlyph
+                                :name="playerState.isPlaying ? 'pause' : 'play'"
+                                :size="17"
+                              />
+                            </button>
+                            <button
+                              type="button"
+                              class="control-music-action control-music-skip"
+                              aria-label="下一首"
+                              title="下一首"
+                              @click="publishPlayerEvent('music-player-next')"
+                            >
+                              <IconGlyph name="skipForward" :size="15" />
+                            </button>
+                            <button
+                              type="button"
+                              class="control-music-action"
+                              :class="{ 'is-active': playerState.isMuted }"
+                              :aria-label="
+                                playerState.isMuted ? '取消静音' : '静音'
+                              "
+                              :title="playerState.isMuted ? '取消静音' : '静音'"
+                              @click="publishPlayerEvent('music-player-mute')"
+                            >
+                              <IconGlyph
+                                :name="
+                                  playerState.isMuted ? 'volumeX' : 'volume'
+                                "
+                                :size="15"
+                              />
+                            </button>
+                            <button
+                              type="button"
+                              class="control-music-action"
+                              aria-label="打开播放列表"
+                              title="打开播放列表"
+                              @click="isPlaylistOpen = true"
+                            >
+                              <IconGlyph name="listMusic" :size="14" />
+                            </button>
+                          </div>
+                        </div>
+                      </Transition>
+                    </div>
+                  </section>
                 </div>
 
                 <Transition name="control-tab">
@@ -1102,59 +1138,79 @@ onBeforeUnmount(() => {
                     class="control-pane control-notifications"
                     aria-label="通知中心"
                   >
-                    <TransitionGroup
-                      v-if="notificationState.items.length"
-                      name="control-notice-list"
-                      tag="div"
-                      class="control-notice-list"
-                    >
-                      <article
-                        v-for="(item, index) in notificationState.items"
-                        :key="item.id"
+                    <!-- 列表 ↔ 空状态整体过渡：必须用 out-in，两个元素都是
+                         flex:1 的流内块，若同时在场「暂无通知」会被挤到列表
+                         下方再跳回原位（结构突变）。列表卸载时卡片已不可见，
+                         它的 leave 用近零时长跳过，空状态立即接棒浮入。 -->
+                    <Transition name="control-notice-swap" mode="out-in">
+                      <TransitionGroup
+                        v-if="notificationState.items.length"
+                        name="control-notice-list"
+                        tag="div"
                         :class="[
-                          'control-notice',
-                          `is-${item.tone}`,
-                          { 'is-latest': index === 0 },
+                          'control-notice-list',
+                          { 'is-clearing': isClearingNotifications },
                         ]"
                       >
-                        <span class="control-notice-icon">
-                          <IconGlyph
-                            :name="categoryIcons[item.category]"
-                            :size="17"
-                            :stroke-width="2.4"
-                          />
-                        </span>
-                        <div class="control-notice-copy">
-                          <div class="control-notice-heading">
-                            <strong>{{ categoryLabels[item.category] }}</strong>
-                            <div class="control-notice-meta">
-                              <span
-                                v-if="index === 0"
-                                class="control-notice-latest"
-                              >
-                                最新
-                              </span>
-                              <time :datetime="new Date(item.time).toISOString()">
-                                {{ relativeTime(item.time) }}
-                              </time>
+                        <article
+                          v-for="(item, index) in notificationState.items"
+                          :key="item.id"
+                          :class="[
+                            'control-notice',
+                            `is-${item.tone}`,
+                            { 'is-latest': index === 0 },
+                          ]"
+                        >
+                          <span class="control-notice-icon">
+                            <IconGlyph
+                              :name="categoryIcons[item.category]"
+                              :size="17"
+                              :stroke-width="2.4"
+                            />
+                          </span>
+                          <div class="control-notice-copy">
+                            <div class="control-notice-heading">
+                              <strong>{{
+                                categoryLabels[item.category]
+                              }}</strong>
+                              <div class="control-notice-meta">
+                                <span
+                                  v-if="index === 0"
+                                  class="control-notice-latest"
+                                >
+                                  最新
+                                </span>
+                                <time
+                                  :datetime="new Date(item.time).toISOString()"
+                                >
+                                  {{ relativeTime(item.time) }}
+                                </time>
+                              </div>
                             </div>
+                            <p>{{ item.message }}</p>
                           </div>
-                          <p>{{ item.message }}</p>
-                        </div>
-                      </article>
-                    </TransitionGroup>
+                        </article>
+                      </TransitionGroup>
 
-                    <p v-else class="control-notice-empty">暂无通知</p>
+                      <p v-else class="control-notice-empty">暂无通知</p>
+                    </Transition>
 
-                    <button
-                      v-if="notificationState.items.length"
-                      type="button"
-                      class="control-notice-clear"
-                      @click="clearNotifications"
-                    >
-                      <IconGlyph name="trash" :size="12" />
-                      <span>清空通知</span>
-                    </button>
+                    <Transition name="control-notice-clear-fade">
+                      <button
+                        v-if="notificationState.items.length"
+                        type="button"
+                        :class="[
+                          'control-notice-clear',
+                          { 'is-clearing': isClearingNotifications },
+                        ]"
+                        @click="handleClearNotifications"
+                      >
+                        <IconGlyph name="trash" :size="12" />
+                        <span>{{
+                          isClearingNotifications ? "清空中…" : "清空通知"
+                        }}</span>
+                      </button>
+                    </Transition>
                   </div>
                 </Transition>
               </div>
@@ -1295,7 +1351,7 @@ onBeforeUnmount(() => {
   width: 100%;
   height: auto;
   min-height: 48px;
-  padding: 5px 8px;
+  padding: 5px 12px;
   align-items: center;
   gap: 5px;
   border-radius: var(--panel-radius, 24px);
@@ -1337,38 +1393,22 @@ onBeforeUnmount(() => {
   object-fit: contain;
 }
 
+/* 简洁版文案：只保留一行主题内容，垂直居中，超长省略。 */
 .control-collapsed-copy {
   display: flex;
   min-width: 0;
   flex: 1;
-  flex-direction: column;
-  gap: 1px;
+  align-items: center;
   line-height: 1.12;
 }
 
-.control-collapsed-copy small,
-.control-collapsed-copy strong,
-.control-collapsed-copy em {
+.control-collapsed-copy strong {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.control-collapsed-copy small {
-  color: var(--muted);
-  font-size: 0.46rem;
-  font-weight: 600;
-}
-
-.control-collapsed-copy strong {
-  font-size: 0.62rem;
-  font-weight: 760;
-}
-
-.control-collapsed-copy em {
-  color: var(--muted);
-  font-size: 0.46rem;
-  font-style: normal;
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
 }
 
 .control-expand-icon {
@@ -1376,32 +1416,7 @@ onBeforeUnmount(() => {
   color: var(--muted);
 }
 
-.control-collapsed-aqi {
-  display: inline-flex;
-  min-width: 25px;
-  height: 21px;
-  padding: 0 6px 0 5px;
-  flex: 0 0 auto;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-  border: 1px solid rgba(53, 165, 123, 0.16);
-  border-radius: 999px;
-  color: #21845f;
-  background: rgba(53, 165, 123, 0.11);
-  font-size: 0.48rem;
-  font-weight: 760;
-}
-
-.control-collapsed-aqi i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: currentColor;
-  box-shadow: 0 0 0 3px rgba(53, 165, 123, 0.1);
-}
-
-/* 未读通知角标：和 AQI 徽章同构，但用主题色表示「有新东西」。 */
+/* 未读通知角标：小胶囊徽章，主题色表示「有新东西」。 */
 .control-collapsed-badge {
   display: inline-flex;
   min-width: 25px;
@@ -1440,7 +1455,7 @@ onBeforeUnmount(() => {
   color: var(--theme);
 }
 
-/* 通知卡片内部：图标成为明确的视觉锚点，文字形成「状态 / 消息 / 时间」层级。 */
+/* 通知横幅：与常规内容同一套简洁单行文案，仅图标按级别着色。 */
 .control-panel.is-notifying .control-collapsed {
   padding: 9px 12px 10px 10px;
   gap: 10px;
@@ -1458,25 +1473,10 @@ onBeforeUnmount(() => {
   height: 18px;
 }
 
-.control-panel.is-notifying .control-collapsed-copy {
-  gap: 2px;
-}
-
-.control-notice-kicker {
-  color: var(--notice-accent, var(--theme)) !important;
-  letter-spacing: 0.08em;
-  line-height: 1;
-}
-
 .control-panel.is-notifying .control-collapsed-copy strong {
   color: var(--ink);
-  font-size: 0.68rem;
+  font-size: 0.8rem;
   line-height: 1.15;
-}
-
-.control-panel.is-notifying .control-collapsed-copy em {
-  color: var(--muted-strong);
-  font-size: 0.48rem;
 }
 
 .control-notice-open {
@@ -1674,6 +1674,72 @@ onBeforeUnmount(() => {
   transform: translateY(-7px) scale(0.985);
 }
 
+/* 清空动画：所有卡片作为一组同时向右收拢淡出——逐条错峰会在列表里
+   留下先消失卡片的"空洞"，整组退场与「暂无通知」的衔接才连贯。
+   40ms 起始延迟让点击有即时反馈，不至于和按钮态切换完全重叠。 */
+.control-notice-list.is-clearing .control-notice {
+  animation: control-notice-clear-out 0.3s cubic-bezier(0.4, 0, 0.7, 0.2) 40ms
+    forwards;
+  pointer-events: none;
+}
+
+@keyframes control-notice-clear-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(26px) scale(0.92);
+  }
+}
+
+/* 清空收尾的整体过渡（mode="out-in"）：空状态文字从下方 6px 处浮入
+   渐显。leave 分两种去向——列表卸载时卡片已全部不可见，用近零时长
+   立即让位；空状态文字在来新通知时才离开，保留短暂淡出。 */
+.control-notice-swap-enter-active {
+  transition:
+    opacity 0.3s ease,
+    transform 0.36s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.control-notice-swap-leave-active {
+  transition: opacity 0.16s ease;
+}
+
+.control-notice-swap-enter-from {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+.control-notice-swap-leave-to {
+  opacity: 0;
+}
+
+.control-notice-list.control-notice-swap-leave-active {
+  transition-duration: 0.01ms;
+}
+
+/* 清空按钮的进出场：来新通知挂载时淡入，历史清空卸载时淡出收场，
+   避免按钮在两个方向上都瞬间闪现/消失。 */
+.control-notice-clear-fade-enter-active,
+.control-notice-clear-fade-leave-active {
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s ease;
+}
+
+.control-notice-clear-fade-enter-from {
+  opacity: 0;
+  transform: scale(0.94);
+}
+
+.control-notice-clear-fade-leave-to {
+  opacity: 0;
+  transform: scale(0.94);
+}
+
 /* 空状态只留一行淡灰文字：不绘制图标、边框、玻璃底或阴影，
    仍占满内容区并居中，避免面板出现大片空白却无处落脚。 */
 .control-notice-empty {
@@ -1703,16 +1769,58 @@ onBeforeUnmount(() => {
   background: rgba(255, 255, 255, 0.58);
   font-size: 0.5rem;
   font-weight: 660;
+  cursor: pointer;
   transition:
     color 0.18s ease,
     border-color 0.18s ease,
-    background 0.18s ease;
+    background 0.18s ease,
+    transform 0.18s ease,
+    box-shadow 0.18s ease,
+    opacity 0.18s ease;
 }
 
 .control-notice-clear:hover {
   border-color: color-mix(in srgb, var(--theme) 20%, transparent);
   color: var(--theme-strong);
   background: #fff;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(54, 45, 106, 0.1);
+}
+
+.control-notice-clear:active {
+  transform: translateY(0) scale(0.95);
+  box-shadow: none;
+}
+
+/* 清空动画进行中：按钮降为次要角色，垃圾桶图标小幅摇摆提示正在清空。 */
+.control-notice-clear.is-clearing {
+  pointer-events: none;
+  opacity: 0.55;
+  transform: none;
+  box-shadow: none;
+}
+
+.control-notice-clear.is-clearing svg {
+  animation: control-notice-clear-icon 0.4s ease-in-out;
+}
+
+@keyframes control-notice-clear-icon {
+  0%,
+  100% {
+    transform: none;
+  }
+
+  25% {
+    transform: rotate(-14deg) translateY(-1px);
+  }
+
+  55% {
+    transform: rotate(12deg);
+  }
+
+  80% {
+    transform: rotate(-7deg);
+  }
 }
 
 .control-expanded {
@@ -1903,7 +2011,7 @@ onBeforeUnmount(() => {
   overflow: hidden;
   margin: 0;
   color: var(--ink-soft);
-  font-size: 0.66rem;
+  font-size: 0.8rem;
   font-weight: bold;
   line-height: 1.55;
 }
@@ -1911,7 +2019,7 @@ onBeforeUnmount(() => {
 .control-quote small {
   overflow: hidden;
   color: var(--muted);
-  font-size: 0.49rem;
+  font-size: 0.7rem;
   text-overflow: ellipsis;
   white-space: nowrap;
   text-align: end;
@@ -2093,7 +2201,8 @@ onBeforeUnmount(() => {
   font-size: 0.54rem;
 }
 
-.control-weather.is-unavailable .control-weather-icon svg {
+.control-weather.is-unavailable .control-weather-icon svg,
+.control-weather.is-unavailable .control-weather-icon img {
   animation: weather-pulse 1.8s ease-in-out infinite;
 }
 
@@ -2656,6 +2765,21 @@ onBeforeUnmount(() => {
   .control-notice-list-leave-active,
   .control-notice-list-move,
   .control-notice {
+    transition-duration: 0.01ms;
+  }
+
+  .control-notice-list.is-clearing .control-notice {
+    animation-duration: 0.01ms;
+    animation-delay: 0ms;
+  }
+
+  .control-notice-clear.is-clearing svg {
+    animation-duration: 0.01ms;
+  }
+
+  .control-notice-swap-enter-active,
+  .control-notice-swap-leave-active,
+  .control-notice-clear-fade-leave-active {
     transition-duration: 0.01ms;
   }
 }
