@@ -1,3 +1,4 @@
+import type { HomeWidgetCategoryId } from "./homeWidgetCategories";
 import type {
   HomeWidget,
   HomeWidgetSettings,
@@ -12,7 +13,23 @@ import type {
 export const HOME_GRID_COLUMNS = 16;
 export const HOME_GRID_ROWS = 4;
 
-export interface HomeWidgetDefinition {
+/** 组件在「添加组件」目录中的元信息。 */
+export interface HomeWidgetMeta {
+  /** 所属分类，决定组件出现在左侧导航的哪一栏。 */
+  category: HomeWidgetCategoryId;
+  /** 目录缩略图与列表使用的语义图标。 */
+  icon: IconName;
+  /** 能力标签；用最短的词说明这个组件读取什么、能做什么。 */
+  tags: string[];
+  settingsKind?: "link" | "game";
+  /** 只有需要适配不同内容长度的组件才开放尺寸调整。 */
+  resizable?: boolean;
+  /** 允许同时存在多个实例的组件（例如跳转按钮）。 */
+  multi?: boolean;
+  defaultVisible: boolean;
+}
+
+export interface HomeWidgetDefinition extends HomeWidgetMeta {
   type: HomeWidgetType;
   label: string;
   description: string;
@@ -23,14 +40,10 @@ export interface HomeWidgetDefinition {
     mobileColSpan: number;
     mobileRowSpan: number;
   };
-  settingsKind?: "link" | "game";
-  /** 只有需要适配不同内容长度的组件才开放尺寸调整。 */
-  resizable?: boolean;
-  defaultVisible: boolean;
 }
 
 /**
- * 创建首页组件目录项，统一描述位置、尺寸和设置类型。
+ * 创建首页组件目录项，统一描述位置、尺寸和展示元信息。
  *
  * @param type - 首页组件类型。
  * @param label - 组件在设置页显示的名称。
@@ -41,7 +54,7 @@ export interface HomeWidgetDefinition {
  * @param rowSpan - 组件默认占用的桌面行数。
  * @param mobileColSpan - 组件在移动端占用的列数。
  * @param mobileRowSpan - 组件在移动端占用的行数。
- * @param options - 组件设置类型、可调整性和默认可见性。
+ * @param meta - 分类、图标、能力标签与可选能力开关。
  * @returns 一个完整的首页组件目录项。
  */
 function definition(
@@ -54,12 +67,7 @@ function definition(
   rowSpan: number,
   mobileColSpan: number,
   mobileRowSpan: number,
-  options: Pick<
-    HomeWidgetDefinition,
-    "settingsKind" | "resizable" | "defaultVisible"
-  > = {
-    defaultVisible: true,
-  },
+  meta: HomeWidgetMeta,
 ): HomeWidgetDefinition {
   return {
     type,
@@ -67,14 +75,29 @@ function definition(
     description,
     defaultPosition: { col, row },
     defaultSize: { colSpan, rowSpan, mobileColSpan, mobileRowSpan },
-    ...options,
+    ...meta,
   };
 }
 
-/** 首页组件目录。新增组件只需要先在这里登记，再接入 HomePage 的组件映射。 */
+/**
+ * 首页组件目录。新增组件只需要先在这里登记，再接入 HomePage 的组件映射。
+ *
+ * 每一条同时承担三件事：首页网格的默认布局、设置面板的字段来源、
+ * 「添加组件」目录的分类与预览信息，因此不从定义里拆出第二份清单。
+ */
 export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
-  definition("greeting", "问候", "时间与问候语", 1, 1, 2, 2, 1, 1),
-  definition("feed", "动态摘要", "轮播式内容摘要", 5, 1, 4, 2, 2, 1),
+  definition("greeting", "问候", "时间与问候语", 1, 1, 2, 2, 1, 1, {
+    category: "basic",
+    icon: "sun",
+    tags: ["时间感知"],
+    defaultVisible: true,
+  }),
+  definition("feed", "动态摘要", "轮播式内容摘要", 5, 1, 4, 2, 2, 1, {
+    category: "content",
+    icon: "rss",
+    tags: ["文章轮播"],
+    defaultVisible: true,
+  }),
   definition(
     "collection",
     "bangumi收藏统计",
@@ -85,11 +108,37 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     2,
     2,
     1,
+    {
+      category: "content",
+      icon: "library",
+      tags: ["番剧统计"],
+      defaultVisible: true,
+    },
   ),
-  definition("friend", "友链", "一个外部站点入口", 13, 1, 2, 2, 1, 1),
-  definition("agent", "看板娘", "角色与人设展示", 15, 1, 2, 2, 1, 1),
-  definition("weather", "天气", "当前天气摘要", 1, 3, 2, 2, 2, 1),
-  definition("media", "网易云音乐", "最近播放与收藏", 3, 3, 4, 2, 2, 1),
+  definition("friend", "友链", "一个外部站点入口", 13, 1, 2, 2, 1, 1, {
+    category: "portal",
+    icon: "globe",
+    tags: ["轮播友链"],
+    defaultVisible: true,
+  }),
+  definition("agent", "看板娘", "角色与人设展示", 15, 1, 2, 2, 1, 1, {
+    category: "basic",
+    icon: "bot",
+    tags: ["人设展示"],
+    defaultVisible: true,
+  }),
+  definition("weather", "天气", "当前天气摘要", 1, 3, 2, 2, 2, 1, {
+    category: "basic",
+    icon: "cloud",
+    tags: ["实时天气"],
+    defaultVisible: true,
+  }),
+  definition("media", "网易云音乐", "最近播放与收藏", 3, 3, 4, 2, 2, 1, {
+    category: "media",
+    icon: "headphones",
+    tags: ["听歌统计"],
+    defaultVisible: true,
+  }),
   definition(
     "game",
     "游戏资料",
@@ -100,9 +149,20 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     2,
     2,
     1,
-    { settingsKind: "game", defaultVisible: true },
+    {
+      category: "portal",
+      icon: "game",
+      tags: ["绑定 UID"],
+      settingsKind: "game",
+      defaultVisible: true,
+    },
   ),
-  definition("music", "音乐播放器", "音乐播放状态", 11, 3, 2, 2, 1, 1),
+  definition("music", "音乐播放器", "音乐播放状态", 11, 3, 2, 2, 1, 1, {
+    category: "media",
+    icon: "music",
+    tags: ["播放控制"],
+    defaultVisible: true,
+  }),
   definition(
     "activities",
     "最近活动",
@@ -113,6 +173,12 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     2,
     2,
     1,
+    {
+      category: "content",
+      icon: "activity",
+      tags: ["全局活动"],
+      defaultVisible: true,
+    },
   ),
   definition(
     "link",
@@ -124,7 +190,15 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     2,
     1,
     1,
-    { settingsKind: "link", resizable: true, defaultVisible: false },
+    {
+      category: "portal",
+      icon: "link",
+      tags: ["可多实例"],
+      settingsKind: "link",
+      resizable: true,
+      multi: true,
+      defaultVisible: false,
+    },
   ),
   definition(
     "github",
@@ -136,7 +210,12 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     2,
     2,
     1,
-    { defaultVisible: true },
+    {
+      category: "content",
+      icon: "github",
+      tags: ["仓库数据"],
+      defaultVisible: true,
+    },
   ),
   definition(
     "bilibili",
@@ -148,7 +227,12 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     2,
     2,
     1,
-    { defaultVisible: false },
+    {
+      category: "content",
+      icon: "video",
+      tags: ["投稿数据"],
+      defaultVisible: false,
+    },
   ),
 ];
 

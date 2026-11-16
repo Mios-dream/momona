@@ -3,10 +3,23 @@ import { onMounted, ref } from 'vue';
 import { airQualityLabel, getWeatherInfo, type WeatherData } from '../../lib/weather';
 import IconGlyph from '../app/IconGlyph.vue';
 
+interface Props {
+  /**
+   * 目录预览模式。
+   *
+   * 预览只需要展示默认空态，不必真的请求天气，避免打开组件目录时
+   * 触发网络请求。
+   */
+  preview?: boolean;
+}
+
+const props = withDefaults(defineProps<Props>(), { preview: false });
+
 const weather = ref<WeatherData | null>(null);
-const loading = ref(true);
+const loading = ref(!props.preview);
 
 onMounted(async () => {
+  if (props.preview) return;
   weather.value = await getWeatherInfo();
   loading.value = false;
 });
@@ -32,7 +45,9 @@ onMounted(async () => {
     </template>
     <div v-else class="weather-empty">
       <IconGlyph :name="loading ? 'refresh' : 'cloud'" :size="21" />
-      <span>{{ loading ? '正在读取天气' : '天气暂不可用' }}</span>
+      <span>{{
+        loading ? "正在读取天气" : props.preview ? "添加后读取天气" : "天气暂不可用"
+      }}</span>
     </div>
   </section>
 </template>

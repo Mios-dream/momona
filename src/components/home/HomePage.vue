@@ -7,12 +7,10 @@ import {
   ref,
   watch,
 } from "vue";
-import type { Component } from "vue";
 import {
   HOME_GRID_COLUMNS,
   HOME_GRID_ROWS,
   createHomeWidget,
-  homeWidgetDefinitions,
 } from "../../data/homeWidgets";
 import {
   cloneLocalConfig,
@@ -29,21 +27,12 @@ import type {
 import FallbackImage from "../app/FallbackImage.vue";
 import HomeBuildInfo from "../app/HomeBuildInfo.vue";
 import IconGlyph from "../app/IconGlyph.vue";
-import HomeActivities from "./HomeActivities.vue";
-import HomeAgentCard from "./HomeAgentCard.vue";
-import HomeBilibiliCard from "./HomeBilibiliCard.vue";
-import HomeCollectionCard from "./HomeCollectionCard.vue";
-import HomeFeedCard from "./HomeFeedCard.vue";
-import HomeFriendCard from "./HomeFriendCard.vue";
-import HomeGameCard from "./HomeGameCard.vue";
-import HomeGithubCard from "./HomeGithubCard.vue";
-import HomeGreeting from "./HomeGreeting.vue";
-import HomeLinkCard from "./HomeLinkCard.vue";
-import HomeMediaPairCard from "./HomeMediaPairCard.vue";
-import HomeMusicCard from "./HomeMusicCard.vue";
-import HomeWeatherCard from "./HomeWeatherCard.vue";
+import HomeWidgetCatalog from "./HomeWidgetCatalog.vue";
 import HomeWidgetEditor from "./HomeWidgetEditor.vue";
+import { homeWidgetComponents } from "./homeWidgetComponents";
+import { homeWidgetProps } from "../../utils/homeWidgetProps";
 import { findNearestWidgetPosition, widgetStyle } from "../../utils/homeGrid";
+import { catalogEntry } from "../../utils/widgetCatalog";
 
 interface Props {
   siteData: SiteData;
@@ -60,22 +49,6 @@ const props = withDefaults(defineProps<Props>(), {
 const emit = defineEmits<{
   "config-change": [config: LocalConfig, persist?: boolean];
 }>();
-
-const widgetComponents: Record<HomeWidgetType, Component> = {
-  greeting: HomeGreeting,
-  feed: HomeFeedCard,
-  friend: HomeFriendCard,
-  agent: HomeAgentCard,
-  collection: HomeCollectionCard,
-  weather: HomeWeatherCard,
-  media: HomeMediaPairCard,
-  music: HomeMusicCard,
-  game: HomeGameCard,
-  activities: HomeActivities,
-  link: HomeLinkCard,
-  github: HomeGithubCard,
-  bilibili: HomeBilibiliCard,
-};
 
 const isEditing = ref(false);
 const isClient = ref(false);
@@ -150,16 +123,13 @@ function widgetDisplayName(widget: HomeWidget): string {
     : widget.label;
 }
 
-/** 暴露首页组件目录供编辑器渲染。 */
-const widgetCatalogDefinitions = computed(() => homeWidgetDefinitions);
-
 /** 根据编辑状态选择配置组件或公开快照中的可见组件。 */
 const activeWidgets = computed(() => {
   const widgets = isEditing.value
     ? editorConfig.value.widgets
     : props.siteData.homeWidgets;
   return widgets.filter(
-    (widget) => widget.visible && widgetComponents[widget.type],
+    (widget) => widget.visible && homeWidgetComponents[widget.type],
   );
 });
 
@@ -174,60 +144,19 @@ const gridRowCount = computed(() =>
 /**
  * 将统一组件配置映射为具体首页组件所需的 props。
  *
+ * 具体映射逻辑在共享工具 homeWidgetProps 中，与「添加组件」弹窗的
+ * 实时预览共用，保证预览与实际渲染结果一致。
+ *
  * @param widget - 当前要渲染的首页组件配置。
  * @returns 传给具体 Vue 组件的属性对象。
  */
 function widgetProps(widget: HomeWidget): Record<string, unknown> {
-  switch (widget.type) {
-    case "feed":
-      return { repositories: props.siteData.repositories };
-    case "collection":
-      return { stats: props.siteData.homeMedia.bangumi };
-    case "activities":
-      return { activities: props.siteData.activities };
-    case "friend":
-      return {
-        friends: props.siteData.friends,
-        interval: widget.settings?.friend?.interval,
-      };
-    case "agent":
-      return { profile: props.siteData.profile };
-    case "media":
-      return { stats: props.siteData.homeMedia.netease };
-    case "game":
-      return {
-        settings: widget.settings?.game,
-        interactive: !isEditing.value,
-      };
-    case "music":
-      return {
-        track: props.siteData.music,
-        catalog: props.siteData.musicCatalog,
-        editable: props.editable,
-      };
-    case "link":
-      return {
-        settings:
-          widget.settings?.link ?? createHomeWidget("link").settings?.link,
-      };
-    case "github":
-      return {
-        repositories: props.siteData.repositories,
-        sort:
-          props.localConfig?.sources.github.content.githubRepositorySort ??
-          "updated",
-      };
-    case "bilibili":
-      return {
-        videos: props.siteData.libraryTiles.filter(
-          (tile) =>
-            tile.id.startsWith("bilibili-") ||
-            tile.subtitle.toLocaleLowerCase().includes("bilibili"),
-        ),
-      };
-    default:
-      return {};
-  }
+  return homeWidgetProps(widget, {
+    siteData: props.siteData,
+    localConfig: props.localConfig,
+    editable: props.editable,
+    interactive: !isEditing.value,
+  });
 }
 
 /**
@@ -432,46 +361,24 @@ function handleWidgetSurfaceClick(event: MouseEvent, widget: HomeWidget): void {
 }
 
 /**
- * 返回组件目录中某类组件的当前状态文案。
- *
- * @param type - 组件目录中的组件类型。
- * @returns 添加、已启用或可启用等状态文案。
- */
-function widgetCatalogState(type: HomeWidgetType): string {
-  if (type === "link") return "新增";
-  const current = editorConfig.value.widgets.find(
-    (widget) => widget.type === type,
-  );
-  return current ? (current.visible ? "已启用" : "可启用") : "可添加";
-}
-
-/**
- * 判断组件目录中的添加按钮是否应被禁用。
- *
- * @param type - 组件目录中的组件类型。
- * @returns 当前类型已经存在可见组件时返回 true。
- */
-function isWidgetCatalogDisabled(type: HomeWidgetType): boolean {
-  if (type === "link") return false;
-  return editorConfig.value.widgets.some(
-    (widget) => widget.type === type && widget.visible,
-  );
-}
-
-/**
  * 新增或重新启用一个首页组件，并为其寻找可用位置。
+ *
+ * 单实例组件命中已有配置时只做「重新启用」，多实例组件（例如跳转按钮）
+ * 每次都会插入一个新实例；两条路径共用同一套网格寻位算法。
  *
  * @param type - 需要新增或重新启用的组件类型。
  * @returns 无返回值；组件位置由公共网格工具统一计算。
  */
 function addWidget(type: HomeWidgetType): void {
+  const entry = catalogEntry(type);
   const current = editorConfig.value.widgets.find(
     (widget) => widget.type === type,
   );
+  const reuseCurrent = Boolean(current) && !entry.definition.multi;
   let nextWidgets = editorConfig.value.widgets.slice();
-  let addedLabel = type === "link" ? "跳转按钮" : widgetCatalogState(type);
+  let addedLabel: string;
 
-  if (current && type !== "link") {
+  if (current && reuseCurrent) {
     const position = findNearestWidgetPosition(
       editorConfig.value.widgets,
       current,
@@ -491,7 +398,7 @@ function addWidget(type: HomeWidgetType): void {
   } else {
     const widget = createHomeWidget(
       type,
-      type === "link" ? `link-${Date.now()}` : type,
+      entry.definition.multi ? `${type}-${Date.now()}` : type,
     );
     const position = findNearestWidgetPosition(
       editorConfig.value.widgets,
@@ -508,7 +415,7 @@ function addWidget(type: HomeWidgetType): void {
     addedLabel = widgetDisplayName(widget);
   }
 
-  widgetCatalogOpen.value = false;
+  // 目录保持打开，方便连续挑选多个组件；卡片自身会切到「已添加」状态。
   emitConfigChange(
     { ...editorConfig.value, widgets: nextWidgets },
     `${addedLabel} 已加入首页`,
@@ -669,7 +576,7 @@ onBeforeUnmount(() => {
                     class="home-edit-action"
                     :tabindex="isEditing ? 0 : -1"
                     title="添加组件"
-                    @click="widgetCatalogOpen = !widgetCatalogOpen"
+                    @click="widgetCatalogOpen = true"
                   >
                     <IconGlyph name="plus" :size="14" />添加组件
                   </button>
@@ -684,55 +591,6 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
               </div>
-              <Transition name="home-widget-catalog">
-                <div
-                  v-if="widgetCatalogOpen"
-                  class="home-widget-catalog"
-                  @click.stop
-                >
-                  <div class="home-widget-catalog-head">
-                    <div>
-                      <strong>添加组件</strong>
-                      <small>选择后会直接放入首页网格。</small>
-                    </div>
-                    <button
-                      type="button"
-                      class="home-widget-catalog-close"
-                      aria-label="关闭组件目录"
-                      title="关闭组件目录"
-                      @click="widgetCatalogOpen = false"
-                    >
-                      <IconGlyph name="x" :size="14" />
-                    </button>
-                  </div>
-                  <div class="home-widget-catalog-grid">
-                    <article
-                      v-for="definition in widgetCatalogDefinitions"
-                      :key="definition.type"
-                      class="home-widget-catalog-item"
-                    >
-                      <div>
-                        <strong>{{ definition.label }}</strong>
-                        <small>{{ definition.description }}</small>
-                      </div>
-                      <button
-                        type="button"
-                        :disabled="isWidgetCatalogDisabled(definition.type)"
-                        @click="addWidget(definition.type)"
-                      >
-                        <IconGlyph
-                          :name="
-                            isWidgetCatalogDisabled(definition.type)
-                              ? 'check'
-                              : 'plus'
-                          "
-                          :size="13"
-                        />{{ widgetCatalogState(definition.type) }}
-                      </button>
-                    </article>
-                  </div>
-                </div>
-              </Transition>
               <Transition name="home-edit-notice">
                 <small v-if="editorNotice" class="home-edit-notice">{{
                   editorNotice
@@ -758,7 +616,7 @@ onBeforeUnmount(() => {
               :style="widgetStyle(widget, index)"
             >
               <component
-                :is="widgetComponents[widget.type]"
+                :is="homeWidgetComponents[widget.type]"
                 v-bind="widgetProps(widget)"
               />
               <div
@@ -814,6 +672,13 @@ onBeforeUnmount(() => {
         @fetch-game="fetchGameAccount"
       />
     </Transition>
+
+    <HomeWidgetCatalog
+      :open="isEditing && widgetCatalogOpen"
+      :widgets="editorConfig.widgets"
+      @close="widgetCatalogOpen = false"
+      @add="addWidget"
+    />
   </div>
 </template>
 
@@ -1050,8 +915,6 @@ onBeforeUnmount(() => {
 
   .home-edit-toolbar,
   .home-edit-state,
-  .home-widget-catalog-enter-active,
-  .home-widget-catalog-leave-active,
   .home-edit-notice-enter-active,
   .home-edit-notice-leave-active {
     transition-duration: 0.01ms;
@@ -1242,134 +1105,6 @@ onBeforeUnmount(() => {
     opacity 0.22s ease,
     transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
     visibility 0s linear 0s;
-}
-
-.home-widget-catalog {
-  position: absolute;
-  z-index: 40;
-  top: calc(100% + 8px);
-  right: 0;
-  width: min(330px, calc(100vw - 32px));
-  max-height: min(430px, calc(100svh - 100px));
-  padding: 12px;
-  overflow: auto;
-  border: 1px solid rgba(255, 255, 255, 0.92);
-  border-radius: 12px;
-  background: rgba(252, 253, 255, 0.94);
-  box-shadow: 0 22px 48px rgba(47, 45, 91, 0.2);
-  backdrop-filter: var(--glass-blur);
-}
-
-.home-widget-catalog-enter-active,
-.home-widget-catalog-leave-active {
-  transform-origin: top right;
-  will-change: opacity, transform;
-  transition:
-    opacity 0.18s ease,
-    transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-.home-widget-catalog-enter-from,
-.home-widget-catalog-leave-to {
-  opacity: 0;
-  transform: translate3d(0, -8px, 0) scale(0.97);
-}
-
-.home-widget-catalog-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.home-widget-catalog-head > div {
-  display: grid;
-  gap: 3px;
-}
-
-.home-widget-catalog-head strong {
-  font-size: 0.64rem;
-}
-
-.home-widget-catalog-head small {
-  color: var(--muted);
-  font-size: 0.54rem;
-}
-
-.home-widget-catalog-close {
-  display: grid;
-  width: 27px;
-  height: 27px;
-  padding: 0;
-  place-items: center;
-  border: 1px solid rgba(118, 126, 151, 0.18);
-  border-radius: 7px;
-  color: var(--muted-strong);
-  background: rgba(255, 255, 255, 0.7);
-}
-
-.home-widget-catalog-close:hover {
-  color: var(--theme-strong);
-  background: #fff;
-}
-
-.home-widget-catalog-grid {
-  display: grid;
-  margin-top: 10px;
-  gap: 6px;
-}
-
-.home-widget-catalog-item {
-  display: flex;
-  min-width: 0;
-  padding: 8px;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  border-radius: 8px;
-  background: rgba(245, 246, 252, 0.72);
-}
-
-.home-widget-catalog-item > div {
-  display: grid;
-  min-width: 0;
-  gap: 3px;
-}
-
-.home-widget-catalog-item strong,
-.home-widget-catalog-item small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-widget-catalog-item strong {
-  font-size: 0.58rem;
-}
-
-.home-widget-catalog-item small {
-  color: var(--muted);
-  font-size: 0.5rem;
-}
-
-.home-widget-catalog-item > button {
-  display: inline-flex;
-  min-height: 27px;
-  padding: 0 7px;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: 4px;
-  border: 1px solid color-mix(in srgb, var(--theme) 18%, transparent);
-  border-radius: 7px;
-  color: var(--theme-strong);
-  background: color-mix(in srgb, var(--theme) 8%, transparent);
-  font-size: 0.52rem;
-}
-
-.home-widget-catalog-item > button:disabled {
-  cursor: default;
-  color: var(--green);
-  background: rgba(53, 165, 123, 0.08);
 }
 
 .home-edit-action {

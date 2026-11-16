@@ -9,6 +9,13 @@ interface Props {
   track?: MusicSettings;
   catalog?: MusicCatalog;
   editable?: boolean;
+  /**
+   * 目录预览模式。
+   *
+   * 预览只展示默认空态，不能订阅全局播放器状态，否则会把用户正在听的
+   * 歌带进组件目录。
+   */
+  preview?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -20,6 +27,7 @@ const props = withDefaults(defineProps<Props>(), {
    */
   catalog: () => ({ playlists: [] }),
   editable: false,
+  preview: false,
 });
 
 interface State {
@@ -70,6 +78,7 @@ function toggle(): void {
 }
 
 onMounted(() => {
+  if (props.preview) return;
   window.addEventListener("music-player-state-change", handleState);
   window.dispatchEvent(new CustomEvent("music-player-request-state"));
 });
