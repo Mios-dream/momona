@@ -7,12 +7,20 @@ import {
 import { normalizeFriendLink } from "./friends";
 import { dataSourceIds } from "./sourceCatalog";
 import { defaultThemeColor, normalizeThemeColor } from "./theme";
+import {
+  defaultWallpaperImage,
+  isWallpaperMode,
+  legacyWallpaperImages,
+  wallpaperProviderById,
+  wallpaperRotateOptions,
+} from "./wallpapers";
 import type {
   HomeWidget,
   IconName,
   LinkWidgetSettings,
   LocalConfig,
   MusicSettings,
+  SiteBackground,
   SiteProfile,
   SiteSettings,
   SocialLink,
@@ -86,7 +94,153 @@ function defaultSiteSettings(): SiteSettings {
     description: "Momona 期待和你相遇的每一天。",
     favicon: "/favicon.svg",
     theme: defaultThemeColor,
+    background: defaultSiteBackground(),
   };
+}
+
+/**
+ * 创建默认壁纸参数。
+ *
+ * 数值与改造前 `global.css` 里写死的壁纸常量一一对应，
+ * 这样老配置文件缺字段时看起来和不升级完全一样。
+ * 壁纸库默认为空，内容来自 `public/wallpapers` 目录扫描结果。
+ */
+export function defaultSiteBackground(): SiteBackground {
+  return {
+    image: defaultWallpaperImage,
+    pool: [],
+    mode: "fixed",
+    rotateMinutes: 30,
+    remoteSources: [],
+    remoteCustom: "",
+    overlay: 0,
+    blur: 4,
+    saturate: 0.82,
+    parallax: true,
+  };
+}
+
+/**
+ * 把未知输入夹到区间内，非数字时退回默认值。
+ *
+ * @param value - 待校验的未知输入。
+ * @param min - 允许的最小值。
+ * @param max - 允许的最大值。
+ * @param fallback - 输入不可用时的默认值。
+ * @returns 落在区间内的数字。
+ */
+function clampNumber(
+  value: unknown,
+  min: number,
+  max: number,
+  fallback: number,
+): number {
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim() !== ""
+        ? Number(value)
+        : Number.NaN;
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
+}
+
+/**
+ * 规范化背景参数。
+ *
+ * 每一项都有独立的取值区间，越界时夹回区间而不是整体丢弃，
+ * 这样手改配置文件写了 `blur: 80` 只会变成上限，不会让整块背景消失。
+ */
+function normalizeSiteBackground(value: unknown): SiteBackground {
+  const record = isRecord(value) ? value : {};
+  const fallback = defaultSiteBackground();
+  return {
+    image: normalizeWallpaperImage(record.image, fallback.image),
+    pool: normalizeWallpaperPool(record.pool),
+    mode: isWallpaperMode(record.mode) ? record.mode : fallback.mode,
+    rotateMinutes: normalizeRotateMinutes(record.rotateMinutes),
+    remoteSources: normalizeRemoteSources(record.remoteSources),
+    remoteCustom: text(record.remoteCustom),
+    overlay: clampNumber(record.overlay, 0, 0.9, fallback.overlay),
+    blur: clampNumber(record.blur, 0, 24, fallback.blur),
+    saturate: clampNumber(record.saturate, 0.3, 1.4, fallback.saturate),
+    parallax:
+      typeof record.parallax === "boolean" ? record.parallax : fallback.parallax,
+  };
+}
+
+/** 壁纸库最多保留的条目数，防止误粘贴一长串地址把配置撑爆。 */
+const maxWallpaperPoolSize = 60;
+
+/**
+ * 读取单张壁纸的绘制值，并把旧版路径迁移到壁纸目录。
+ *
+ * @param value - 配置里的壁纸值。
+ * @param fallback - 值不可用时的兜底值。
+ * @returns 迁移后的壁纸值；输入不是字符串时返回兜底值。
+ */
+function normalizeWallpaperImage(value: unknown, fallback: string): string {
+  if (typeof value !== "string") return fallback;
+  const image = value.trim();
+  return legacyWallpaperImages[image] ?? image;
+}
+
+/**
+ * 过滤壁纸库：去空、去重、迁移旧路径，并限制总条数。
+ *
+ * @param value - 配置里的壁纸库数组。
+ * @returns 可直接参与随机与轮换的壁纸地址列表。
+ */
+function normalizeWallpaperPool(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set<string>();
+  const pool: string[] = [];
+  for (const entry of value) {
+    const image = normalizeWallpaperImage(entry, "");
+    if (!image || seen.has(image)) continue;
+    seen.add(image);
+    pool.push(image);
+    if (pool.length >= maxWallpaperPoolSize) break;
+  }
+  return pool;
+}
+
+/**
+ * 把轮换间隔吸附到设置页提供的档位。
+ *
+ * 手改配置写了 `rotateMinutes: 42` 时，直接夹区间会让下拉框显示成空值；
+ * 吸附到最近的档位，界面和实际行为才一致。
+ *
+ * @param value - 配置里的间隔分钟数。
+ * @returns 最接近的合法档位；输入不可用时返回默认档位。
+ */
+function normalizeRotateMinutes(value: unknown): number {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return defaultSiteBackground().rotateMinutes;
+  return wallpaperRotateOptions.reduce(
+    (nearest, option) =>
+      Math.abs(option.value - numeric) < Math.abs(nearest - numeric)
+        ? option.value
+        : nearest,
+    wallpaperRotateOptions[0].value,
+  );
+}
+
+/**
+ * 过滤网络图源开关，只保留已注册的图源 ID。
+ *
+ * @param value - 配置里的图源 ID 数组。
+ * @returns 去重且按目录顺序排列的合法图源 ID。
+ */
+function normalizeRemoteSources(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const enabled = new Set(
+    value.flatMap((entry) => {
+      const id = text(entry);
+      return id && wallpaperProviderById(id) ? [id] : [];
+    }),
+  );
+  return [...enabled];
 }
 
 /**
@@ -288,6 +442,7 @@ function normalizeSiteSettings(value: unknown): SiteSettings {
     description: text(record.description) || "一个静态的个人数字生活展示入口。",
     favicon: text(record.favicon) || "/favicon.svg",
     theme: normalizeThemeColor(record.theme),
+    background: normalizeSiteBackground(record.background),
   };
 }
 

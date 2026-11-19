@@ -18,6 +18,11 @@
    *
    * 组件只使用这三个变量，不再各自手写半透明渐变，
    * 否则透明度稍有差异就会让某些卡片被背景干扰。
+   *
+   * 用法边界（细节见 docs/design-language.md）：
+   * 玻璃只做「窗」，不做「纸」——窗是页面外壳和浮层外框，一旦进入窗内，
+   * 就只剩不透明表面。透射永远只有一层；需要第二个层级时用留白和发丝线，
+   * 而不是再叠一层更白的玻璃，叠到第三层壁纸就成了内容本身。
    */
   --glass: rgba(255, 255, 255, 0.68);
   --glass-strong: rgba(255, 255, 255, 0.86);
@@ -26,6 +31,14 @@
   --glass-shadow:
     0 1px 0 rgba(255, 255, 255, 0.52) inset, 0 13px 34px rgba(54, 45, 106, 0.13);
   --glass-blur: blur(21px) saturate(148%);
+  /**
+   * 发丝线：不透明表面上唯一允许的边界。
+   *
+   * 白描边的强度随背景明度浮动，墨线在纸上则恒定——所以「光」和「墨」
+   * 各有各的地盘：浮在壁纸上的用白，落在纸上的用墨，不能混用。
+   */
+  --hairline: rgba(19, 26, 45, 0.08);
+  --hairline-soft: rgba(19, 26, 45, 0.055);
   --content-surface: #fbfcff;
   --content-border: rgba(255, 255, 255, 0.84);
   --content-shadow: 0 10px 25px rgba(72, 56, 135, 0.08);
@@ -197,13 +210,19 @@ img {
  * 缩放、模糊强度、色调与过渡全部在这里集中定义，页面只允许覆写底色。
  * 任何页面都不该单独调整壁纸的缩放或模糊，否则跨页面切换时会出现跳变。
  */
+/*
+ * 壁纸层。壳层同时渲染两层，切换时旧层淡出、新层淡入——
+ * 只改 background-image 是没有过渡的，会硬切成"闪一下"。
+ * 两层共用同一套视差与滤镜变量，淡入淡出期间观感连续。
+ */
 .app-background {
   position: fixed;
   z-index: -2;
   inset: -28px;
-  background-image: url("/assets/cyrene-wallpaper.webp");
+  background-image: var(--background-paint, url("/wallpapers/cyrene.webp"));
   background-position: center;
   background-size: cover;
+  opacity: 0;
   --background-blur: 4px;
   --background-saturate: 0.82;
   --background-brightness: 1.04;
@@ -216,9 +235,14 @@ img {
   /* 放大 4% 让视差位移始终有壁纸覆盖，所有页面共用同一比例。 */
   transform: translate3d(var(--parallax-x), var(--parallax-y), 0) scale(1.04);
   transition:
+    opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
     transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
     filter 0.82s cubic-bezier(0.22, 1, 0.36, 1);
   will-change: transform;
+}
+
+.app-background.is-visible {
+  opacity: 1;
 }
 
 /* 模式 static：整体模糊，焦点值恒为 0，强度固定为 --background-blur。 */
@@ -229,6 +253,7 @@ img {
 /* 模式 pointer：焦点值由 AppShell 按指针位置写入，过渡收紧以跟随指针。 */
 .app-frame[data-background-blur-mode="pointer"] .app-background {
   transition:
+    opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
     transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
     filter 0.42s ease;
 }
@@ -244,6 +269,21 @@ img {
   z-index: -1;
   inset: 0;
   pointer-events: none;
+}
+
+/*
+ * 背景遮罩：一层恒定浓度的白，用来压低壁纸的对比度。
+ *
+ * 它刻意和壁纸分开成两块：壁纸带视差会位移，遮罩不动，
+ * 否则遮罩跟着壁纸走，等于没遮——用户看到的是同一个图案换了个位置。
+ * 浓度由设置页写入 `--background-overlay`，默认 0，不改变原有观感。
+ */
+.app-background-overlay::before {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: rgba(247, 248, 253, var(--background-overlay, 0));
+  transition: background 0.32s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 /*

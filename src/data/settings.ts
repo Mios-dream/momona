@@ -42,9 +42,15 @@ export interface SourceCard {
   }>;
 }
 
-/** 设置页的一级标签。 */
+/**
+ * 设置页的一级标签。
+ *
+ * 标签文字一律两个字：这一行同时承载页面标题、导航和保存动作，
+ * 任何一项变长都会把窗口头部撑开，破坏"一条栏"的整体感。
+ */
 export type SettingsTab =
   | "profile"
+  | "appearance"
   | "data"
   | "status";
 
@@ -159,9 +165,10 @@ export const settingsTabs: Array<{
   label: string;
   icon: IconName;
 }> = [
-  { id: "profile", label: "基础设置", icon: "settings" },
-  { id: "data", label: "数据管理", icon: "globe" },
-  { id: "status", label: "同步状态", icon: "activity" },
+  { id: "profile", label: "基础", icon: "settings" },
+  { id: "appearance", label: "外观", icon: "palette" },
+  { id: "data", label: "数据", icon: "globe" },
+  { id: "status", label: "状态", icon: "activity" },
 ];
 
 /**

@@ -4,6 +4,7 @@ import vue from "@astrojs/vue";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { localSettingsServerPlugin } from "./src/integrations/localSettingsServerPlugin.mjs";
+import { wallpaperIndexPlugin } from "./src/integrations/wallpaperIndexPlugin.mjs";
 
 const packageMetadata = JSON.parse(
   readFileSync(new URL("./package.json", import.meta.url), "utf8"),
@@ -46,5 +47,9 @@ export default defineConfig({
       __MOMONA_REVISION__: JSON.stringify(buildRevision),
     },
   },
-  integrations: [vue({ devtools: false }), localSettingsServerPlugin],
+  integrations: [
+    vue({ devtools: false }),
+    wallpaperIndexPlugin,
+    localSettingsServerPlugin,
+  ],
 });

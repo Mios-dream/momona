@@ -23,3 +23,29 @@ export const backgroundBlurModeByPage: Record<AppPage, BackgroundBlurMode> = {
   brew: "static",
   settings: "static",
 };
+
+/**
+ * 把壁纸值转成合法的 `background-image` 值。
+ *
+ * 允许三种写法：空串（只用底色）、渐变、以及图片地址。图片地址不强制写
+ * `url()`，因为设置页的输入框里让用户敲 `url("…")` 是没必要的负担。
+ *
+ * 随机与定时轮换最终也走这里：候选池里的每一项都会被翻译成同一个绘制值，
+ * 所以壁纸层不需要区分"固定图"和"轮换图"。
+ *
+ * @param image - 配置文件里保存的壁纸值。
+ * @returns 可直接写入 CSS 的 `background-image` 值。
+ */
+export function backgroundImageValue(image: string): string {
+  const value = image.trim();
+  if (!value) return "none";
+  if (
+    value.startsWith("url(") ||
+    value.startsWith("linear-gradient") ||
+    value.startsWith("radial-gradient") ||
+    value.startsWith("conic-gradient")
+  ) {
+    return value;
+  }
+  return `url("${value}")`;
+}

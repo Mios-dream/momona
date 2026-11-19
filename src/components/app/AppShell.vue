@@ -1,8 +1,16 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { backgroundBlurModeByPage } from "../../data/background";
+import {
+  backgroundBlurModeByPage,
+  backgroundImageValue,
+} from "../../data/background";
+import { useWallpaper, type WallpaperLayer } from "../../composables/useWallpaper";
 import { getAppPageFromPath } from "../../data/routes";
-import { cloneLocalConfig, normalizeLocalConfig } from "../../data/localConfig";
+import {
+  cloneLocalConfig,
+  defaultSiteBackground,
+  normalizeLocalConfig,
+} from "../../data/localConfig";
 import { applyThemeColor } from "../../lib/theme";
 import { applyLocalConfigToSiteData } from "../../lib/dataSources/index";
 import type {
@@ -11,6 +19,7 @@ import type {
   LibraryFilter,
   LocalConfig,
   MusicSettings,
+  SiteBackground,
   SiteData,
 } from "../../data/types";
 import BrewPage from "../brew/BrewPage.vue";
@@ -104,13 +113,46 @@ function syncSettingsViewportLock(): void {
 const parallaxX = ref(0);
 const parallaxY = ref(0);
 const backgroundFocus = ref(0);
+/**
+ * 设置页里尚未保存的背景草稿。
+ *
+ * 背景是"调一下就能看到"的参数，走保存再预览会让人失去判断依据，
+ * 所以由设置页把草稿推上来即时生效；离开设置页或保存后自动退回配置值。
+ */
+const previewBackground = ref<SiteBackground | null>(null);
+const activeBackground = computed<SiteBackground>(
+  () =>
+    previewBackground.value ??
+    runtimeConfig.value.site.background ??
+    defaultSiteBackground(),
+);
 const backgroundBlurMode = computed(
   () => backgroundBlurModeByPage[currentPage.value],
 );
-const backgroundStyle = computed<Record<string, string>>(() => {
+/**
+ * 壁纸切换引擎：随机、定时轮换与网络图源都走这里。
+ *
+ * 壳层只拿 `layers` 做渲染，两层交替淡入淡出，因此换图不会出现黑屏或重排。
+ */
+const wallpaper = useWallpaper(activeBackground);
+const wallpaperLayers = wallpaper.layers;
+
+/**
+ * 生成某一层壁纸的行内样式。
+ *
+ * 视差、模糊、饱和度是全局参数，两层一致；只有绘制值跟着层走。
+ *
+ * @param layer - 待渲染的壁纸层。
+ * @returns 可直接绑定的 CSS 变量集合。
+ */
+function backgroundStyleFor(layer: WallpaperLayer): Record<string, string> {
+  const background = activeBackground.value;
   const style: Record<string, string> = {
     "--parallax-x": `${parallaxX.value.toFixed(2)}px`,
     "--parallax-y": `${parallaxY.value.toFixed(2)}px`,
+    "--background-paint": backgroundImageValue(layer.image),
+    "--background-blur": `${background.blur}px`,
+    "--background-saturate": String(background.saturate),
   };
 
   // 只有跟随指针的模式需要行内焦点值；其余模式交由样式表里的统一取值决定。
@@ -119,7 +161,11 @@ const backgroundStyle = computed<Record<string, string>>(() => {
   }
 
   return style;
-});
+}
+/** 遮罩写在覆盖层上，和壁纸分开，避免它跟着视差一起移动。 */
+const overlayStyle = computed<Record<string, string>>(() => ({
+  "--background-overlay": String(activeBackground.value.overlay),
+}));
 
 let animationFrame: number | null = null;
 let pointerOffsetX = 0;
@@ -133,6 +179,12 @@ let scrollOffset = 0;
  */
 function updateParallax(): void {
   animationFrame = null;
+  if (!activeBackground.value.parallax) {
+    parallaxX.value = 0;
+    parallaxY.value = 0;
+    backgroundFocus.value = 0;
+    return;
+  }
   parallaxX.value = pointerOffsetX * 10;
   parallaxY.value = pointerOffsetY * 8 - Math.min(scrollOffset, 720) * 0.025;
   // 鼠标从屏幕底部上移时逐步清晰，进入屏幕上方 1/5 后完全取消模糊。
@@ -390,7 +442,43 @@ watch(currentPage, (page, previousPage) => {
   if (page === "brew" && previousPage !== "brew") {
     activeBrewSection.value = "articles";
   }
+  // 离开设置页就撤掉背景草稿，避免未保存的观感被带到其他页面。
+  if (page !== "settings") previewBackground.value = null;
 });
+
+/**
+ * 接收设置页推上来的背景草稿。
+ *
+ * @param background - 待预览的背景参数；null 表示退回已保存的配置。
+ * @returns 无返回值。
+ */
+function handleBackgroundPreview(background: SiteBackground | null): void {
+  previewBackground.value = background;
+}
+
+/**
+ * 设置页的"换一张"：立刻切一张壁纸，不需要保存配置。
+ *
+ * 用自定义事件而不是把引擎暴露给设置页，是因为设置页只拿到配置草稿、
+ * 拿不到壁纸层；事件是最小的一根线。
+ *
+ * @returns 无返回值。
+ */
+function handleWallpaperShuffle(): void {
+  void wallpaper.advance();
+}
+
+/**
+ * 设置页重新扫描目录后，让切换引擎换成新的壁纸库。
+ *
+ * 否则新图片能出现在设置页的网格里，却不会参与随机与轮换，
+ * 要刷新整页才"生效"——那种延迟很难被理解为缓存。
+ *
+ * @returns 无返回值。
+ */
+function handleWallpaperRefresh(): void {
+  void wallpaper.refreshLibrary();
+}
 
 onMounted(() => {
   currentPage.value = getAppPageFromPath(window.location.pathname, props.page);
@@ -415,6 +503,8 @@ onMounted(() => {
     "music-player-config-change",
     handleMusicConfigChange,
   );
+  window.addEventListener("momona-wallpaper-shuffle", handleWallpaperShuffle);
+  window.addEventListener("momona-wallpaper-refresh", handleWallpaperRefresh);
 });
 
 onBeforeUnmount(() => {
@@ -428,6 +518,8 @@ onBeforeUnmount(() => {
     "music-player-config-change",
     handleMusicConfigChange,
   );
+  window.removeEventListener("momona-wallpaper-shuffle", handleWallpaperShuffle);
+  window.removeEventListener("momona-wallpaper-refresh", handleWallpaperRefresh);
   if (animationFrame !== null) window.cancelAnimationFrame(animationFrame);
   if (configSaveTimer !== null) window.clearTimeout(configSaveTimer);
 });
@@ -442,11 +534,14 @@ onBeforeUnmount(() => {
     @click.capture="handleAppClick"
   >
     <div
+      v-for="layer in wallpaperLayers"
+      :key="layer.key"
       class="app-background"
-      :style="backgroundStyle"
+      :class="{ 'is-visible': layer.visible }"
+      :style="backgroundStyleFor(layer)"
       aria-hidden="true"
     ></div>
-    <div class="app-background-overlay" aria-hidden="true"></div>
+    <div class="app-background-overlay" :style="overlayStyle" aria-hidden="true"></div>
     <NavigationRail
       :page="currentPage"
       :library-filter="activeLibraryFilter"
@@ -507,6 +602,7 @@ onBeforeUnmount(() => {
             :site-data="runtimeSiteData"
             :local-config="runtimeConfig"
             @config-change="handleHomeConfigChange"
+            @background-preview="handleBackgroundPreview"
           />
         </Transition>
       </main>

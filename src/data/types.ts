@@ -216,6 +216,44 @@ export interface SiteProfile {
   avatar: string;
 }
 
+/**
+ * 壁纸的切换策略。
+ *
+ * - `fixed`：只画 `image`，行为和改造前完全一致。
+ * - `random`：每次打开页面从壁纸库随机挑一张。
+ * - `rotate`：打开期间按 `rotateMinutes` 自动换图。
+ */
+export type WallpaperMode = "fixed" | "random" | "rotate";
+
+/**
+ * 站点背景的显示参数。
+ *
+ * 只描述「壁纸怎么画、怎么换」，不描述「哪个页面用哪种模糊模式」——后者是设计决定，
+ * 由 `data/background.ts` 的页面映射统一声明，避免设置项和版式策略互相覆盖。
+ */
+export interface SiteBackground {
+  /** 固定壁纸的绘制值：空串表示只用底色；图片地址会自动包成 url()，也接受渐变。 */
+  image: string;
+  /** 手动加入壁纸库的地址（本地路径、渐变或网络图片）。 */
+  pool: string[];
+  /** 切换策略。 */
+  mode: WallpaperMode;
+  /** 定时轮换的间隔，单位分钟。 */
+  rotateMinutes: number;
+  /** 启用的网络图源 ID，取值来自 `data/wallpapers.ts` 的图源目录。 */
+  remoteSources: string[];
+  /** 自定义网络图源地址，与 `remoteSources` 一起进入壁纸库。 */
+  remoteCustom: string;
+  /** 遮罩浓度 0–1，用白色压低壁纸对比度，给文字和玻璃留出安静区域。 */
+  overlay: number;
+  /** 壁纸模糊半径 0–24px。 */
+  blur: number;
+  /** 壁纸饱和度 0.3–1.4，大面积玻璃需要偏低的饱和度才不会被壁纸染色。 */
+  saturate: number;
+  /** 是否启用指针与滚动视差。 */
+  parallax: boolean;
+}
+
 /** 站点级展示设置；它只影响页面身份，不参与来源同步。 */
 export interface SiteSettings {
   title: string;
@@ -223,6 +261,8 @@ export interface SiteSettings {
   favicon: string;
   /** 主题色，统一存为 6 位十六进制，由 `--theme` 变量驱动全站强调色。 */
   theme: string;
+  /** 全站壁纸参数。 */
+  background: SiteBackground;
 }
 
 /** GitHub 仓库的统一展示字段。 */

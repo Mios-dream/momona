@@ -4,6 +4,8 @@ interface Props {
   modelValue: T;
   /** 字段上方的标签。 */
   label?: string;
+  /** 字段的无障碍名称；标签由外部版式渲染时用它补上。 */
+  ariaLabel?: string;
   /** 输入类型，仅覆盖设置页用到的几种。 */
   type?: "text" | "url" | "password" | "number";
   /** 占位文案。 */
@@ -24,6 +26,7 @@ interface Props {
 
 const props = withDefaults(defineProps<Props>(), {
   label: "",
+  ariaLabel: undefined,
   type: "text",
   placeholder: "",
   multiline: false,
@@ -62,6 +65,7 @@ function handleInput(event: Event): void {
       class="mo-field-control"
       :value="props.modelValue"
       :rows="props.rows"
+      :aria-label="props.ariaLabel"
       :placeholder="props.placeholder"
       :disabled="props.disabled"
       spellcheck="false"
@@ -72,6 +76,7 @@ function handleInput(event: Event): void {
       class="mo-field-control"
       :value="props.modelValue"
       :type="props.type"
+      :aria-label="props.ariaLabel"
       :placeholder="props.placeholder"
       :min="props.min"
       :max="props.max"

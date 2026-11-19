@@ -562,7 +562,7 @@ onBeforeUnmount(() => {
                   :title="isEditing ? '编辑中' : '编辑首页'"
                   @click="startEditing"
                 >
-                  <IconGlyph name="pencil" :size="14" />
+                  <IconGlyph name="pencil" :size="13" />
                   <span v-if="isEditing">编辑</span>
                 </button>
                 <div
@@ -578,16 +578,16 @@ onBeforeUnmount(() => {
                     title="添加组件"
                     @click="widgetCatalogOpen = true"
                   >
-                    <IconGlyph name="plus" :size="14" />添加组件
+                    <IconGlyph name="plus" :size="13" />添加组件
                   </button>
                   <button
                     type="button"
-                    class="home-edit-action is-quiet"
+                    class="home-edit-action is-primary"
                     :tabindex="isEditing ? 0 : -1"
                     title="退出编辑"
                     @click="stopEditing"
                   >
-                    <IconGlyph name="check" :size="14" />完成
+                    <IconGlyph name="check" :size="13" />完成
                   </button>
                 </div>
               </div>
@@ -1008,6 +1008,14 @@ onBeforeUnmount(() => {
   background: #fff;
 }
 
+/**
+ * 编辑工具条：玻璃材质的小窗框，浮在首页右下角。
+ *
+ * 这里是一次「光与墨」的分工演示——工具条自己浮在壁纸上，所以外沿用白光
+ * 和投影立住；里面的按钮坐在玻璃上，用半透明底和墨色字区分，不再各自加白边。
+ * 强调色只给「完成」（结束编辑这个会话终结动作），添加组件保持中性，
+ * 这样工具条里只有一个实色点。
+ */
 .home-edit-toolbar {
   position: absolute;
   z-index: 32;
@@ -1015,20 +1023,24 @@ onBeforeUnmount(() => {
   right: 4px;
   bottom: 4px;
   display: flex;
-  min-height: 38px;
+  min-height: 40px;
   padding: 4px;
   align-items: center;
   gap: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  border-radius: 11px;
-  background: rgba(255, 255, 255, 0.78);
-  box-shadow: 0 13px 28px rgba(54, 45, 106, 0.14);
+  border: 1px solid rgba(255, 255, 255, 0.86);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.74);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 0 0 1px rgba(52, 42, 96, 0.05),
+    0 12px 32px rgba(54, 45, 106, 0.16),
+    0 2px 6px rgba(54, 45, 106, 0.06);
   backdrop-filter: var(--glass-blur);
   transition:
     width 0.32s cubic-bezier(0.22, 1, 0.36, 1),
-    border-color 0.24s ease,
-    box-shadow 0.24s ease,
-    background 0.24s ease;
+    border-color 0.16s ease,
+    box-shadow 0.16s ease,
+    background 0.16s ease;
   will-change: width;
 }
 
@@ -1036,38 +1048,48 @@ onBeforeUnmount(() => {
   top: auto;
   right: 4px;
   bottom: 4px;
-  box-shadow: 0 16px 32px rgba(54, 45, 106, 0.16);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 0 0 1px rgba(52, 42, 96, 0.05),
+    0 16px 40px rgba(54, 45, 106, 0.18),
+    0 2px 6px rgba(54, 45, 106, 0.06);
 }
 
 .home-edit-state {
   display: inline-flex;
   flex: 0 0 auto;
-  min-height: 29px;
+  min-height: 30px;
   align-items: center;
 }
 
 .home-edit-leading {
   display: inline-flex;
-  min-height: 29px;
-  padding: 0 5px;
+  min-width: 30px;
+  min-height: 30px;
+  padding: 0 6px;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 10px;
+  /* 可点击时才有颜色：未进入编辑是入口，进入后变成灰色状态指示。 */
   color: var(--theme-strong);
   background: transparent;
-  font-size: 0.57rem;
+  font-size: 0.6875rem;
+  font-weight: 640;
   white-space: nowrap;
   transition:
-    color 0.18s ease,
-    background 0.18s ease;
+    color 0.16s ease,
+    background 0.16s ease;
 }
 
 .home-edit-leading:hover:not(:disabled) {
   background: color-mix(in srgb, var(--theme) 10%, transparent);
 }
 
+/* 编辑态下它是状态而不是动作，撤掉强调色。 */
 .home-edit-leading:disabled {
+  color: var(--muted);
   cursor: default;
 }
 
@@ -1109,39 +1131,62 @@ onBeforeUnmount(() => {
 
 .home-edit-action {
   display: inline-flex;
-  min-height: 29px;
-  padding: 0 8px;
+  min-height: 30px;
+  padding: 0 10px;
   align-items: center;
   gap: 5px;
   border: 1px solid transparent;
-  border-radius: 7px;
+  border-radius: 10px;
   color: var(--muted-strong);
   background: transparent;
-  font-size: 0.57rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
   white-space: nowrap;
+  transition:
+    color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
 .home-edit-action:hover,
 .home-edit-action.is-quiet:hover {
   color: var(--theme-strong);
-  background: color-mix(in srgb, var(--theme) 10%, transparent);
+  background: rgba(255, 255, 255, 0.72);
 }
 
+/* 工具条里唯一的实色：结束编辑。它前面所有动作都保持中性。 */
 .home-edit-action.is-primary {
-  color: var(--theme-strong);
-  background: color-mix(in srgb, var(--theme) 10%, transparent);
+  color: var(--theme-on);
+  background: var(--theme);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--theme) 26%, transparent);
+}
+
+.home-edit-action.is-primary:hover {
+  color: var(--theme-on);
+  background: var(--theme-hover);
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--theme) 30%, transparent);
+}
+
+.home-edit-action.is-primary:active {
+  background: var(--theme-active);
+  transform: scale(0.97);
 }
 
 .home-edit-notice {
   position: absolute;
-  top: calc(100% + 7px);
+  top: calc(100% + 8px);
   right: 0;
-  padding: 6px 8px;
-  border-radius: 7px;
-  color: #27815f;
-  background: rgba(247, 255, 251, 0.9);
-  box-shadow: 0 8px 18px rgba(54, 45, 106, 0.1);
-  font-size: 0.55rem;
+  padding: 8px 12px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  border-radius: 10px;
+  /* 提示条浮在壁纸上，所以是白光 + 微浮投影，不是纸上的墨线。 */
+  color: color-mix(in srgb, var(--green) 76%, #10241c);
+  background: rgba(250, 255, 252, 0.94);
+  box-shadow:
+    0 0 0 1px rgba(52, 42, 96, 0.04),
+    0 12px 32px rgba(54, 45, 106, 0.14);
+  font-size: 0.6875rem;
+  font-weight: 600;
   white-space: nowrap;
 }
 

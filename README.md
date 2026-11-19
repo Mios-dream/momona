@@ -70,6 +70,7 @@ Momona 把个人资料、公开动态、收藏、友链、音乐和数据摘要�
 - [x] **Brew 阅读空间**：聚合友链 RSS / Atom 订阅源与本地文章，支持搜索、筛选、排序和文章阅读。
 - [x] **阅读体验**：文章详情页提供目录、阅读进度、字号、行高和主题切换等工具。
 - [x] **数据报告**：按来源展示同步状态、指标摘要和平台数据卡片。
+- [x] **壁纸库**：壁纸放进独立目录即可被发现，支持固定、每次随机和定时轮换，也可接入网络随机图源。
 
 ### 数据与编辑
 
@@ -247,6 +248,7 @@ pnpm build
 │   └── routes/settings.astro       # 仅开发期注入的设置页
 ├── public/assets/                  # 图片、字体和游戏资源
 ├── docs/assets/                    # README 预览截图
+├── docs/design-language.md         # 界面设计语言与组件规范
 ├── scripts/sync-data.ts            # 命令行同步入口
 ├── .github/workflows/ci.yml        # 类型检查与构建检查
 ├── astro.config.mjs                # Astro 与 Vue 集成配置
@@ -263,6 +265,7 @@ pnpm build
 2. 保持数据源适配器的错误处理和公开数据边界。
 3. 运行 `pnpm astro check` 和 `pnpm build`。
 4. 不要提交 `.momona/`、`dist/`、`.astro/` 或包含令牌的文件。
+5. 改动界面之前先读 [设计语言](./docs/design-language.md)，新组件按其中的刻度与检查表交付。
 
 ## 📜 许可证
 

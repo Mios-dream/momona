@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import { scanWallpaperFolder } from "./wallpaperIndexPlugin.mjs";
 
 const snapshotPath = fileURLToPath(
   new URL("../../.momona/generated.json", import.meta.url),
@@ -282,6 +283,8 @@ export const localSettingsServerPlugin = {
       register("/__momona/snapshot", "GET", () => api.readSnapshot());
       register("/__momona/config", "GET", () => api.readConfig());
       register("/__momona/source-status", "GET", () => api.readSourceStatus());
+      // 设置页的"重新扫描"走这里，能在不重启开发服务器的情况下读到新放进目录的壁纸。
+      register("/__momona/wallpapers", "GET", () => scanWallpaperFolder());
       register("/__momona/save", "POST", (payload) => api.save(payload));
       register("/__momona/sync-source", "POST", (payload) =>
         api.syncSource(payload),
