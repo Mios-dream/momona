@@ -86,13 +86,13 @@ function definition(
  * 「添加组件」目录的分类与预览信息，因此不从定义里拆出第二份清单。
  */
 export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
-  definition("greeting", "问候", "时间与问候语", 1, 1, 2, 2, 1, 1, {
+  definition("greeting", "问候", "时间与问候语", 1, 1, 2, 2, 2, 2, {
     category: "basic",
     icon: "sun",
     tags: ["时间感知"],
     defaultVisible: true,
   }),
-  definition("feed", "动态摘要", "轮播式内容摘要", 5, 1, 4, 2, 2, 1, {
+  definition("feed", "动态摘要", "轮播式内容摘要", 5, 1, 4, 2, 4, 2, {
     category: "content",
     icon: "rss",
     tags: ["文章轮播"],
@@ -106,8 +106,8 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     1,
     4,
     2,
+    4,
     2,
-    1,
     {
       category: "content",
       icon: "library",
@@ -115,25 +115,25 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
       defaultVisible: true,
     },
   ),
-  definition("friend", "友链", "一个外部站点入口", 13, 1, 2, 2, 1, 1, {
+  definition("friend", "友链", "一个外部站点入口", 13, 1, 2, 2, 2, 2, {
     category: "portal",
     icon: "globe",
     tags: ["轮播友链"],
     defaultVisible: true,
   }),
-  definition("agent", "看板娘", "角色与人设展示", 15, 1, 2, 2, 1, 1, {
+  definition("agent", "看板娘", "角色与人设展示", 15, 1, 2, 2, 2, 2, {
     category: "basic",
     icon: "bot",
     tags: ["人设展示"],
     defaultVisible: true,
   }),
-  definition("weather", "天气", "当前天气摘要", 1, 3, 2, 2, 2, 1, {
+  definition("weather", "天气", "当前天气摘要", 1, 3, 2, 2, 2, 2, {
     category: "basic",
     icon: "cloud",
     tags: ["实时天气"],
     defaultVisible: true,
   }),
-  definition("media", "网易云音乐", "最近播放与收藏", 3, 3, 4, 2, 2, 1, {
+  definition("media", "网易云音乐", "最近播放与收藏", 3, 3, 4, 2, 4, 2, {
     category: "media",
     icon: "headphones",
     tags: ["听歌统计"],
@@ -147,8 +147,8 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     3,
     4,
     2,
+    4,
     2,
-    1,
     {
       category: "portal",
       icon: "game",
@@ -159,7 +159,7 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
       defaultVisible: true,
     },
   ),
-  definition("music", "音乐播放器", "音乐播放状态", 11, 3, 2, 2, 1, 1, {
+  definition("music", "音乐播放器", "音乐播放状态", 11, 3, 2, 2, 2, 2, {
     category: "media",
     icon: "music",
     tags: ["播放控制"],
@@ -173,8 +173,8 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     3,
     4,
     2,
+    4,
     2,
-    1,
     {
       category: "content",
       icon: "activity",
@@ -210,8 +210,8 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     1,
     4,
     2,
+    4,
     2,
-    1,
     {
       category: "content",
       icon: "github",
@@ -227,8 +227,8 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
     1,
     4,
     2,
+    4,
     2,
-    1,
     {
       category: "content",
       icon: "video",
@@ -744,7 +744,8 @@ export function normalizeHomeWidget(
       ? fallbackWidget.mobileColSpan
       : item.defaultSize.mobileColSpan,
     1,
-    2,
+    // 手机是 4 列网格：1×1 的入口（社交卡片）缩成一格图标，其余是真卡片。
+    4,
   );
   const mobileRowSpan = numberOr(
     item.resizable ? record.mobileRowSpan : item.defaultSize.mobileRowSpan,

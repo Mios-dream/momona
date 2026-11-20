@@ -138,14 +138,4 @@ defineProps<Props>();
   color: var(--muted);
   font-size: 0.62rem;
 }
-
-@media (max-width: 820px) {
-  .home-activities {
-    padding-bottom: 15px;
-  }
-
-  .activity-list {
-    grid-template-columns: 1fr;
-  }
-}
 </style>

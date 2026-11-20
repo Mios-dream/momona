@@ -28,6 +28,7 @@ import { hoyoGameLabels, normalizeHref } from "../../data/widgetVariants";
 import FallbackImage from "../app/FallbackImage.vue";
 import HomeBuildInfo from "../app/HomeBuildInfo.vue";
 import IconGlyph from "../app/IconGlyph.vue";
+import HomeAppTile from "./HomeAppTile.vue";
 import HomeWidgetCatalog from "./HomeWidgetCatalog.vue";
 import { homeWidgetComponents } from "./homeWidgetComponents";
 import { homeWidgetProps } from "../../utils/homeWidgetProps";
@@ -65,6 +66,10 @@ const gridElement = ref<HTMLElement | null>(null);
 const draggingWidgetId = ref<string | null>(null);
 const dragStartPoint = ref<{ x: number; y: number } | null>(null);
 const dragMoved = ref(false);
+/** 拖拽虚影：被拖卡片在 body 上的克隆，跟随指针移动。 */
+const dragGhost = ref<HTMLElement | null>(null);
+/** 指针在虚影内的抓取偏移，保证虚影不从指针下"跳"走。 */
+const ghostGrabOffset = ref<{ x: number; y: number }>({ x: 0, y: 0 });
 const editToolbarContent = ref<HTMLElement | null>(null);
 const editToolbarLeading = ref<HTMLElement | null>(null);
 const editToolbarActions = ref<HTMLElement | null>(null);
@@ -139,6 +144,93 @@ const gridRowCount = computed(() =>
     ...activeWidgets.value.map((widget) => widget.row + widget.rowSpan - 1),
   ),
 );
+
+/**
+ * 手机端是否把这张卡画成图标格。
+ *
+ * 判断依据是移动端占格而不是组件类型：默认占格为 1×1 的入口（社交卡片）
+ * 画成一格毛玻璃图标；占格更大的组件是真卡片。
+ *
+ * @param widget - 需要判断的首页组件配置。
+ * @returns 该组件在手机上应渲染为图标格时返回 true。
+ */
+function isAppTile(widget: HomeWidget): boolean {
+  return widget.mobileColSpan === 1 && widget.mobileRowSpan === 1;
+}
+
+/**
+ * 手机网格单元边长的像素值。
+ *
+ * 4 列网格的格子必须是正方形，图标才像图标。用 CSS 的百分比算不出行高
+ * （行高百分比相对的是容器高度），用 vw 又会在桌面窄窗口里被滚动条
+ * 吃掉十几像素，所以量一次实际宽度再换算。
+ */
+const gridWidth = ref(0);
+let gridResizeObserver: ResizeObserver | null = null;
+
+/** 手机端列间距。 */
+const MOBILE_GRID_GAP = 10;
+
+/**
+ * 卡片内容缩放的基准格子边长：桌面 4×2 卡的设计尺寸（308×150）对应
+ * 一格约 80px，手机一格正好 80，平板一格 170+ 时内容跟着等比放大。
+ */
+const MOBILE_CELL_BASE = 80;
+
+/** 内容缩放上限：格子再大，卡片内容最多放大到 2.2 倍。 */
+const CARD_SCALE_MAX = 2.2;
+
+/** 竖屏放不下的组件在横屏里靠这一格宽度保持可读，格子不再跟着宽度涨。 */
+const LANDSCAPE_TILE = 86;
+
+/**
+ * 是否处于手机的横屏 / 矮窗布局。
+ *
+ * 横屏时高度只有 400 上下，格子必须按高度定大小，按宽度算会得到一颗
+ * 150px 的"图标"。判定条件与 CSS 里的媒体查询保持一致。
+ *
+ * @returns 命中横屏网格时返回 true。
+ */
+function isLandscapeGrid(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia(
+    "(max-width: 1024px) and (max-height: 560px) and (orientation: landscape)",
+  ).matches;
+}
+
+/**
+ * 计算手机网格的列数、格子边长与内容缩放。
+ *
+ * 列数固定 4：一格一个图标，桌面 4×2 的卡刚好占满整行。
+ * 格子边长由"容器宽 − 间距"反推，所以图标和格子永远等宽等高。
+ * 内容缩放 = 格子边长 / 80（桌面卡片的设计格宽），卡片里的文字与
+ * 内容按这个系数整体放大，宽屏上卡片不会显得空。
+ *
+ * @returns 供模板绑定的 CSS 自定义属性。
+ */
+const gridStyle = computed<Record<string, string>>(() => {
+  const style: Record<string, string> = {
+    "--home-grid-rows": String(gridRowCount.value),
+  };
+  if (gridWidth.value <= 0) return style;
+  if (isLandscapeGrid()) {
+    style["--home-mobile-cell"] = `${LANDSCAPE_TILE}px`;
+    style["--home-card-scale"] = (
+      Math.min(LANDSCAPE_TILE / MOBILE_CELL_BASE, CARD_SCALE_MAX) || 1
+    ).toFixed(3);
+    return style;
+  }
+  const cols = 4;
+  const cell = Math.floor(
+    (gridWidth.value - MOBILE_GRID_GAP * (cols - 1)) / cols,
+  );
+  style["--home-cols"] = String(cols);
+  style["--home-mobile-cell"] = `${cell}px`;
+  style["--home-card-scale"] = (
+    Math.min(Math.max(cell / MOBILE_CELL_BASE, 1), CARD_SCALE_MAX) || 1
+  ).toFixed(3);
+  return style;
+});
 
 /**
  * 将统一组件配置映射为具体首页组件所需的 props。
@@ -225,7 +317,10 @@ function removeWidget(widget: HomeWidget): void {
 }
 
 /**
- * 根据指针位置更新被拖拽组件的吸附网格位置。
+ * 根据指针位置更新被拖拽组件的布局。
+ *
+ * 桌面网格按坐标吸附（col/row 显式存储）；手机网格没有独立坐标，
+ * 排版由组件在列表里的先后顺序决定，所以拖拽按顺序重排处理。
  *
  * @param event - 当前指针移动事件。
  * @returns 无返回值；指针尚未超过拖拽阈值时不改变布局。
@@ -240,22 +335,139 @@ function updateDragPosition(event: PointerEvent): void {
     event.clientY - dragStartPoint.value.y,
   );
   if (!dragMoved.value && distance < 6) return;
+  const firstMove = !dragMoved.value;
   dragMoved.value = true;
   event.preventDefault();
-  const rect = grid.getBoundingClientRect();
-  const columns = HOME_GRID_COLUMNS;
-  const rows = gridRowCount.value;
-  const col =
-    Math.floor(((event.clientX - rect.left) / rect.width) * columns) + 1;
-  const row = Math.floor(((event.clientY - rect.top) / rect.height) * rows) + 1;
-  const position = findNearestWidgetPosition(
-    editorConfig.value.widgets,
-    widget,
-    col,
-    row,
+  if (firstMove) createDragGhost(widget, event);
+  if (isMobileGrid()) {
+    reorderDraggedWidget(event, widget);
+  } else {
+    const rect = grid.getBoundingClientRect();
+    const columns = HOME_GRID_COLUMNS;
+    const rows = gridRowCount.value;
+    const col =
+      Math.floor(((event.clientX - rect.left) / rect.width) * columns) + 1;
+    const row =
+      Math.floor(((event.clientY - rect.top) / rect.height) * rows) + 1;
+    const position = findNearestWidgetPosition(
+      editorConfig.value.widgets,
+      widget,
+      col,
+      row,
+    );
+    widget.col = position.col;
+    widget.row = position.row;
+  }
+  moveDragGhost(event);
+}
+
+/**
+ * 创建拖拽虚影：被拖卡片槽位的克隆，固定定位挂在 body 上。
+ *
+ * 虚影是"被拿起来的那张卡"——带离地投影、略微透明，跟着指针走；
+ * 网格里那张原卡降透明度，它所在的位置就是当前吸附/重排出的落点。
+ * 克隆会丢失网格上的 CSS 变量继承（--home-card-scale 等），需要
+ * 把缩放系数显式写回，平板上虚影才和原卡一样大。
+ *
+ * @param widget - 被拖拽的首页组件。
+ * @param event - 触发创建的指针事件。
+ * @returns 无返回值；找不到槽位时静默跳过（拖拽仍可继续）。
+ */
+function createDragGhost(widget: HomeWidget, event: PointerEvent): void {
+  const slot = gridElement.value?.querySelector(
+    `[data-widget-id="${CSS.escape(widget.id)}"]`,
   );
-  widget.col = position.col;
-  widget.row = position.row;
+  if (!(slot instanceof HTMLElement)) return;
+  const rect = slot.getBoundingClientRect();
+  const clone = slot.cloneNode(true) as HTMLElement;
+  clone.classList.remove("is-dragging");
+  clone.classList.add("is-drag-ghost");
+  clone.removeAttribute("id");
+  clone.setAttribute("aria-hidden", "true");
+  clone
+    .querySelectorAll(".home-slot-remove, .home-slot-surface")
+    .forEach((element) => element.remove());
+  clone.style.position = "fixed";
+  clone.style.left = "0";
+  clone.style.top = "0";
+  clone.style.margin = "0";
+  clone.style.width = `${rect.width}px`;
+  clone.style.height = `${rect.height}px`;
+  clone.style.pointerEvents = "none";
+  const scale = gridElement.value?.style
+    .getPropertyValue("--home-card-scale")
+    .trim();
+  if (scale) clone.style.setProperty("--home-card-scale", scale);
+  document.body.appendChild(clone);
+  dragGhost.value = clone;
+  ghostGrabOffset.value = {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top,
+  };
+}
+
+/**
+ * 让虚影跟随指针，保持按下时的抓取偏移。
+ *
+ * @param event - 当前指针移动事件。
+ * @returns 无返回值；虚影不存在时忽略。
+ */
+function moveDragGhost(event: PointerEvent): void {
+  const ghost = dragGhost.value;
+  if (!ghost) return;
+  ghost.style.transform = `translate3d(${event.clientX - ghostGrabOffset.value.x}px, ${
+    event.clientY - ghostGrabOffset.value.y
+  }px, 0)`;
+}
+
+/**
+ * 移除拖拽虚影并释放引用。
+ *
+ * @returns 无返回值。
+ */
+function removeDragGhost(): void {
+  dragGhost.value?.remove();
+  dragGhost.value = null;
+}
+
+/**
+ * 是否处于手机网格排版（窄屏竖屏，或矮窗横屏），与 CSS 媒体查询一致。
+ *
+ * @returns 命中手机网格时返回 true。
+ */
+function isMobileGrid(): boolean {
+  if (typeof window === "undefined" || !window.matchMedia) return false;
+  return window.matchMedia(
+    "(max-width: 820px), (max-width: 1024px) and (max-height: 560px) and (orientation: landscape)",
+  ).matches;
+}
+
+/**
+ * 手机网格的拖拽：把被拖组件重排到指针下方卡片的位置。
+ *
+ * 手机的排版 = 列表顺序（auto-flow dense + 各自跨格），所以手机端
+ * 不写 col/row（那是桌面的坐标），只调整组件在列表里的先后——一份
+ * 配置同时承载两种排版，不需要为手机存第二份位置。
+ *
+ * @param event - 当前指针移动事件。
+ * @param widget - 被拖拽的首页组件。
+ * @returns 无返回值；指针不在任何卡片上时保持原顺序。
+ */
+function reorderDraggedWidget(event: PointerEvent, widget: HomeWidget): void {
+  const slot = document
+    .elementFromPoint(event.clientX, event.clientY)
+    ?.closest?.(".home-slot");
+  const targetId =
+    slot instanceof HTMLElement ? slot.dataset.widgetId : undefined;
+  if (!targetId || targetId === widget.id) return;
+  const widgets = editorConfig.value.widgets;
+  const from = widgets.findIndex((item) => item.id === widget.id);
+  const to = widgets.findIndex((item) => item.id === targetId);
+  if (from < 0 || to < 0 || from === to) return;
+  const [moved] = widgets.splice(from, 1);
+  // 落到哪张卡上就占它的位置：删除后直接插到目标当前索引，目标卡
+  // 顺势挪进被拖卡留下的空位，向前向后拖都成立。
+  widgets.splice(to, 0, moved!);
 }
 
 /**
@@ -269,6 +481,7 @@ function finishDrag(): void {
   draggingWidgetId.value = null;
   dragStartPoint.value = null;
   dragMoved.value = false;
+  removeDragGhost();
   window.removeEventListener("pointermove", updateDragPosition);
   window.removeEventListener("pointerup", finishDrag);
   window.removeEventListener("pointercancel", finishDrag);
@@ -380,7 +593,11 @@ function variantSettings(
 
   if (variant.type === "link" && variant.link) {
     const previous = widget.settings?.link;
-    const title = (values.title ?? previous?.title ?? variant.link.title).trim();
+    const title = (
+      values.title ??
+      previous?.title ??
+      variant.link.title
+    ).trim();
     return {
       link: {
         title: title || variant.link.title,
@@ -490,6 +707,15 @@ onMounted(() => {
       editToolbarResizeObserver.observe(editToolbarLeading.value);
     if (editToolbarActions.value)
       editToolbarResizeObserver.observe(editToolbarActions.value);
+
+    // 手机网格的格子边长要量真实宽度：窄窗口里的滚动条会让 100vw 偏大。
+    if (gridElement.value) {
+      gridResizeObserver = new ResizeObserver((entries) => {
+        const width = entries[0]?.contentRect.width ?? 0;
+        if (width > 0) gridWidth.value = width;
+      });
+      gridResizeObserver.observe(gridElement.value);
+    }
   });
   window.addEventListener("resize", measureEditToolbar);
 });
@@ -500,6 +726,8 @@ onBeforeUnmount(() => {
   window.removeEventListener("pointercancel", finishDrag);
   window.removeEventListener("resize", measureEditToolbar);
   editToolbarResizeObserver?.disconnect();
+  gridResizeObserver?.disconnect();
+  removeDragGhost();
 });
 </script>
 
@@ -576,19 +804,25 @@ onBeforeUnmount(() => {
             </div>
           </header>
 
-          <div
-            ref="gridElement"
-            class="home-grid"
-            :style="{ '--home-grid-rows': String(gridRowCount) }"
-          >
+          <div ref="gridElement" class="home-grid" :style="gridStyle">
             <div
               v-for="(widget, index) in activeWidgets"
               :key="widget.id"
               class="home-slot"
-              :class="{ 'is-dragging': draggingWidgetId === widget.id }"
+              :class="{
+                'is-dragging': draggingWidgetId === widget.id,
+                'is-tile': isAppTile(widget),
+              }"
               :data-widget="widget.type"
+              :data-widget-id="widget.id"
               :style="widgetStyle(widget, index)"
             >
+              <!--
+                手机上占一格的入口（社交卡片）画成毛玻璃图标格。它和真卡片同时
+                存在，由媒体查询决定给谁看——这样 SSR 首帧不会先画出真卡片
+                再跳成图标。
+              -->
+              <HomeAppTile v-if="isAppTile(widget)" :widget="widget" />
               <component
                 :is="homeWidgetComponents[widget.type]"
                 v-bind="widgetProps(widget)"
@@ -607,9 +841,7 @@ onBeforeUnmount(() => {
               <button
                 v-if="isEditing"
                 class="home-slot-remove"
-                :class="{
-                  'is-compact': widget.colSpan === 1 && widget.rowSpan === 1,
-                }"
+                :class="{ 'is-compact': isAppTile(widget) }"
                 type="button"
                 :aria-label="`移除${widgetDisplayName(widget)}`"
                 :title="`移除${widgetDisplayName(widget)}`"
@@ -779,6 +1011,11 @@ onBeforeUnmount(() => {
   min-height: 0;
 }
 
+/* 图标格只在手机上出场；桌面上这颗 "图标" 由真卡片本体承担。 */
+.home-slot > .home-app-tile {
+  display: none;
+}
+
 /*
  * 入场动画直接挂在卡片上，和友链页 .friend-card 完全同构。
  *
@@ -797,6 +1034,29 @@ onBeforeUnmount(() => {
 
 .home-slot.is-dragging {
   z-index: 4;
+}
+
+/* 编辑态禁用入场动画：手机端重排会移动 DOM 节点，动画重播会让整屏闪烁。 */
+.home-page.is-editing .home-slot > .glass-panel,
+.home-page.is-editing .home-slot :deep(.home-friend-card-shell) {
+  animation: none;
+}
+
+/*
+ * 拖拽虚影：跟随指针的卡片副本（克隆自槽位，挂在 body 上）。
+ * drop-shadow 打在整棵子树上，玻璃卡、图片卡都得到同一枚离地投影；
+ * 网格里那张原卡降透明度，它所在的位置就是吸附/重排出的落点预览。
+ */
+.home-slot.is-drag-ghost {
+  z-index: 90;
+  filter: drop-shadow(0 18px 30px rgba(23, 30, 55, 0.3));
+  will-change: transform;
+}
+
+/* 克隆节点插入 body 会重跑入场动画（backwards 填充会闪一帧透明）。 */
+.home-slot.is-drag-ghost :deep(.glass-panel),
+.home-slot.is-drag-ghost :deep(.home-friend-card-shell) {
+  animation: none;
 }
 
 @keyframes home-widget-enter {
@@ -854,6 +1114,8 @@ onBeforeUnmount(() => {
 
 .home-page.is-editing .home-slot.is-dragging > *:first-child {
   outline: 2px solid color-mix(in srgb, var(--theme) 78%, transparent);
+  /* 原卡半透明：被"拿走"的是虚影，网格里留下的只是落点预览。 */
+  opacity: 0.45;
 }
 
 /*
@@ -1141,7 +1403,13 @@ onBeforeUnmount(() => {
   }
 }
 
-@media (max-width: 820px) {
+/*
+ * 手机布局的触发条件有两个：竖屏按宽度（≤820），横屏按"矮窗"——
+ * 844×390 这种机器宽度超过 820，但 16 列桌面网格在它上面每格只有 42px，
+ * 所以并入同一套 4 列图标网格，只是格子按高度定大小。
+ */
+@media (max-width: 820px),
+  (max-width: 1024px) and (max-height: 560px) and (orientation: landscape) {
   .home-page {
     display: block;
     min-height: 0;
@@ -1149,7 +1417,7 @@ onBeforeUnmount(() => {
      * 底部留白 = 导航栏高度 58 + 距底 14 + 视觉间距 16。
      * 主导航是 fixed 的，原来只留 28px，滚到最底时最后一张卡会被它压住。
      */
-    padding: 28px 28px calc(88px + env(safe-area-inset-bottom, 0px));
+    padding: 24px 20px calc(88px + env(safe-area-inset-bottom, 0px));
     align-items: initial;
   }
 
@@ -1167,45 +1435,87 @@ onBeforeUnmount(() => {
   }
 
   .home-intro {
-    height: 184px;
-    flex: 0 0 184px;
+    height: 168px;
+    flex: 0 0 168px;
     padding: 0;
   }
 
   .home-intro h1 {
-    top: -7px;
+    /* 标题和身份卡是一组：贴着身份卡上方，中间不留一段用不上的空。 */
+    top: auto;
     right: auto;
-    bottom: auto;
+    bottom: 66px;
     left: 0;
     max-width: 100%;
-    font-size: clamp(3.2rem, 15vw, 4rem);
+    font-size: clamp(3rem, 13.5vw, 3.8rem);
     line-height: 0.9;
+  }
+
+  /* 编辑工具栏压在标题栏底部；给它腾一行，别盖住身份卡。 */
+  .home-page.is-editing .home-intro {
+    padding-bottom: 56px;
   }
 
   .home-status {
     position: relative;
-    margin-left: 4px;
+    margin-left: 2px;
   }
 
   .home-grid-area {
-    gap: 12px;
+    /* 标题区和网格同属一列，整页随内容一起滚，不再各自为屏。 */
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
     margin-top: 0;
   }
 
+  /*
+   * 手机是一张桌面，不是一列卡片。
+   *
+   * 4 列、方格：一格就是一个 App 图标，桌面 4×2 的组件占满整行。
+   * 格子边长必须等宽等高，否则图标会变成竖条——所以行高由 JS 量出来的
+   * 容器宽度算（--home-mobile-cell），不用百分比也不用 vw。
+   *
+   * 页面本身滚动：标题和身份卡跟着组件内容一起滚出屏幕。
+   */
   .home-grid {
-    min-height: 0;
+    --home-mobile-gap: 10px;
+
+    flex: 0 0 auto;
     aspect-ratio: auto;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    /* 列数固定 4（--home-cols 由脚本给出），格子边长由脚本按列数反推。 */
+    grid-template-columns: repeat(var(--home-cols, 4), minmax(0, 1fr));
     grid-template-rows: none;
-    grid-auto-rows: 164px;
-    grid-auto-flow: row;
-    gap: 8px;
+    grid-auto-rows: var(--home-mobile-cell, 80px);
+    grid-auto-flow: row dense;
+    gap: var(--home-mobile-gap);
+    padding-bottom: 2px;
+  }
+
+  /*
+   * 内容随格子尺寸等比缩放：手机一格 80 时系数 1（与桌面卡片同大），
+   * 平板一格 170+ 时卡片里的文字、间距整体放大，不会显得空。
+   * 标准化 zoom 会把元素自身的百分比尺寸解析到缩放后的坐标系里，
+   * 所以宽高保持 100%，渲染尺寸自然正好填满槽位。
+   */
+  .home-slot > *:first-child {
+    zoom: var(--home-card-scale, 1);
   }
 
   .home-slot {
     grid-column: span var(--widget-mobile-col-span);
     grid-row: auto / span var(--widget-mobile-row-span);
     padding: 0;
+  }
+
+  /* 一格的位置只留给图标：真卡片塞不进 80px，藏起来。 */
+  .home-slot.is-tile
+    > *:not(.home-app-tile):not(.home-slot-surface):not(.home-slot-remove) {
+    display: none;
+  }
+
+  .home-slot.is-tile > .home-app-tile {
+    display: flex;
   }
 
   .home-slot-surface {
@@ -1240,6 +1550,42 @@ onBeforeUnmount(() => {
 
   .home-edit-action {
     flex: 0 0 auto;
+  }
+}
+
+/*
+ * 横屏的差异只有两处：格子按高度定大小（由脚本给 --home-mobile-cell），
+ * 标题区压扁。滚动与列数和竖屏同一套。
+ */
+@media (max-width: 1024px) and (max-height: 560px) and (orientation: landscape) {
+  .home-page {
+    padding: 16px 20px calc(72px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .home-intro {
+    height: 104px;
+    flex: 0 0 104px;
+  }
+
+  .home-intro h1 {
+    /* 横屏高度不够把标题和身份卡排成一组，回到顶部单行。 */
+    top: -4px;
+    bottom: auto;
+    font-size: clamp(2.2rem, 6.5vw, 3rem);
+  }
+
+  .home-grid {
+    /* 横屏同样是 4 列：格子按高度定死 86，网格整体居中。 */
+    grid-template-columns: repeat(4, var(--home-mobile-cell, 86px));
+    justify-content: center;
+  }
+}
+
+/* 宽过 820 时主导航是左侧竖条，内容要让开它，否则第一列被压在导航下面。 */
+@media (min-width: 821px) and (max-height: 560px) and (orientation: landscape) {
+  .home-page {
+    padding-left: 78px;
+    padding-bottom: 24px;
   }
 }
 

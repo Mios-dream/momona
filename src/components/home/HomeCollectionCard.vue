@@ -564,57 +564,6 @@ onBeforeUnmount(() => {
   transform: translateY(-8px);
 }
 
-@media (max-width: 820px) {
-  .bangumi-stats-content {
-    padding: 10px 11px 9px;
-  }
-
-  .bangumi-cover-wall {
-    width: 55%;
-    padding-right: 8px;
-  }
-
-  .bangumi-wall-cover {
-    width: 31px;
-    height: 58px;
-  }
-
-  .bangumi-count-row {
-    gap: 10px;
-    margin-bottom: 19px;
-  }
-
-  .bangumi-count-primary strong {
-    font-size: 2rem;
-  }
-
-  .bangumi-count strong {
-    font-size: 1.15rem;
-  }
-
-  .bangumi-type-labels {
-    gap: 2px 5px;
-    font-size: 0.42rem;
-  }
-
-  .bangumi-title-float {
-    bottom: 7px;
-    left: 7px;
-    width: min(190px, 54%);
-    padding: 5px 7px 5px 5px;
-    gap: 5px;
-  }
-
-  .bangumi-title-mark {
-    width: 18px;
-    height: 18px;
-  }
-
-  .bangumi-title-line {
-    font-size: 0.5rem;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .bangumi-face-enter-active,
   .bangumi-face-leave-active {

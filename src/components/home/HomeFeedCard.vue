@@ -734,26 +734,6 @@ onBeforeUnmount(clearRotation);
   transform: translateY(-8px);
 }
 
-@media (max-width: 820px) {
-  .github-overview-face {
-    padding: 10px 11px 9px;
-  }
-
-  .github-heatmap {
-    width: 104px;
-    height: 62px;
-    gap: 2px;
-  }
-
-  .github-stat-row strong {
-    font-size: 1.4rem;
-  }
-
-  .github-repository-content {
-    padding: 12px 13px 11px;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .github-face-enter-active,
   .github-face-leave-active,

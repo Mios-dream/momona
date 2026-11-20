@@ -162,10 +162,4 @@ const isBrandPlatform = computed(() => brandPlatforms.includes(props.settings.pl
   opacity: 0.72;
 }
 
-@media (max-width: 820px) {
-  .home-link-card {
-    min-height: 104px;
-  }
-}
-
 </style>

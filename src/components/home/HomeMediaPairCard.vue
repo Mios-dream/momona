@@ -552,43 +552,6 @@ onBeforeUnmount(() => {
   transform: translateY(-8px);
 }
 
-@media (max-width: 820px) {
-  .netease-stats-content {
-    padding: 10px 11px 9px;
-  }
-
-  .netease-count-panel {
-    min-width: 110px;
-    gap: 7px;
-  }
-
-  .netease-count-panel strong {
-    font-size: 0.9rem;
-  }
-
-  .netease-title-float {
-    bottom: 7px;
-    left: 7px;
-    width: min(190px, 54%);
-    padding: 5px 7px 5px 5px;
-    gap: 5px;
-  }
-
-  .netease-title-mark {
-    width: 18px;
-    height: 18px;
-  }
-
-  .netease-title-line {
-    font-size: 0.5rem;
-  }
-
-  .netease-mood-bubble {
-    padding: 5px;
-    font-size: 0.56rem;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
   .netease-mood-bubble {
     animation: none;
