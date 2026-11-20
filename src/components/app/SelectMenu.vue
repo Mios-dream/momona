@@ -50,7 +50,8 @@ const menuRef = ref<HTMLElement | null>(null);
 const menuStyle = ref<Record<string, string>>({});
 
 const selectedOption = computed(
-  () => props.options.find((option) => option.value === props.modelValue) ?? null,
+  () =>
+    props.options.find((option) => option.value === props.modelValue) ?? null,
 );
 
 /**
@@ -71,7 +72,8 @@ function optionId(index: number): string {
 function scrollActiveIntoView(): void {
   const menu = menuRef.value;
   const option = menu?.children[activeIndex.value];
-  if (!(menu instanceof HTMLElement) || !(option instanceof HTMLElement)) return;
+  if (!(menu instanceof HTMLElement) || !(option instanceof HTMLElement))
+    return;
   const menuBox = menu.getBoundingClientRect();
   const optionBox = option.getBoundingClientRect();
   if (optionBox.top < menuBox.top) {
@@ -298,7 +300,10 @@ onBeforeUnmount(() => syncGlobalListeners(false));
 </script>
 
 <template>
-  <div class="select-menu" :class="{ 'is-open': isOpen, 'is-disabled': props.disabled }">
+  <div
+    class="select-menu"
+    :class="{ 'is-open': isOpen, 'is-disabled': props.disabled }"
+  >
     <span v-if="props.label" class="select-menu-label">{{ props.label }}</span>
 
     <button
@@ -314,7 +319,10 @@ onBeforeUnmount(() => syncGlobalListeners(false));
       @click="toggleMenu"
       @keydown="handleTriggerKeydown"
     >
-      <span class="select-menu-value" :class="{ 'is-placeholder': !selectedOption }">
+      <span
+        class="select-menu-value"
+        :class="{ 'is-placeholder': !selectedOption }"
+      >
         {{ selectedOption?.label ?? props.placeholder }}
       </span>
       <IconGlyph name="chevronDown" :size="12" class="select-menu-chevron" />
@@ -376,7 +384,7 @@ onBeforeUnmount(() => syncGlobalListeners(false));
 
 .select-menu-label {
   color: var(--muted);
-  font-size: 0.52rem;
+  font-size: 0.75rem;
 }
 
 .select-menu-trigger {
@@ -419,7 +427,7 @@ onBeforeUnmount(() => syncGlobalListeners(false));
 
 .select-menu-value {
   overflow: hidden;
-  font-size: 0.55rem;
+  font-size: 0.75rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -481,7 +489,7 @@ onBeforeUnmount(() => syncGlobalListeners(false));
   border-radius: 7px;
   color: var(--ink-soft);
   background: transparent;
-  font-size: 0.55rem;
+  font-size: 0.75rem;
   text-align: left;
   transition:
     color 0.14s ease,

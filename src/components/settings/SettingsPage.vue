@@ -948,7 +948,7 @@ function statusClass(status?: ProviderStatus): string {
               当前用的是哪张、这张从哪来，一眼就能对上，不必在两处列表之间对照。
             -->
             <div class="settings-row is-top">
-              <span class="settings-row-label">选择</span>
+              <span class="settings-row-label">选择壁纸</span>
               <div class="settings-row-body is-wrap">
                 <div
                   class="settings-wallpaper-grid"
@@ -1010,7 +1010,7 @@ function statusClass(status?: ProviderStatus): string {
               </div>
             </div>
             <div class="settings-row is-top">
-              <span class="settings-row-label">添加</span>
+              <span class="settings-row-label">添加壁纸</span>
               <div class="settings-row-body is-wrap">
                 <div class="settings-wallpaper-add">
                   <MoField
@@ -1097,7 +1097,7 @@ function statusClass(status?: ProviderStatus): string {
           </section>
 
           <section class="settings-group">
-            <h2 class="settings-group-title">画面</h2>
+            <h2 class="settings-group-title">背景和遮罩</h2>
             <div class="settings-row">
               <span class="settings-row-label">遮罩浓度</span>
               <div class="settings-row-body">
@@ -1205,7 +1205,10 @@ function statusClass(status?: ProviderStatus): string {
                           @click="selectTheme(preset.value)"
                         ></button>
                       </div>
-                      <span class="settings-theme-divider" aria-hidden="true"></span>
+                      <span
+                        class="settings-theme-divider"
+                        aria-hidden="true"
+                      ></span>
                       <!-- 色点 + 色值：这两样是同一个值的两种写法，不该被读成第六个选项。 -->
                       <div class="settings-theme-value">
                         <MoColor
@@ -1245,7 +1248,6 @@ function statusClass(status?: ProviderStatus): string {
               </aside>
             </div>
           </section>
-
         </section>
 
         <section
@@ -1605,7 +1607,12 @@ function statusClass(status?: ProviderStatus): string {
   display: flex;
   height: 100%;
   min-height: 0;
-  padding: 30px max(112px, calc(clamp(16px, 6vw, 96px) + 24px)) 30px
+  /*
+   * 右侧留 192：状态控制台是 160 宽、贴右 16 的浮层，它和窗头抢的是同一条
+   * 右上角。窗的右缘必须停在 x = 视口宽 − 192，否则"保存"会被压在胶囊底下
+   * （z 70，点击也会被截走）。这不是留白，是给浮层留的车道。
+   */
+  padding: 30px max(192px, calc(clamp(16px, 6vw, 96px) + 24px)) 30px
     clamp(16px, 6vw, 96px);
   flex-direction: column;
   overflow: hidden;
@@ -1800,7 +1807,7 @@ button:disabled {
   align-items: baseline;
   gap: 10px;
   color: var(--ink);
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 680;
   letter-spacing: 0.01em;
 }
@@ -2486,17 +2493,29 @@ button:disabled {
   min-width: 0;
   align-items: center;
   gap: 4px;
+  /* 边框常驻（透明），选中时只换颜色：不因为"被选中"而挪动一像素。 */
+  border: 1px solid transparent;
   border-radius: 10px;
-  transition: background 0.16s ease;
+  transition:
+    background 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .settings-source-list-item:hover {
   background: rgba(19, 26, 45, 0.035);
 }
 
+/*
+ * 选中靠"淡主题色底 + 一圈主题色细环"，不靠贴边的色条。
+ * 色条是给"位置会移动"的指示用的；这里选的是条目本身，环才能把整条圈住。
+ */
 .settings-source-list-item.is-selected {
-  background: color-mix(in srgb, var(--theme) 7%, transparent);
-  box-shadow: inset 2px 0 0 var(--theme);
+  border-color: color-mix(in srgb, var(--theme) 32%, transparent);
+  background: color-mix(in srgb, var(--theme) 8%, transparent);
+}
+
+.settings-source-list-item.is-selected:hover {
+  background: color-mix(in srgb, var(--theme) 11%, transparent);
 }
 
 .settings-source-list-item.is-disabled {
@@ -2530,10 +2549,11 @@ button:disabled {
     background 0.16s ease;
 }
 
-/* 只有当前选中的数据源用强调色：七个图标同时发粉，等于没有重点。 */
+/* 只有当前选中的数据源用强调色：七个图标同时发粉，等于没有重点。
+   底已经着主题色了，图标底片就退回白色——两片主题色叠在一起会糊成一块。 */
 .settings-source-list-item.is-selected .settings-source-icon {
   color: var(--theme-strong);
-  background: color-mix(in srgb, var(--theme) 11%, transparent);
+  background: #fff;
 }
 
 .settings-source-select-copy {
@@ -3039,43 +3059,86 @@ button:disabled {
 }
 
 @media (max-width: 900px) {
-  /* 底部导航是浮层，窗口必须给它让出高度，否则最后一行永远被盖住。 */
+  /*
+   * 窄屏上窗没有横向余量，右上角那 172（160 + 贴边 12）躲不开：状态控制台必然
+   * 压在窗头的"保存"上，连点击都会被它截走。所以改成纵向让路——控制台占顶部
+   * 一条带（12 + 64 通知态 + 4 呼吸 ≈ 80），窗从这条带下面开始。
+   * 底部导航同理：14 的贴边 + 58 的高度 + 8 的呼吸 ≈ 80。
+   */
   .settings-page {
-    padding: 14px 14px calc(96px + env(safe-area-inset-bottom, 0px));
+    padding: 80px 10px calc(80px + env(safe-area-inset-bottom, 0px));
   }
 
+  .settings-window {
+    border-radius: 18px;
+  }
+
+  /*
+   * 窗头收成两行 app bar：标题左、动作右，分类轨独占第二行。
+   * 用 grid 而不是让 flex 自己折行——420 的轨道在 768 上正好能和标题同排，
+   * 结果就是"标签栏跑到了保存右边"，读起来像挂错地方。
+   *
+   * 两行都从 14 起：桌面那套 28 的左内边距在 390 宽上会读成"标题比内容
+   * 缩进了一点"，14px 的错位在手机上足够被眼睛抓到。
+   */
   .settings-window-head {
-    min-height: 56px;
-    padding: 0 12px;
-    gap: 10px;
-    flex-wrap: wrap;
+    display: grid;
+    min-height: 0;
+    padding: 18px 18px 8px;
+    grid-template-areas:
+      "title actions"
+      "nav nav";
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 8px 12px;
   }
 
+  /* 16px 在这一档不是标题，是一行加粗正文；首页页标题是 32，这里给 20。 */
   .settings-window-title {
-    font-size: 16px;
+    grid-area: title;
+    font-size: 20px;
+    font-weight: 680;
+    line-height: 1.3;
   }
 
+  .settings-window-actions {
+    margin-left: 0;
+    grid-area: actions;
+    gap: 10px;
+  }
+
+  .settings-save {
+    min-height: 30px;
+    padding: 0 12px;
+  }
+
+  /*
+   * 分类轨独占第二行：整行四等分，不横向滑动；
+   * 上限 420 是给平板的——768 上拉满会变成四条 190 宽的空轨道。
+   */
   .settings-nav {
-    order: 3;
     width: 100%;
-    margin-bottom: 8px;
+    max-width: 420px;
+    grid-area: nav;
     justify-content: space-between;
   }
 
+  /* 手指比光标粗：每一项给到 34 高，整行都是可点区域。 */
   .settings-nav-item {
+    min-height: 34px;
     padding: 0 8px;
     flex: 1 1 0;
     justify-content: center;
   }
 
   .settings-view {
-    padding: 18px 14px 26px;
+    padding: 18px 18px 24px;
   }
 
-  /* 窄屏改成"标签在上、控件在下"：132px 的标签列会挤掉输入框。 */
-  .settings-row {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 8px;
+  /* 竖向空间比横向贵：章节之间的呼吸从 26/24 收到 20/18。 */
+  .settings-group + .settings-group {
+    margin-top: 20px;
+    padding-top: 18px;
   }
 
   /* 预览折到本组设置的下方：仍是"先改后看"，只是改成上下读。 */
@@ -3111,8 +3174,9 @@ button:disabled {
     grid-column: 2;
   }
 
-  .settings-row.is-top > .settings-row-label {
-    padding-top: 0;
+  /* 缩略图按行宽铺开：固定 148 会在右边留下一条 24px 的死白。 */
+  .settings-wallpaper-grid {
+    grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
   }
 
   .settings-source-workspace {
@@ -3122,23 +3186,110 @@ button:disabled {
   .settings-source-index {
     position: static;
     padding-right: 0;
-    padding-bottom: 14px;
+    padding-bottom: 12px;
     border-right: 0;
     border-bottom: 1px solid var(--hairline);
   }
 
   .settings-source-detail {
-    padding-top: 16px;
+    padding-top: 14px;
     padding-left: 0;
+  }
+
+  .settings-source-detail-head {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .settings-source-fields {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* 说明文字和按钮在窄屏各占一行，按钮不被挤成半个。 */
+  .settings-source-detail-foot {
+    flex-wrap: wrap;
+  }
+
   .settings-foot {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .settings-foot-actions {
+    width: 100%;
+  }
+
+  .settings-foot-actions > * {
+    flex: 1 1 0;
+  }
+}
+
+/*
+ * 手机（≤560）：这一档只剩"一列"，任何并排都在抢宽度。
+ */
+@media (max-width: 560px) {
+  /*
+   * 到这一档才把行拆成上下：132px 的标签列会挤掉输入框，
+   * 而 560 以上（平板竖屏）还有余量，拆开只是让页面更长的滚动。
+   */
+  .settings-row {
+    padding: 8px 0;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  .settings-row.is-top > .settings-row-label {
+    padding-top: 0;
+  }
+
+  /* 控件占满整行：留着半行空白只会显得这里没画完。 */
+  .settings-row-body,
+  .settings-row-body.is-wrap {
+    max-width: none;
+  }
+
+  /* 两个字段并排时各剩 150，中文标签加值已经读不出边界，改成上下。 */
+  .settings-row-body.is-pair {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+
+  /*
+   * 同步状态：名字和数量一行、消息一行，色点跟着两行居中。
+   * 原来是 6/92/1fr/auto 四列，390 宽上消息只剩一百来像素。
+   */
+  .settings-status-row {
+    grid-template-areas:
+      "dot label count"
+      "dot message message";
+    grid-template-columns: 6px minmax(0, 1fr) auto;
+    padding: 10px 0;
+    gap: 2px 10px;
+    align-items: center;
+  }
+
+  .settings-status-dot {
+    grid-area: dot;
+    align-self: start;
+    margin-top: 5px;
+  }
+
+  .settings-status-row strong {
+    grid-area: label;
+  }
+
+  .settings-status-message {
+    grid-area: message;
+    white-space: normal;
+  }
+
+  .settings-status-row small {
+    grid-area: count;
+  }
+
+  /* 背板留 18 时弹窗几乎贴到屏幕边，标题和关闭钮会挤在一起。 */
+  .settings-modal-backdrop {
+    padding: 12px;
   }
 }
 

@@ -134,12 +134,12 @@ function toggle(): void {
   white-space: nowrap;
 }
 .mo-checkbox-copy strong {
-  font-size: 0.55rem;
+  font-size: 0.65rem;
   font-weight: 700;
 }
 .mo-checkbox-copy small {
   color: var(--muted);
-  font-size: 0.48rem;
+  font-size: 0.58rem;
   font-weight: 500;
 }
 .mo-checkbox.is-checked .mo-checkbox-copy strong {
