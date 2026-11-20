@@ -4,8 +4,9 @@ import {
   homeWidgetCategories,
   type HomeWidgetCategoryId,
 } from "../../data/homeWidgetCategories";
-import type { HomeWidget, HomeWidgetType, IconName } from "../../data/types";
+import type { HomeWidget, IconName, LocalConfig, SiteData } from "../../data/types";
 import IconGlyph from "../app/IconGlyph.vue";
+import HomeWidgetDetail from "./HomeWidgetDetail.vue";
 import { homeWidgetComponents } from "./homeWidgetComponents";
 import { homeWidgetPreviewProps } from "../../utils/homeWidgetProps";
 import {
@@ -28,19 +29,28 @@ import {
  * 不加暗色遮罩，玻璃才能采到真实页面；层次靠描边、内凹的预览画布和投影
  * 表达，而不是靠压暗背景。全屏只有一块强调色（当前分类 + 添加按钮），
  * 信息只出现一次——不列已启用数量、不写分类说明、不重复卡片描述与标签。
+ *
+ * 一个组件类型只占一张卡：13 个平台收在「社交卡片」里，3 款游戏收在
+ * 「游戏资料」里。点卡片上的「添加」不是当场落地，而是翻到这一类的
+ * 详情页——在那里看按真实比例放大的本体、切换变体、填字段，再决定带走。
+ * 目录因此只有一层，不会因为变体多就把别的组件挤到第三屏。
  */
 interface Props {
   /** 当前是否打开目录。开关动画由目录自身管理，父组件只切状态。 */
   open: boolean;
   /** 编辑器当前的组件列表，用于判断已添加状态。 */
   widgets: HomeWidget[];
+  /** 首页已读到的数据；预览要让组件画出它在首页的样子，而不是空壳。 */
+  siteData: SiteData;
+  /** 编辑中的配置，预览里的排序等设置项要跟首页一致。 */
+  localConfig?: LocalConfig | null;
 }
 
 const props = defineProps<Props>();
 
 const emit = defineEmits<{
   close: [];
-  add: [type: HomeWidgetType];
+  add: [payload: { key: string; values: Record<string, string> }];
 }>();
 
 /** 左侧导航的一项：只有名称与图标，不携带统计或说明。 */
@@ -57,7 +67,9 @@ const cardWidth = ref(0);
 const mounted = ref(false);
 const gridElement = ref<HTMLElement | null>(null);
 const searchInput = ref<HTMLInputElement | null>(null);
-const justAdded = ref<HomeWidgetType | null>(null);
+/** 正在查看详情的那一类组件；非空时目录翻到详情页。 */
+const detailEntry = ref<WidgetCatalogEntry | null>(null);
+const justAdded = ref<string | null>(null);
 let addedTimer: number | null = null;
 let gridObserver: ResizeObserver | null = null;
 
@@ -86,15 +98,15 @@ const visibleEntries = computed(() => {
 });
 
 /**
- * 每个组件当前的目录状态。
+ * 每张卡当前的目录状态。
  *
- * 卡片按钮的文案、图标和禁用态都读这一份，模板里不再反复计算状态，
- * 多实例组件（跳转按钮）也不会被误判成「已添加」。
+ * 卡片代表一整类组件，所以只有每个变体都已在首页上时才算「已添加」；
+ * 否则保持可点，由添加窗口去标出哪些变体已经加过。
  */
 const cardStatus = computed<Record<string, WidgetCatalogStatus>>(() => {
   const map: Record<string, WidgetCatalogStatus> = {};
   for (const entry of widgetCatalogEntries) {
-    map[entry.definition.type] = catalogStatus(props.widgets, entry.definition);
+    map[entry.key] = catalogStatus(props.widgets, entry);
   }
   return map;
 });
@@ -102,14 +114,20 @@ const cardStatus = computed<Record<string, WidgetCatalogStatus>>(() => {
 /**
  * 生成目录条目的预览属性。
  *
- * 只传空数据与默认设置，让组件渲染自己的默认空态：预览既与实际组件一致，
- * 又不会读取用户数据、不会发起请求。
+ * 走的是首页同一条 `homeWidgetProps` 通路，所以预览里的卡片和落到首页之后
+ * 是同一张：读过数据就画数据，没读过才画空态。聚合卡用第一个变体出镜，
+ * 标题栏会写明这一组有几种，不必把 13 张卡都铺出来。
  *
  * @param entry - 目录条目。
  * @returns 传给具体组件实例的属性对象。
  */
 function previewProps(entry: WidgetCatalogEntry): Record<string, unknown> {
-  return homeWidgetPreviewProps(entry.definition.type);
+  return homeWidgetPreviewProps(
+    entry.definition.type,
+    entry.variants[0],
+    {},
+    { siteData: props.siteData, localConfig: props.localConfig },
+  );
 }
 
 /**
@@ -120,6 +138,29 @@ function previewProps(entry: WidgetCatalogEntry): Record<string, unknown> {
  */
 function previewStyle(entry: WidgetCatalogEntry): Record<string, string> {
   return catalogPreviewStyle(entry, cardWidth.value);
+}
+
+/**
+ * 判断某张卡刚刚是否完成过一次添加（用于播一下确认动画）。
+ *
+ * 卡片代表一整类，所以命中任意一个变体都算这张卡刚被加过。
+ *
+ * @param entry - 目录条目。
+ * @returns 刚刚添加过时返回 true。
+ */
+function justAddedEntry(entry: WidgetCatalogEntry): boolean {
+  const key = justAdded.value;
+  return Boolean(key) && entry.variants.some((variant) => variant.id === key);
+}
+
+/**
+ * 生成添加按钮的无障碍名称：卡片名 + 当前状态。
+ *
+ * @param entry - 目录条目。
+ * @returns 形如「社交卡片：添加」的文案。
+ */
+function addAriaLabel(entry: WidgetCatalogEntry): string {
+  return `${entry.label}：${catalogStatusLabel(cardStatus.value[entry.key])}`;
 }
 
 /**
@@ -144,6 +185,7 @@ function statusIcon(status: WidgetCatalogStatus): IconName {
  * @returns 无返回值；点击当前分类且未搜索时不产生任何变化。
  */
 function selectCategory(id: HomeWidgetCategoryId | "all"): void {
+  detailEntry.value = null;
   if (searching.value) {
     query.value = "";
   } else if (activeCategory.value === id) {
@@ -170,31 +212,59 @@ function measureCardWidth(): void {
 }
 
 /**
- * 请求父组件添加组件，并给卡片一次确认反馈。
+ * 点击「添加」：翻到这一类的详情页。
+ *
+ * 详情页要承担三件事——看预览、切变体、填字段。没有变体也没有字段的
+ * 组件同样进这一页：右列整列不渲染，预览占满，那是"看一眼实物"，
+ * 不是为了一个选项开一扇门。
  *
  * @param entry - 用户点击的目录条目。
  * @returns 无返回值；已添加的组件不会重复加入。
  */
-function handleAdd(entry: WidgetCatalogEntry): void {
-  if (cardStatus.value[entry.definition.type] === "added") return;
-  justAdded.value = entry.definition.type;
+function openAdd(entry: WidgetCatalogEntry): void {
+  if (cardStatus.value[entry.key] === "added") return;
+  detailEntry.value = entry;
+}
+
+/**
+ * 把一次添加交给父组件，并给卡片一次确认反馈。
+ *
+ * @param key - 变体 id。
+ * @param values - 用户补填的字段值。
+ * @returns 无返回值；提交后回到列表，方便接着加下一个。
+ */
+function commit(key: string, values: Record<string, string>): void {
+  justAdded.value = key;
+  detailEntry.value = null;
   if (addedTimer !== null) window.clearTimeout(addedTimer);
   addedTimer = window.setTimeout(() => {
     justAdded.value = null;
     addedTimer = null;
   }, 520);
-  emit("add", entry.definition.type);
+  emit("add", { key, values });
 }
 
 /** 清空搜索与分类筛选，回到「全部」视图。 */
 function resetFilters(): void {
+  detailEntry.value = null;
   query.value = "";
   activeCategory.value = "all";
   searchInput.value?.focus();
 }
 
+/**
+ * Escape 一次退一层：先退回列表，再关目录。
+ *
+ * @param event - 浏览器键盘事件。
+ * @returns 无返回值。
+ */
 function handleKeydown(event: KeyboardEvent): void {
-  if (props.open && event.key === "Escape") emit("close");
+  if (!props.open || event.key !== "Escape") return;
+  if (detailEntry.value) {
+    detailEntry.value = null;
+    return;
+  }
+  emit("close");
 }
 
 /**
@@ -224,6 +294,7 @@ watch(
     // 每次打开都回到「全部 + 空搜索」，避免上次的筛选状态让人以为组件丢失。
     activeCategory.value = "all";
     query.value = "";
+    detailEntry.value = null;
     void nextTick(syncAfterOpen);
   },
 );
@@ -264,7 +335,7 @@ onBeforeUnmount(() => {
         ></button>
 
         <section class="catalog-panel">
-          <header class="catalog-head">
+          <header class="catalog-head" :inert="detailEntry ? '' : undefined">
             <h2 id="catalog-title" class="catalog-title">添加组件</h2>
 
             <label class="catalog-search">
@@ -299,7 +370,7 @@ onBeforeUnmount(() => {
             </button>
           </header>
 
-          <div class="catalog-body">
+          <div class="catalog-body" :inert="detailEntry ? '' : undefined">
             <nav class="catalog-nav" aria-label="组件分类">
               <button
                 v-for="view in categoryViews"
@@ -326,11 +397,11 @@ onBeforeUnmount(() => {
                 <TransitionGroup name="catalog-card" appear>
                   <article
                     v-for="(entry, index) in visibleEntries"
-                    :key="entry.definition.type"
+                    :key="entry.key"
                     class="catalog-card"
                     :class="{
-                      'is-added': cardStatus[entry.definition.type] === 'added',
-                      'is-just-added': justAdded === entry.definition.type,
+                      'is-added': cardStatus[entry.key] === 'added',
+                      'is-just-added': justAddedEntry(entry),
                     }"
                     :style="{ '--card-index': String(Math.min(index, 10)) }"
                   >
@@ -350,21 +421,25 @@ onBeforeUnmount(() => {
 
                     <div class="catalog-card-foot">
                       <div class="catalog-card-copy">
-                        <strong>{{ entry.definition.label }}</strong>
-                        <span>{{ entry.sizeLabel }}</span>
+                        <strong>{{ entry.label }}</strong>
+                        <span class="catalog-card-meta">
+                          {{ entry.sizeLabel
+                          }}<template v-if="entry.variants.length > 1">
+                            · {{ entry.variants.length }} 种</template>
+                        </span>
                       </div>
                       <button
                         type="button"
                         class="catalog-card-add"
-                        :class="`is-${cardStatus[entry.definition.type]}`"
-                        :disabled="cardStatus[entry.definition.type] === 'added'"
-                        :aria-label="`${entry.definition.label}：${catalogStatusLabel(cardStatus[entry.definition.type])}`"
-                        @click="handleAdd(entry)"
+                        :class="`is-${cardStatus[entry.key]}`"
+                        :disabled="cardStatus[entry.key] === 'added'"
+                        :aria-label="addAriaLabel(entry)"
+                        @click="openAdd(entry)"
                       >
                         <IconGlyph
-                          :name="statusIcon(cardStatus[entry.definition.type])"
+                          :name="statusIcon(cardStatus[entry.key])"
                           :size="12"
-                        />{{ catalogStatusLabel(cardStatus[entry.definition.type]) }}
+                        />{{ catalogStatusLabel(cardStatus[entry.key]) }}
                       </button>
                     </div>
                   </article>
@@ -381,6 +456,22 @@ onBeforeUnmount(() => {
               </div>
             </section>
           </div>
+
+          <!--
+            详情页盖在整块面板上：同一扇窗翻到第二页，而不是再叠一个浮层。
+            列表留在底下（inert），从右边推进来，退回去时原路返回。
+          -->
+          <Transition name="catalog-detail">
+            <HomeWidgetDetail
+              v-if="detailEntry"
+              :entry="detailEntry"
+              :widgets="props.widgets"
+              :site-data="props.siteData"
+              :local-config="props.localConfig"
+              @back="detailEntry = null"
+              @add="commit($event.key, $event.values)"
+            />
+          </Transition>
         </section>
       </div>
     </Transition>
@@ -468,6 +559,20 @@ onBeforeUnmount(() => {
 .catalog-dialog.catalog-enter-from .catalog-panel,
 .catalog-dialog.catalog-leave-to .catalog-panel {
   transform: translateY(12px) scale(0.986);
+}
+
+/* 详情页从右边推进来：方向说明"更深一层"，返回时原路退回。 */
+.catalog-detail-enter-active,
+.catalog-detail-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.catalog-detail-enter-from,
+.catalog-detail-leave-to {
+  opacity: 0;
+  transform: translateX(26px);
 }
 
 /* ---- 头部：标题 + 搜索 + 关闭，只有这三个元素 ---- */
@@ -721,6 +826,19 @@ onBeforeUnmount(() => {
   pointer-events: none;
 }
 
+/*
+ * 和首页一样撑满画布。
+ *
+ * 不撑满时卡片按内容自己长高，4×2 的格子只能装 152px，内容 163px 就会被
+ * 裁掉一截；撑满之后缩略图和首页那张卡是同构的——同样的宽高比、同样的
+ * 截断位置，用户看到的就是装上去的那个尺寸。
+ */
+.catalog-card-frame > :first-child {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
 .catalog-card:hover .catalog-card-frame {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.6),
@@ -753,7 +871,8 @@ onBeforeUnmount(() => {
   white-space: nowrap;
 }
 
-.catalog-card-copy span {
+/* 尺寸与「几种」共用一行：数字用等宽字形，切换分类时不会左右跳。 */
+.catalog-card-meta {
   flex: 0 0 auto;
   color: var(--cat-muted);
   font-size: 0.65rem;
@@ -993,7 +1112,9 @@ onBeforeUnmount(() => {
   .catalog-card,
   .catalog-card-frame,
   .catalog-card-add,
-  .catalog-nav-item {
+  .catalog-nav-item,
+  .catalog-detail-enter-active,
+  .catalog-detail-leave-active {
     transition-duration: 0.01ms;
   }
 

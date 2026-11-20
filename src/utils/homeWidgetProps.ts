@@ -1,4 +1,5 @@
 import { createHomeWidget } from "../data/homeWidgets";
+import { normalizeHref, type WidgetVariant } from "../data/widgetVariants";
 import type {
   HomeBangumiStats,
   HomeNeteaseStats,
@@ -128,18 +129,87 @@ function emptyNeteaseStats(): HomeNeteaseStats {
 }
 
 /**
+ * 生成预览用的设置项：变体预设 + 用户正在填的值。
+ *
+ * 只有跳转按钮和游戏资料带设置，其余组件没有可配的东西。
+ *
+ * @param type - 组件类型。
+ * @param variant - 当前变体。
+ * @param values - 用户正在填写的字段值。
+ * @returns 该类型的新组件设置；没有可配项时返回 undefined。
+ */
+function previewSettings(
+  type: HomeWidgetType,
+  variant: WidgetVariant | undefined,
+  values: Record<string, string>,
+): HomeWidget["settings"] | undefined {
+  if (type === "link") {
+    return {
+      link: {
+        ...EMPTY_LINK_SETTINGS,
+        ...variant?.link,
+        // 名称跟着输入走；还没填时先给变体预设的名字，预览别落在空卡上。
+        title: (values.title ?? "").trim() || variant?.link?.title || "链接",
+        // 地址不参与外观，但空地址会让卡片退成"暂无链接"，所以补一个占位。
+        // 画布是 inert 的，点不动，也不会真的跳走。
+        href: normalizeHref(values.href ?? "") || "#",
+      },
+    };
+  }
+  if (type === "game") {
+    return {
+      game: {
+        uid: (values.uid ?? "").trim(),
+        game: variant?.game ?? "hsr",
+        account: null,
+      },
+    };
+  }
+  return undefined;
+}
+
+/**
  * 生成「添加组件」目录预览用的默认 props。
  *
- * 预览展示的是组件未绑定数据、未做设置时的默认样子：数据源一律传空，
- * 设置一律传默认值，组件自然落到自己的空态。这样目录里既能看清组件
- * 的真实版式和配色，又不会读取用户数据、不会发请求、不会起轮播定时器。
+ * 预览的原则是**它就是那张卡**，所以拿到页面数据时走的是同一条
+ * `homeWidgetProps` 通路：首页已经读到的仓库、追番、歌单、友链、个人资料
+ * 原样带进来，卡片因此是"装到首页的样子"，而不是一张空壳。
+ * 从前这里把数据一律置空，结果所有数据型组件都停在空态——预览里看是
+ * 一整块空白毛玻璃，用户以为组件坏了。
+ *
+ * 变体（平台 / 游戏）带进各自的预设，详情页还会把正在填的值一起传进来，
+ * 于是改一个字，画布上的那张卡就变一个字。
  *
  * @param type - 需要预览的组件类型。
- * @returns 只包含空数据与默认值的属性对象。
+ * @param variant - 该卡片对应的变体；省略时按类型默认值渲染。
+ * @param values - 用户正在填写的字段值；省略时按变体预设渲染。
+ * @param context - 页面数据；省略时退回空态（目录脱离页面单独渲染时）。
+ * @returns 传给具体组件实例的属性对象。
  */
 export function homeWidgetPreviewProps(
   type: HomeWidgetType,
+  variant?: WidgetVariant,
+  values: Record<string, string> = {},
+  context?: HomeWidgetPropsContext,
 ): Record<string, unknown> {
+  // 天气靠浏览器定位自取数据，预览只让它画空壳，不发请求。
+  if (type === "weather") return { preview: true };
+
+  const settings = previewSettings(type, variant, values);
+  if (context) {
+    const widget = createHomeWidget(type);
+    if (settings) widget.settings = { ...widget.settings, ...settings };
+    const props = homeWidgetProps(widget, {
+      ...context,
+      editable: false,
+      interactive: false,
+    });
+    // 音乐卡要看到真实封面与曲名，但不能订阅全局播放器——
+    // 否则预览会跟着用户在别处点的歌一起变。
+    if (type === "music") return { ...props, preview: true };
+    return props;
+  }
+
   switch (type) {
     case "feed":
     case "github":
@@ -152,19 +222,15 @@ export function homeWidgetPreviewProps(
       return { friends: [] };
     case "agent":
       return { profile: { name: "", latinName: "", motto: "", avatar: "" } };
-    case "weather":
-      // 天气组件会自己请求数据，预览模式只渲染默认空态。
-      return { preview: true };
     case "game":
-      return { interactive: false };
+      return { settings: settings?.game, interactive: false };
     case "link":
-      return { settings: EMPTY_LINK_SETTINGS };
+      return { settings: settings?.link };
     case "activities":
       return { activities: [] };
     case "bilibili":
       return { videos: [] };
     case "music":
-      // 同样不订阅全局播放器状态，避免把正在播放的歌带进预览。
       return { track: undefined, editable: false, preview: true };
     default:
       return {};

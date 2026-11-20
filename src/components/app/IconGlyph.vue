@@ -3,6 +3,7 @@ import type { Component } from 'vue';
 import {
   Activity,
   CircleAlert,
+  CircleQuestionMark,
   ArrowLeft,
   ArrowRight,
   ArrowUpDown,
@@ -140,6 +141,7 @@ const iconMap: Record<IconName, Component> = {
   github: GitBranch,
   gripVertical: GripVertical,
   headphones: Headphones,
+  help: CircleQuestionMark,
   home: Home,
   imageOff: ImageOff,
   keyboard: Keyboard,

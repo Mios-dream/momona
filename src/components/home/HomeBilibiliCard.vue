@@ -44,9 +44,9 @@ const props = defineProps<Props>();
 .home-bilibili-card {
   display: flex;
   min-height: 148px;
-  padding: 13px;
+  padding: 12px;
   flex-direction: column;
-  gap: 9px;
+  gap: 8px;
   background: linear-gradient(145deg, rgba(255, 237, 246, 0.82), rgba(237, 242, 255, 0.68));
 }
 
@@ -76,24 +76,28 @@ const props = defineProps<Props>();
 .bilibili-video-list {
   display: grid;
   min-height: 0;
-  gap: 6px;
+  gap: 4px;
 }
 
+/*
+ * 两条视频要在 4×2 的格子里站得下：格子 150px，去掉内边距和标题只剩 84px，
+ * 原来按 5px 内边距 + 35px 封面算，第二条会被卡片裁掉半行。
+ */
 .bilibili-video {
   display: grid;
   min-width: 0;
-  padding: 5px;
-  grid-template-columns: 50px minmax(0, 1fr) auto;
+  padding: 4px;
+  grid-template-columns: 46px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 7px;
+  gap: 6px;
   border: 1px solid rgba(255, 255, 255, 0.7);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.5);
 }
 
 .bilibili-video-image {
-  width: 50px;
-  height: 35px;
+  width: 46px;
+  height: 31px;
   border-radius: 6px;
 }
 

@@ -461,6 +461,7 @@ export type IconName =
   | "listOrdered"
   | "listMusic"
   | "headphones"
+  | "help"
   | "mail"
   | "mapPin"
   | "menu"

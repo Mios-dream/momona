@@ -141,6 +141,7 @@ const greeting = computed(() => {
 /** 通知来源图标：与手机通知一样，先识别来源，再通过颜色区分状态。 */
 const categoryIcons: Record<NotificationCategory, IconName> = {
   system: "monitor",
+  home: "layoutGrid",
   weather: "cloud",
   music: "music",
   game: "game",
@@ -163,6 +164,7 @@ const categoryStickerIcons: Partial<Record<NotificationCategory, string>> = {
 
 const categoryLabels: Record<NotificationCategory, string> = {
   system: "系统",
+  home: "首页",
   weather: "天气",
   music: "音乐",
   game: "游戏",

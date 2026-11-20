@@ -19,20 +19,25 @@ import {
 } from "../../data/localConfig";
 import type {
   HomeWidget,
-  HomeWidgetType,
+  HoyoGame,
   LocalConfig,
   SiteData,
   StarRailAccountData,
 } from "../../data/types";
+import { hoyoGameLabels, normalizeHref } from "../../data/widgetVariants";
 import FallbackImage from "../app/FallbackImage.vue";
 import HomeBuildInfo from "../app/HomeBuildInfo.vue";
 import IconGlyph from "../app/IconGlyph.vue";
 import HomeWidgetCatalog from "./HomeWidgetCatalog.vue";
-import HomeWidgetEditor from "./HomeWidgetEditor.vue";
 import { homeWidgetComponents } from "./homeWidgetComponents";
 import { homeWidgetProps } from "../../utils/homeWidgetProps";
 import { findNearestWidgetPosition, widgetStyle } from "../../utils/homeGrid";
-import { catalogEntry } from "../../utils/widgetCatalog";
+import {
+  findCatalogVariant,
+  variantStatus,
+  variantWidget,
+} from "../../utils/widgetCatalog";
+import { showToast } from "../../lib/toast";
 
 interface Props {
   siteData: SiteData;
@@ -53,7 +58,6 @@ const emit = defineEmits<{
 const isEditing = ref(false);
 const isClient = ref(false);
 const widgetCatalogOpen = ref(false);
-const selectedWidgetId = ref<string | null>(null);
 const editorConfig = ref<LocalConfig>(
   cloneLocalConfig(props.localConfig ?? createEmptyLocalConfig()),
 );
@@ -61,11 +65,6 @@ const gridElement = ref<HTMLElement | null>(null);
 const draggingWidgetId = ref<string | null>(null);
 const dragStartPoint = ref<{ x: number; y: number } | null>(null);
 const dragMoved = ref(false);
-const suppressWidgetClick = ref(false);
-let suppressWidgetClickTimer: number | null = null;
-const gameBusy = ref(false);
-const gameError = ref("");
-const editorNotice = ref("");
 const editToolbarContent = ref<HTMLElement | null>(null);
 const editToolbarLeading = ref<HTMLElement | null>(null);
 const editToolbarActions = ref<HTMLElement | null>(null);
@@ -104,23 +103,23 @@ function measureEditToolbar(): void {
   editToolbarWidth.value = Math.ceil(leadingWidth + visibleActionsWidth + 10);
 }
 
-/** 读取当前正在编辑的首页组件。 */
-const selectedWidget = computed(() =>
-  editorConfig.value.widgets.find(
-    (widget) => widget.id === selectedWidgetId.value,
-  ),
-);
-
 /**
- * 返回组件在编辑提示中使用的显示名称。
+ * 返回组件在提示与操作中的显示名称。
+ *
+ * 跳转按钮读自定义标题、游戏资料读游戏名，其余用目录名称——
+ * 详情页取消之后，这是唯一还会念出"这是哪张卡"的地方。
  *
  * @param widget - 需要生成名称的首页组件配置。
- * @returns 链接组件的自定义标题或组件默认标签。
+ * @returns 用于提示的显示名称。
  */
 function widgetDisplayName(widget: HomeWidget): string {
-  return widget.type === "link"
-    ? widget.settings?.link?.title?.trim() || widget.label
-    : widget.label;
+  if (widget.type === "link") {
+    return widget.settings?.link?.title?.trim() || widget.label;
+  }
+  if (widget.type === "game") {
+    return hoyoGameLabels[widget.settings?.game?.game ?? "hsr"];
+  }
+  return widget.label;
 }
 
 /** 根据编辑状态选择配置组件或公开快照中的可见组件。 */
@@ -163,23 +162,20 @@ function widgetProps(widget: HomeWidget): Record<string, unknown> {
  * 规范化编辑配置，并通知应用壳层更新运行时页面数据。
  *
  * @param nextConfig - 编辑器产生的下一份本地配置。
- * @param notice - 需要在编辑器中显示的短提示。
  * @param persist - 是否请求应用壳层持久化配置。
  * @returns 无返回值；事件载荷始终使用深拷贝后的规范化配置。
  */
-function emitConfigChange(
-  nextConfig: LocalConfig,
-  notice = "",
-  persist = false,
-): void {
+function emitConfigChange(nextConfig: LocalConfig, persist = false): void {
   const normalized = normalizeLocalConfig(nextConfig);
   editorConfig.value = normalized;
   emit("config-change", cloneLocalConfig(normalized), persist);
-  if (notice) editorNotice.value = notice;
 }
 
 /**
  * 打开首页编辑器并复制一份可回滚的本地配置。
+ *
+ * 顺带补齐"有 UID 但还没读到账号"的游戏卡：详情页取消之后，读取账号
+ * 这件事只能自动发生，否则用户会看到一张空的游戏卡却无处可点。
  *
  * @returns 无返回值。
  */
@@ -188,75 +184,44 @@ function startEditing(): void {
     props.localConfig ?? createEmptyLocalConfig(),
   );
   isEditing.value = true;
-  editorNotice.value = "";
+  for (const widget of editorConfig.value.widgets) {
+    if (widget.type !== "game") continue;
+    if (!widget.settings?.game?.uid || widget.settings.game.account) continue;
+    void syncGameAccount(widget.id);
+  }
 }
 
 /**
- * 结束首页编辑，将编辑结果持久化并清理选择状态。
+ * 结束首页编辑，将编辑结果持久化并清理拖拽状态。
  *
  * @returns 无返回值；未处于编辑模式时直接结束。
  */
 function stopEditing(): void {
   if (!isEditing.value) return;
-  emitConfigChange(editorConfig.value, "", true);
+  emitConfigChange(editorConfig.value, true);
   isEditing.value = false;
   widgetCatalogOpen.value = false;
-  selectedWidgetId.value = null;
   draggingWidgetId.value = null;
-  editorNotice.value = "";
-}
-
-/**
- * 选中一个首页组件并打开对应设置面板。
- *
- * @param widget - 用户点击的首页组件配置。
- * @returns 无返回值；非编辑模式下忽略点击。
- */
-function openWidgetEditor(widget: HomeWidget): void {
-  if (!isEditing.value) return;
-  selectedWidgetId.value = widget.id;
-  gameError.value = "";
-}
-
-/**
- * 用编辑器返回的组件配置替换当前组件。
- *
- * @param widget - 编辑器返回的最新组件配置。
- * @returns 无返回值；变更通过统一配置事件提交。
- */
-function updateWidget(widget: HomeWidget): void {
-  const next = editorConfig.value.widgets.map((item) =>
-    item.id === widget.id ? widget : item,
-  );
-  emitConfigChange({ ...editorConfig.value, widgets: next });
+  showToast("首页布局已保存", "success", 2600, "home");
 }
 
 /**
  * 从首页布局中移除一个组件。
  *
  * @param widget - 需要移除的首页组件配置。
- * @returns 无返回值；同时清理当前选中状态。
+ * @returns 无返回值。
  */
 function removeWidget(widget: HomeWidget): void {
-  selectedWidgetId.value = null;
-  emitConfigChange(
-    {
-      ...editorConfig.value,
-      widgets: editorConfig.value.widgets.filter(
-        (item) => item.id !== widget.id,
-      ),
-    },
+  emitConfigChange({
+    ...editorConfig.value,
+    widgets: editorConfig.value.widgets.filter((item) => item.id !== widget.id),
+  });
+  showToast(
     `${widgetDisplayName(widget)} 已从首页移除`,
+    "neutral",
+    4000,
+    "home",
   );
-}
-
-/**
- * 移除当前选中的组件。
- *
- * @returns 无返回值；没有选中组件时不执行操作。
- */
-function removeSelectedWidget(): void {
-  if (selectedWidget.value) removeWidget(selectedWidget.value);
 }
 
 /**
@@ -308,16 +273,7 @@ function finishDrag(): void {
   window.removeEventListener("pointerup", finishDrag);
   window.removeEventListener("pointercancel", finishDrag);
   if (!wasMoved) return;
-
-  suppressWidgetClick.value = true;
-  if (suppressWidgetClickTimer !== null) {
-    window.clearTimeout(suppressWidgetClickTimer);
-  }
-  suppressWidgetClickTimer = window.setTimeout(() => {
-    suppressWidgetClick.value = false;
-    suppressWidgetClickTimer = null;
-  }, 450);
-  emitConfigChange(editorConfig.value, "组件位置已吸附");
+  emitConfigChange(editorConfig.value);
 }
 
 /**
@@ -340,104 +296,142 @@ function startDrag(event: PointerEvent, widget: HomeWidget): void {
 }
 
 /**
- * 处理组件表面点击，区分拖拽结束后的误触发。
+ * 把添加窗口选中的变体落到首页网格上。
  *
- * @param event - 组件表面点击事件。
- * @param widget - 被点击的首页组件配置。
- * @returns 无返回值；拖拽后的短暂窗口内会阻止误点击。
- */
-function handleWidgetSurfaceClick(event: MouseEvent, widget: HomeWidget): void {
-  if (suppressWidgetClick.value) {
-    event.preventDefault();
-    event.stopPropagation();
-    suppressWidgetClick.value = false;
-    if (suppressWidgetClickTimer !== null) {
-      window.clearTimeout(suppressWidgetClickTimer);
-      suppressWidgetClickTimer = null;
-    }
-    return;
-  }
-  openWidgetEditor(widget);
-}
-
-/**
- * 新增或重新启用一个首页组件，并为其寻找可用位置。
+ * 目录里一个类型只有一张卡，具体是哪个平台、哪款游戏由添加窗口决定，
+ * 所以这里先按变体找回已有实例：隐藏过的卡走「重新启用」并把新填的内容
+ * 写回去，没有实例就新建一张；两条路径共用同一套网格寻位算法。
  *
- * 单实例组件命中已有配置时只做「重新启用」，多实例组件（例如跳转按钮）
- * 每次都会插入一个新实例；两条路径共用同一套网格寻位算法。
- *
- * @param type - 需要新增或重新启用的组件类型。
+ * @param payload - 添加窗口给出的变体键与用户补填的字段值。
  * @returns 无返回值；组件位置由公共网格工具统一计算。
  */
-function addWidget(type: HomeWidgetType): void {
-  const entry = catalogEntry(type);
-  const current = editorConfig.value.widgets.find(
-    (widget) => widget.type === type,
-  );
-  const reuseCurrent = Boolean(current) && !entry.definition.multi;
-  let nextWidgets = editorConfig.value.widgets.slice();
-  let addedLabel: string;
-
-  if (current && reuseCurrent) {
-    const position = findNearestWidgetPosition(
-      editorConfig.value.widgets,
-      current,
-      current.col,
-      current.row,
-    );
-    const nextWidget = {
-      ...current,
-      visible: true,
-      col: position.col,
-      row: position.row,
-    };
-    addedLabel = widgetDisplayName(nextWidget);
-    nextWidgets = nextWidgets.map((widget) =>
-      widget.id === current.id ? nextWidget : widget,
-    );
-  } else {
-    const widget = createHomeWidget(
-      type,
-      entry.definition.multi ? `${type}-${Date.now()}` : type,
-    );
-    const position = findNearestWidgetPosition(
-      editorConfig.value.widgets,
-      widget,
-      widget.col,
-      widget.row,
-    );
-    nextWidgets.push({
-      ...widget,
-      visible: true,
-      col: position.col,
-      row: position.row,
-    });
-    addedLabel = widgetDisplayName(widget);
+function addWidget(payload: {
+  key: string;
+  values: Record<string, string>;
+}): void {
+  const match = findCatalogVariant(payload.key);
+  if (!match) return;
+  const { entry, variant } = match;
+  if (variantStatus(editorConfig.value.widgets, entry, variant) === "added") {
+    return;
   }
 
-  // 目录保持打开，方便连续挑选多个组件；卡片自身会切到「已添加」状态。
-  emitConfigChange(
-    { ...editorConfig.value, widgets: nextWidgets },
-    `${addedLabel} 已加入首页`,
+  const current = variantWidget(editorConfig.value.widgets, entry, variant);
+  const base: HomeWidget =
+    current ??
+    createHomeWidget(
+      variant.type,
+      entry.definition.multi ? `${variant.id}-${Date.now()}` : variant.id,
+    );
+  const settings = variantSettings(base, payload.key, payload.values);
+  const position = findNearestWidgetPosition(
+    editorConfig.value.widgets,
+    { ...base, settings },
+    current?.col ?? base.col,
+    current?.row ?? base.row,
   );
+  const nextWidget: HomeWidget = {
+    ...base,
+    visible: true,
+    col: position.col,
+    row: position.row,
+    settings,
+  };
+
+  // 目录保持打开，方便连续添加；卡片自身会切到「已添加」状态。
+  emitConfigChange({
+    ...editorConfig.value,
+    widgets: current
+      ? editorConfig.value.widgets.map((widget) =>
+          widget.id === current.id ? nextWidget : widget,
+        )
+      : [...editorConfig.value.widgets, nextWidget],
+  });
+  showToast(
+    `${widgetDisplayName(nextWidget)} 已加入首页`,
+    "success",
+    3200,
+    "home",
+  );
+
+  // 游戏资料的账号数据只能自动读取：加完立刻拉一次，卡片随后自己长出来。
+  if (nextWidget.type === "game") void syncGameAccount(nextWidget.id);
 }
 
 /**
- * 为选中的游戏组件读取 UID 对应的公开账号摘要。
+ * 把变体预设和用户填写的内容合成一份组件设置。
  *
- * @param uid - 游戏账号 UID。
- * @returns 账号请求完成后结束；失败信息写入编辑器状态。
+ * 变体决定平台、图标、色调和游戏；字段决定这一张的具体内容。重新启用
+ * 一张隐藏的卡时以新填的为准，没填的沿用旧值，避免把已有内容抹成默认。
+ *
+ * @param widget - 目标组件骨架（新建或已有实例）。
+ * @param key - 变体 id。
+ * @param values - 用户补填的字段值。
+ * @returns 该组件的设置对象；没有设置的组件返回 undefined。
  */
-async function fetchGameAccount(uid: string): Promise<void> {
-  const widget = selectedWidget.value;
+function variantSettings(
+  widget: HomeWidget,
+  key: string,
+  values: Record<string, string>,
+): HomeWidget["settings"] {
+  const match = findCatalogVariant(key);
+  if (!match) return widget.settings;
+  const { variant } = match;
+
+  if (variant.type === "link" && variant.link) {
+    const previous = widget.settings?.link;
+    const title = (values.title ?? previous?.title ?? variant.link.title).trim();
+    return {
+      link: {
+        title: title || variant.link.title,
+        subtitle: previous?.subtitle ?? "",
+        href: normalizeHref(values.href ?? previous?.href ?? ""),
+        platform: variant.link.platform,
+        icon: variant.link.icon,
+        tone: variant.link.tone,
+        openInNewTab: previous?.openInNewTab ?? true,
+      },
+    };
+  }
+
+  if (variant.type === "game" && variant.game) {
+    const previous = widget.settings?.game;
+    const uid = (values.uid ?? previous?.uid ?? "").trim();
+    return {
+      game: {
+        uid,
+        game: variant.game,
+        // 换了 UID 就别再挂着上一个账号的昵称，等新的读完再显示。
+        account: previous?.uid === uid ? (previous?.account ?? null) : null,
+      },
+    };
+  }
+
+  return widget.settings;
+}
+
+/**
+ * 读取某张游戏卡 UID 对应的公开账号摘要。
+ *
+ * 详情页取消之后，"读账号"没有按钮可点了，所以改由添加成功与进入编辑
+ * 这两处自动触发；失败只发通知，不再阻塞编辑。
+ *
+ * @param widgetId - 需要刷新的游戏组件 id。
+ * @returns 账号请求完成后结束。
+ */
+async function syncGameAccount(widgetId: string): Promise<void> {
+  const widget = editorConfig.value.widgets.find(
+    (item) => item.id === widgetId,
+  );
+  const uid = widget?.settings?.game?.uid?.trim();
+  const game = (widget?.settings?.game?.game ?? "hsr") as HoyoGame;
   if (!widget || widget.type !== "game" || !uid) return;
-  gameBusy.value = true;
-  gameError.value = "";
+
   try {
     const response = await fetch("/__momona/sync-game", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ uid, game: widget.settings?.game?.game ?? "hsr" }),
+      body: JSON.stringify({ uid, game }),
     });
     const payload = (await response.json().catch(() => null)) as {
       account?: StarRailAccountData;
@@ -446,34 +440,29 @@ async function fetchGameAccount(uid: string): Promise<void> {
     if (!response.ok || !payload?.account) {
       throw new Error(payload?.message || "账号数据暂时无法读取");
     }
-    updateWidget({
-      ...widget,
-      settings: {
-        ...widget.settings,
-        game: {
-          ...widget.settings?.game,
-          uid,
-          game: widget.settings?.game?.game ?? "hsr",
-          account: payload.account,
-        },
-      },
-    });
+    const account = payload.account;
+    const nextWidgets = editorConfig.value.widgets.map((item) =>
+      item.id === widgetId
+        ? {
+            ...item,
+            settings: {
+              ...item.settings,
+              game: { ...item.settings?.game, uid, game, account },
+            },
+          }
+        : item,
+    );
+    emitConfigChange({ ...editorConfig.value, widgets: nextWidgets });
+    showToast(`${hoyoGameLabels[game]} 资料已读取`, "success", 3200, "game");
   } catch (error) {
-    gameError.value = String(error instanceof Error ? error.message : error);
-  } finally {
-    gameBusy.value = false;
-  }
-}
-
-/**
- * 响应 Escape 键关闭当前首页组件编辑器。
- *
- * @param event - 浏览器键盘事件。
- * @returns 无返回值；只处理 Escape 键。
- */
-function handleKeydown(event: KeyboardEvent): void {
-  if (event.key === "Escape" && selectedWidgetId.value) {
-    selectedWidgetId.value = null;
+    showToast(
+      `${hoyoGameLabels[game]} 资料暂时读不到：${String(
+        error instanceof Error ? error.message : error,
+      )}`,
+      "error",
+      5000,
+      "game",
+    );
   }
 }
 
@@ -505,19 +494,12 @@ onMounted(() => {
   window.addEventListener("resize", measureEditToolbar);
 });
 
-if (typeof window !== "undefined")
-  window.addEventListener("keydown", handleKeydown);
-
 onBeforeUnmount(() => {
   window.removeEventListener("pointermove", updateDragPosition);
   window.removeEventListener("pointerup", finishDrag);
   window.removeEventListener("pointercancel", finishDrag);
-  window.removeEventListener("keydown", handleKeydown);
   window.removeEventListener("resize", measureEditToolbar);
   editToolbarResizeObserver?.disconnect();
-  if (suppressWidgetClickTimer !== null) {
-    window.clearTimeout(suppressWidgetClickTimer);
-  }
 });
 </script>
 
@@ -591,11 +573,6 @@ onBeforeUnmount(() => {
                   </button>
                 </div>
               </div>
-              <Transition name="home-edit-notice">
-                <small v-if="editorNotice" class="home-edit-notice">{{
-                  editorNotice
-                }}</small>
-              </Transition>
             </div>
           </header>
 
@@ -608,10 +585,7 @@ onBeforeUnmount(() => {
               v-for="(widget, index) in activeWidgets"
               :key="widget.id"
               class="home-slot"
-              :class="{
-                'is-selected': selectedWidgetId === widget.id,
-                'is-dragging': draggingWidgetId === widget.id,
-              }"
+              :class="{ 'is-dragging': draggingWidgetId === widget.id }"
               :data-widget="widget.type"
               :style="widgetStyle(widget, index)"
             >
@@ -619,63 +593,42 @@ onBeforeUnmount(() => {
                 :is="homeWidgetComponents[widget.type]"
                 v-bind="widgetProps(widget)"
               />
+              <!--
+                编辑态只加两样东西：一张盖住整卡的拖拽面（顺带拦住卡片内的
+                链接，免得拖动时跳走），和右上角那一枚移除。卡片名不再显示——
+                自己认得出来的卡不需要再报一遍名字。
+              -->
               <div
                 v-if="isEditing"
-                class="home-widget-editor-surface"
+                class="home-slot-surface"
+                :aria-label="`拖动${widgetDisplayName(widget)}`"
+                @pointerdown="startDrag($event, widget)"
+              ></div>
+              <button
+                v-if="isEditing"
+                class="home-slot-remove"
                 :class="{
                   'is-compact': widget.colSpan === 1 && widget.rowSpan === 1,
                 }"
-                @click="handleWidgetSurfaceClick($event, widget)"
+                type="button"
+                :aria-label="`移除${widgetDisplayName(widget)}`"
+                :title="`移除${widgetDisplayName(widget)}`"
+                @pointerdown.stop
+                @click.stop="removeWidget(widget)"
               >
-                <div class="home-widget-editor-label">
-                  {{ widgetDisplayName(widget) }}
-                </div>
-                <div class="home-widget-editor-actions">
-                  <button
-                    class="home-widget-handle"
-                    type="button"
-                    :aria-label="`拖动${widgetDisplayName(widget)}`"
-                    :title="`拖动${widgetDisplayName(widget)}`"
-                    @pointerdown.stop="startDrag($event, widget)"
-                    @click.stop
-                  >
-                    <IconGlyph name="gripVertical" :size="15" />
-                  </button>
-                </div>
-              </div>
+                <IconGlyph name="x" :size="13" />
+              </button>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <Transition name="home-editor-backdrop">
-      <button
-        v-if="isEditing && selectedWidget"
-        class="home-editor-backdrop"
-        type="button"
-        tabindex="-1"
-        aria-label="关闭组件配置"
-        @click="selectedWidgetId = null"
-      ></button>
-    </Transition>
-
-    <Transition name="home-editor-panel">
-      <HomeWidgetEditor
-        v-if="isEditing && selectedWidget"
-        :widget="selectedWidget"
-        :game-busy="gameBusy"
-        :game-error="gameError"
-        @close="selectedWidgetId = null"
-        @remove="removeSelectedWidget"
-        @update:widget="updateWidget"
-        @fetch-game="fetchGameAccount"
-      />
-    </Transition>
-
     <HomeWidgetCatalog
       :open="isEditing && widgetCatalogOpen"
       :widgets="editorConfig.widgets"
+      :site-data="props.siteData"
+      :local-config="editorConfig"
       @close="widgetCatalogOpen = false"
       @add="addWidget"
     />
@@ -842,14 +795,8 @@ onBeforeUnmount(() => {
   animation-delay: var(--widget-enter-delay, 0ms);
 }
 
-.home-slot.is-selected {
+.home-slot.is-dragging {
   z-index: 4;
-}
-
-.home-slot.is-selected > *:first-child,
-.home-slot.is-dragging > *:first-child {
-  outline: 2px solid color-mix(in srgb, var(--theme) 72%, transparent);
-  outline-offset: 2px;
 }
 
 @keyframes home-widget-enter {
@@ -863,149 +810,124 @@ onBeforeUnmount(() => {
   }
 }
 
-.home-editor-backdrop {
-  position: fixed;
-  z-index: 44;
-  inset: 0;
-  padding: 0;
-  border: 0;
-  outline: 0;
-  background: rgba(42, 45, 74, 0.18);
-  cursor: pointer;
-  backdrop-filter: blur(3px) saturate(110%);
-  -webkit-backdrop-filter: blur(3px) saturate(110%);
-}
-
-.home-editor-backdrop-enter-active,
-.home-editor-backdrop-leave-active {
-  transition: opacity 0.24s ease;
-}
-
-.home-editor-backdrop-enter-from,
-.home-editor-backdrop-leave-to {
-  opacity: 0;
-}
-
-:deep(.home-editor-panel-enter-active),
-:deep(.home-editor-panel-leave-active) {
-  will-change: opacity, transform;
-  transition:
-    opacity 0.24s ease,
-    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-:deep(.home-editor-panel-enter-from),
-:deep(.home-editor-panel-leave-to) {
-  opacity: 0;
-  transform: translate3d(-50%, calc(-50% + 28px), 0) scale(0.985);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .home-slot > .glass-panel,
   .home-slot :deep(.home-friend-card-shell) {
     animation: none;
   }
 
-  .home-editor-backdrop-enter-active,
-  .home-editor-backdrop-leave-active,
-  :deep(.home-editor-panel-enter-active),
-  :deep(.home-editor-panel-leave-active) {
-    transition-duration: 0.01ms;
-  }
-
   .home-edit-toolbar,
-  .home-edit-state,
-  .home-edit-notice-enter-active,
-  .home-edit-notice-leave-active {
+  .home-edit-state {
     transition-duration: 0.01ms;
   }
 }
 
-.home-widget-editor-surface {
+/*
+ * 拖拽面：整张卡就是把手，所以没有可见手柄——它是一层透明的抓取层，
+ * 顺带拦住卡片内部的链接，免得拖动时把页面带走。
+ */
+.home-slot-surface {
   position: absolute;
   z-index: 5;
   inset: 4px;
-  display: flex;
-  padding: 7px;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 6px;
-  border: 1px dashed color-mix(in srgb, var(--theme-strong) 52%, transparent);
-  border-radius: 10px;
-  color: var(--theme-strong);
-  background: rgba(255, 255, 255, 0.1);
-  cursor: pointer;
-  transition:
-    border-color 0.18s ease,
-    background 0.18s ease;
-}
-
-.home-widget-editor-surface:hover {
-  border-color: color-mix(in srgb, var(--theme-strong) 85%, transparent);
-  background: rgba(255, 255, 255, 0.18);
-}
-
-.home-widget-editor-surface.is-compact {
-  padding: 3px;
-  align-items: flex-start;
-  justify-content: flex-end;
-}
-
-.home-widget-editor-surface.is-compact .home-widget-editor-label {
-  display: none;
-}
-
-.home-widget-editor-surface.is-compact .home-widget-editor-actions {
-  justify-content: flex-end;
-}
-
-.home-widget-editor-label {
-  max-width: calc(100% - 72px);
-  overflow: hidden;
-  padding: 3px 6px;
-  border-radius: 6px;
-  color: var(--theme-strong);
-  background: rgba(255, 255, 255, 0.83);
-  font-size: 0.52rem;
-  font-weight: 780;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.home-widget-editor-actions {
-  display: inline-flex;
-  flex: 0 0 auto;
-  gap: 4px;
-}
-
-.home-widget-handle {
-  display: grid;
-  width: 25px;
-  height: 25px;
-  padding: 0;
-  place-items: center;
-  border: 1px solid rgba(255, 255, 255, 0.86);
-  border-radius: 7px;
-  color: var(--theme-strong);
-  background: rgba(255, 255, 255, 0.86);
-  box-shadow: 0 5px 12px rgba(54, 45, 106, 0.1);
-}
-
-.home-widget-editor-surface.is-compact .home-widget-handle {
-  width: 22px;
-  height: 22px;
-}
-
-.home-widget-handle {
+  border-radius: 14px;
   cursor: grab;
+  touch-action: none;
 }
 
-.home-widget-handle:active {
+.home-slot.is-dragging .home-slot-surface {
   cursor: grabbing;
 }
 
-.home-widget-handle:hover {
-  background: #fff;
+/*
+ * "可拖"用卡片自身的外描边表达，而不是在卡上再画一圈：outline 会跟着
+ * 卡片自己的圆角走，13px 的小方卡和 20px 的横卡都不会出现"框和卡打架"。
+ */
+.home-page.is-editing .home-slot > *:first-child {
+  outline: 1px dashed color-mix(in srgb, var(--theme-strong) 32%, transparent);
+  outline-offset: 3px;
+}
+
+.home-page.is-editing .home-slot:hover > *:first-child {
+  outline: 1px solid color-mix(in srgb, var(--theme) 58%, transparent);
+}
+
+.home-page.is-editing .home-slot.is-dragging > *:first-child {
+  outline: 2px solid color-mix(in srgb, var(--theme) 78%, transparent);
+}
+
+/*
+ * 移除：hover 才浮出来的一枚小圆片，压在卡片右上角。
+ * 触屏没有 hover，`(hover: none)` 下常驻显示，否则根本没法删。
+ */
+/*
+ * 移除：编辑态里唯一的实色圆片。底色直接用主题色、图标反白，
+ * 在任何一张卡（浅色、深色、图片）上都读得出来；白色描边是它和卡片之间
+ * 那道缝，投影则说明它浮在卡上而不是卡的一部分。
+ */
+.home-slot-remove {
+  position: absolute;
+  z-index: 6;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.92);
+  border-radius: 50%;
+  color: var(--theme-on);
+  background: var(--theme);
+  box-shadow:
+    0 1px 2px rgba(31, 25, 64, 0.22),
+    0 5px 14px color-mix(in srgb, var(--theme) 42%, transparent);
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.9);
+  transition:
+    opacity 0.16s ease,
+    transform 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.home-slot:hover .home-slot-remove,
+.home-slot-remove:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.home-slot-remove:hover {
+  background: var(--theme-hover);
+  box-shadow:
+    0 1px 2px rgba(31, 25, 64, 0.24),
+    0 7px 18px color-mix(in srgb, var(--theme) 52%, transparent);
+}
+
+.home-slot-remove:active {
+  background: var(--theme-active);
+  transform: scale(0.94);
+}
+
+/* 1×1 的小方卡只有 70 上下，24 的圆片会盖掉右上角一大块，缩一档。 */
+.home-slot-remove.is-compact {
+  top: 5px;
+  right: 5px;
+  width: 20px;
+  height: 20px;
+}
+
+.home-slot-remove:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--theme) 60%, transparent);
+  outline-offset: 2px;
+}
+
+@media (hover: none) {
+  .home-slot-remove {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /**
@@ -1172,38 +1094,6 @@ onBeforeUnmount(() => {
   transform: scale(0.97);
 }
 
-.home-edit-notice {
-  position: absolute;
-  top: calc(100% + 8px);
-  right: 0;
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  border-radius: 10px;
-  /* 提示条浮在壁纸上，所以是白光 + 微浮投影，不是纸上的墨线。 */
-  color: color-mix(in srgb, var(--green) 76%, #10241c);
-  background: rgba(250, 255, 252, 0.94);
-  box-shadow:
-    0 0 0 1px rgba(52, 42, 96, 0.04),
-    0 12px 32px rgba(54, 45, 106, 0.14);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.home-edit-notice-enter-active,
-.home-edit-notice-leave-active {
-  will-change: opacity, transform;
-  transition:
-    opacity 0.16s ease,
-    transform 0.2s ease;
-}
-
-.home-edit-notice-enter-from,
-.home-edit-notice-leave-to {
-  opacity: 0;
-  transform: translateY(-4px) scale(0.98);
-}
-
 .home-masthead,
 .home-heading,
 .home-kicker,
@@ -1318,13 +1208,13 @@ onBeforeUnmount(() => {
     padding: 0;
   }
 
-  .home-widget-editor-surface {
+  .home-slot-surface {
     inset: 0;
   }
 
-  :deep(.home-editor-panel-enter-from),
-  :deep(.home-editor-panel-leave-to) {
-    transform: translate3d(-50%, calc(-50% + 24px), 0) scale(0.985);
+  .home-slot-remove {
+    top: 6px;
+    right: 6px;
   }
 
   .home-edit-toolbar {

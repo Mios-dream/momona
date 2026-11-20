@@ -5,6 +5,7 @@ export type ToastTone = "success" | "error" | "neutral";
 /** 通知来源，类似手机通知中的 App 类别。 */
 export type NotificationCategory =
   | "system"
+  | "home"
   | "weather"
   | "music"
   | "game"

@@ -154,6 +154,8 @@ export const homeWidgetDefinitions: HomeWidgetDefinition[] = [
       icon: "game",
       tags: ["绑定 UID"],
       settingsKind: "game",
+      // 一款游戏一张卡：原神和星穹铁道可以同时挂在首页上。
+      multi: true,
       defaultVisible: true,
     },
   ),

@@ -8,6 +8,10 @@ interface Props {
   ariaLabel?: string;
   /** 输入类型，仅覆盖设置页用到的几种。 */
   type?: "text" | "url" | "password" | "number";
+  /** 移动端键盘类型；用 text 配 numeric 可以拿到数字键盘又不带加减按钮。 */
+  inputMode?: "text" | "url" | "numeric";
+  /** 最大字符数；不传表示不限制。 */
+  maxLength?: number;
   /** 占位文案。 */
   placeholder?: string;
   /** 是否渲染为多行文本域。 */
@@ -28,6 +32,8 @@ const props = withDefaults(defineProps<Props>(), {
   label: "",
   ariaLabel: undefined,
   type: "text",
+  inputMode: undefined,
+  maxLength: undefined,
   placeholder: "",
   multiline: false,
   rows: 3,
@@ -76,6 +82,8 @@ function handleInput(event: Event): void {
       class="mo-field-control"
       :value="props.modelValue"
       :type="props.type"
+      :inputmode="props.inputMode"
+      :maxlength="props.maxLength"
       :aria-label="props.ariaLabel"
       :placeholder="props.placeholder"
       :min="props.min"

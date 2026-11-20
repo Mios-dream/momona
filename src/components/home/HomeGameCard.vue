@@ -609,6 +609,9 @@ function selectCharacter(index: number): void {
 .game-empty {
   position: relative;
   display: flex;
+  /* 空态要占满详情列：只给 min-height 的话，卡被撑高时文字浮在上半截，
+     下半截留一块空玻璃，看着像挂了个空盒子。 */
+  flex: 1;
   min-height: 70px;
   align-items: center;
   justify-content: center;
